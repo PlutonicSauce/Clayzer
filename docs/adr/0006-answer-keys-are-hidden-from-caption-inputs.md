@@ -1,0 +1,3 @@
+# Answer Keys are hidden from caption inputs
+
+No tool or data source the caption Harness can use may read an Answer Key (USGS USPVDB / USWTDB, Global Renewables Watch, OpenStreetMap) for the region being scored, because grounding grades Captions against those same Reference Labels: a Harness that could look them up would score well by copying, not by seeing. "Verify, then write" therefore checks Claims with independent sources (detectors, segmenters, embedding search), and the development/test region split keeps any Answer Key used while tuning out of the test region. Adding a convenient lookup tool, such as an OSM query, to the caption Harness would silently break this.
