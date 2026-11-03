@@ -1,0 +1,725 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clayzer caption flow: a walkthrough</title>
+<!--
+  Prototype for the team: one Case travels through the caption flow in
+  docs/caption-plan.md. Everything is synthetic and runs in the browser:
+  the Chips are drawn SVGs, the "VLM" and "Judge" are scripted, and the
+  grounding and retrieval scores are computed live from the Case and
+  Caption formats in caption-plan.md section 5. Nothing here calls a
+  model or reads NAIP, USGS, LGND, or RSICD.
+-->
+<style>
+  :root {
+    --ink: #252323;
+    --muted: #6b6461;
+    --paper: #fffdfb;
+    --line: #e4dbd6;
+    --data: #efe8e3;      --data-line: #cebeb5;
+    --captions: #f4dcd4;  --captions-line: #e8beb2;
+    --evaluation: #dfe9df; --evaluation-line: #c9d7c9;
+    --platform: #dde7e9;  --platform-line: #c9d6d8;
+    --decision: #9a4a35;
+    --hidden: #a1352b;
+    --ok: #2f6b3a;
+    --warn: #8a5b0e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  header { padding: 20px 28px 8px; }
+  h1 { margin: 0; font-size: 22px; }
+  .sub { color: var(--muted); margin: 4px 0 0; }
+  code, pre, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+
+  /* Flow ribbon */
+  nav.flow { display: flex; gap: 6px; padding: 12px 28px; flex-wrap: wrap; }
+  nav.flow button {
+    flex: 1 1 140px; text-align: left; border: 1px solid; border-radius: 8px;
+    padding: 8px 10px; cursor: pointer; font: inherit; color: var(--ink);
+    position: relative; min-height: 56px;
+  }
+  nav.flow button small { display: block; color: var(--muted); font-size: 11.5px; }
+  nav.flow button[aria-current="step"] { outline: 2px solid var(--ink); outline-offset: 1px; }
+  .area-data { background: var(--data); border-color: var(--data-line); }
+  .area-captions { background: var(--captions); border-color: var(--captions-line); }
+  .area-evaluation { background: var(--evaluation); border-color: var(--evaluation-line); }
+  .area-platform { background: var(--platform); border-color: var(--platform-line); }
+  .area-decision { background: var(--paper); border-color: var(--decision); }
+
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 20px; padding: 8px 28px 40px; }
+  @media (max-width: 1000px) { .layout { grid-template-columns: 1fr; } }
+
+  .bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+  .bar label { color: var(--muted); }
+  select, input[type=range] { font: inherit; }
+
+  .stage { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 20px; }
+  @media (max-width: 760px) { .stage { grid-template-columns: 1fr; } }
+  .chip-wrap { position: relative; }
+  .chip-wrap svg { width: 100%; height: auto; border-radius: 6px; border: 1px solid var(--line); display: block; }
+  .chip-caption { color: var(--muted); font-size: 12.5px; margin-top: 6px; }
+
+  h2 { font-size: 18px; margin: 0 0 4px; }
+  h3 { font-size: 14px; margin: 16px 0 6px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  p { margin: 6px 0; }
+  pre { background: #faf6f3; border: 1px solid var(--line); border-radius: 6px; padding: 10px; overflow-x: auto; margin: 6px 0; }
+  .hidden-box { border: 1.5px dashed var(--hidden); border-radius: 6px; padding: 8px 10px; margin: 8px 0; }
+  .hidden-box .tag { color: var(--hidden); font-weight: 600; font-size: 12.5px; }
+  .leak { background: #fbe9e6; }
+
+  table { border-collapse: collapse; width: 100%; margin: 6px 0; }
+  th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12.5px; color: var(--muted); font-weight: 600; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+  .badge { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 12px; border: 1px solid; white-space: nowrap; }
+  .b-ok { color: var(--ok); border-color: #b9d3bd; background: #eef6ef; }
+  .b-bad { color: var(--hidden); border-color: #e6b8b1; background: #fbefed; }
+  .b-warn { color: var(--warn); border-color: #e3cfa8; background: #fbf4e6; }
+  .b-na { color: var(--muted); border-color: var(--line); background: #f7f3f1; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 8px; }
+  .card { border: 1px solid var(--evaluation-line); background: var(--evaluation); border-radius: 8px; padding: 10px 12px; }
+  .card .big { font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .card ul { margin: 4px 0; padding-left: 18px; }
+
+  .banner { border-radius: 8px; padding: 10px 12px; margin: 0 0 12px; border: 1px solid; }
+  .banner.bad { border-color: #e6b8b1; background: #fbefed; color: #6e231c; }
+  .banner.warn { border-color: #e3cfa8; background: #fbf4e6; color: #5a3c09; }
+
+  aside.panel { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; align-self: start; position: sticky; top: 12px; }
+  aside.panel h3 { margin-top: 0; }
+  aside.panel label { display: flex; gap: 8px; align-items: flex-start; margin: 8px 0; cursor: pointer; }
+  aside.panel label small { display: block; color: var(--muted); }
+  .term { border-bottom: 1px dotted var(--muted); cursor: help; }
+
+  .navbtns { display: flex; justify-content: space-between; margin-top: 18px; }
+  .navbtns button, .btn { font: inherit; padding: 6px 14px; border-radius: 6px; border: 1px solid var(--line); background: #fff; cursor: pointer; }
+  .verdict { font-size: 20px; font-weight: 650; padding: 10px 14px; border-radius: 8px; display: inline-block; margin: 6px 0; }
+  .verdict.keep { background: #eef6ef; color: var(--ok); border: 1px solid #b9d3bd; }
+  .verdict.reject { background: #fbefed; color: var(--hidden); border: 1px solid #e6b8b1; }
+  .locked { border: 1.5px dashed var(--muted); border-radius: 8px; padding: 10px 12px; margin-top: 14px; color: var(--muted); }
+  details { margin-top: 12px; }
+  summary { cursor: pointer; color: var(--muted); }
+  .rank-me { background: var(--captions); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Caption flow, step by step</h1>
+  <p class="sub">One <span class="term" data-t="Case">Case</span> travels from public data to the regression gate.
+    Synthetic data, scripted models, real scoring logic. Hover a dotted term for its glossary definition.</p>
+</header>
+
+<nav class="flow" id="flow" aria-label="Flow steps"></nav>
+
+<div class="layout">
+  <main>
+    <div class="bar" id="casebar">
+      <label for="casepick">Case</label>
+      <select id="casepick"></select>
+      <span class="mono" id="caseid"></span>
+    </div>
+    <div id="banners"></div>
+    <div id="step"></div>
+    <div class="navbtns">
+      <button id="prev" type="button">← Back</button>
+      <button id="next" type="button">Next →</button>
+    </div>
+  </main>
+
+  <aside class="panel" aria-label="Try breaking it">
+    <h3>Try breaking it</h3>
+    <label><input type="checkbox" id="t-verify" checked>
+      <span>Verify, then write<small>Off: every drafted Claim goes straight into the Caption.</small></span></label>
+    <label><input type="checkbox" id="t-peek">
+      <span>Let the Harness read the Answer Key<small>Breaks ADR-0006. Watch grounding.</small></span></label>
+    <label><input type="checkbox" id="t-free">
+      <span>Free-text positions<small>Breaks ADR-0007: no 3×3 grid cell.</small></span></label>
+    <label><input type="checkbox" id="t-grid" checked>
+      <span>Show the 3×3 grid on the Chip</span></label>
+    <h3 style="margin-top:16px">Legend</h3>
+    <p><span class="badge area-data">Data and Cases</span>
+       <span class="badge area-captions">Captioning</span>
+       <span class="badge area-evaluation">Evaluation</span>
+       <span class="badge area-platform">Sandbox integration</span>
+       <span class="badge area-decision">Decision</span></p>
+    <p style="color:var(--muted);font-size:12.5px">Colours match the diagrams in <code>docs/caption-plan.md</code>.</p>
+  </aside>
+</div>
+
+<script>
+/* ───────────── Vocabulary (from GLOSSARY.md) ───────────── */
+const TERMS = {
+  Case: "One concrete prompt within a Task, together with the expectations a good result must meet.",
+  Chip: "A fixed-size image tile of one place on one date: the unit a Caption describes.",
+  Harness: "The whole system under test: the model, its instructions, its tool wiring, and whatever framework drives it.",
+  Caption: "The generated description of a Chip or Chip Pair: free text together with the Claims it makes.",
+  Claim: "One checkable statement inside a Caption, such as an object, its count, its position, or its relation to another object.",
+  "Reference Label": "A known fact about a Chip, taken from an Answer Key, that a Caption is graded against.",
+  "Answer Key": "The dataset Reference Labels come from.",
+  Trace: "The complete, ordered record of one Run, holding everything needed to judge it later without running it again.",
+  Run: "One execution of a Harness on a Case.",
+  Judge: "The model that grades a Run's final answer against a Rubric, using the Trace as its evidence.",
+  Batch: "A set of Runs, several per Case, made under one fixed configuration.",
+  Repeat: "One of the several Runs of the same Case within a Batch.",
+  Spread: "How much a Case's scores vary across the Repeats in a Batch.",
+  Baseline: "The accepted Batch that later changes are measured against.",
+  "Unsupported Claim": "A specific claim in an answer that appears in no tool output in the Trace.",
+  Gate: "A Rubric criterion whose score caps the Output Score, so failing it can't be outweighed by doing well on the others.",
+};
+function term(word, shown) {
+  return `<span class="term" data-t="${word}">${shown || word}</span>`;
+}
+
+/* ───────────── Formats (caption-plan.md §5, ADR-0007) ───────────── */
+const GRID = ["north_west", "north", "north_east", "west", "centre", "east", "south_west", "south", "south_east"];
+const FREE_TEXT = {
+  north_west: "top left corner", north: "along the top", north_east: "upper right",
+  west: "left side", centre: "in the middle", east: "right-hand side",
+  south_west: "bottom left", south: "near the bottom", south_east: "lower right",
+};
+// Only these classes are in the Answer Key (USGS solar + wind), so only
+// they can be graded. Roads, buildings, fields need OSM, not yet wired.
+const KEYED = new Set(["solar_array", "wind_turbine"]);
+
+/* ───────────── Synthetic Cases ───────────── */
+// `truth` is what is really in the picture (used only by the scripted Judge);
+// `reference_labels` is what the Answer Key knows (used only by grounding).
+const CASES = [
+  {
+    key: "solar",
+    title: "Solar array, Mojave (dev region)",
+    case: {
+      id: "fixed-dev-uspvdb-58123", task: "caption", kind: "fixed", region: "dev",
+      chips: [{ id: "ca-uspvdb-58123-20220618", uri: "s3://<bucket>/chips/ca-uspvdb-58123-20220618.png",
+        date: "2022-06-18", bbox: [-118.033, 35.184, -118.027, 35.190], source: "naip-pc" }],
+      reference_labels: [{ object: "solar_array", count: 1, position: "centre", source: "uspvdb", source_id: "58123" }],
+    },
+    truth: { solar_array: 1, road: 1, building: 1, bare_ground: 1 },
+    drafts: [
+      { id: "o1", object: "solar_array", count: 1, position: "centre",
+        verify: { tool: "panel detector", result: "confirmed", note: "1 array, 0.94 confidence" } },
+      { id: "o2", object: "road", count: 1, position: "north",
+        verify: { tool: "road segmenter", result: "confirmed", note: "linear paved surface along top edge" } },
+      { id: "o3", object: "wind_turbine", count: 2, position: "north_east", repeats: [true, false, true],
+        verify: { tool: "turbine detector", result: "rejected", note: "0 turbines found; likely shadows of poles" } },
+      { id: "o4", object: "building", count: 1, position: "south_east",
+        verify: { tool: "building segmenter", result: "uncertain", note: "small structure, 0.41 confidence",
+          uncertain: "whether the structure in the south-east is a substation" } },
+    ],
+    relations: [{ subject: "o2", relation: "north_of", object: "o1" }],
+    text: {
+      raw: "A large solar array fills the centre of the image, with a road along its north side, two wind turbines to the north-east, and a building in the south-east.",
+      verified: "A large solar array fills the centre of the image, with a paved road running along its north side and open desert to the south.",
+    },
+  },
+  {
+    key: "wind",
+    title: "Wind turbines, Tehachapi (dev region)",
+    case: {
+      id: "fixed-dev-uswtdb-3044127", task: "caption", kind: "fixed", region: "dev",
+      chips: [{ id: "ca-uswtdb-3044127-20220703", uri: "s3://<bucket>/chips/ca-uswtdb-3044127-20220703.png",
+        date: "2022-07-03", bbox: [-118.351, 35.051, -118.345, 35.057], source: "naip-pc" }],
+      reference_labels: [{ object: "wind_turbine", count: 3, position: "east", source: "uswtdb", source_id: "3044127" }],
+    },
+    truth: { wind_turbine: 3, road: 1, vegetation: 1 },
+    drafts: [
+      { id: "o1", object: "wind_turbine", count: 4, position: "east", repeatCounts: [4, 5, 4],
+        verify: { tool: "turbine detector", result: "corrected", correctedCount: 3, note: "detector finds 3; count corrected" } },
+      { id: "o2", object: "road", count: 1, position: "west",
+        verify: { tool: "road segmenter", result: "confirmed", note: "unpaved access road" } },
+      { id: "o3", object: "vegetation", count: 1, position: "centre",
+        verify: { tool: "land-cover embedding search", result: "confirmed", note: "nearest cells: scrubland" } },
+    ],
+    relations: [{ subject: "o2", relation: "west_of", object: "o1" }],
+    text: {
+      raw: "Four wind turbines stand in a line on the east side of scrubland, served by a dirt road to the west.",
+      verified: "Three wind turbines stand in a line on the east side of scrubland, served by a dirt road to the west.",
+    },
+  },
+  {
+    key: "neg",
+    title: "Greenhouses, a look-alike negative (dev region)",
+    case: {
+      id: "fixed-dev-neg-07", task: "caption", kind: "fixed", region: "dev",
+      chips: [{ id: "ca-neg-07-20220618", uri: "s3://<bucket>/chips/ca-neg-07-20220618.png",
+        date: "2022-06-18", bbox: [-117.402, 34.091, -117.396, 34.097], source: "naip-pc" }],
+      reference_labels: [],
+    },
+    truth: { greenhouse: 1, field: 2, road: 1 },
+    drafts: [
+      { id: "o1", object: "solar_array", count: 1, position: "centre", repeats: [true, true, false],
+        verify: { tool: "land-cover embedding search", result: "rejected",
+          note: "nearest cells are greenhouse clusters, not solar",
+          uncertain: "whether the bright rows in the centre are solar panels or greenhouses" } },
+      { id: "o2", object: "field", count: 2, position: "west",
+        verify: { tool: "land-cover embedding search", result: "confirmed", note: "irrigated cropland" } },
+      { id: "o3", object: "road", count: 1, position: "south",
+        verify: { tool: "road segmenter", result: "confirmed", note: "two-lane road along bottom edge" } },
+    ],
+    relations: [{ subject: "o3", relation: "south_of", object: "o1" }],
+    text: {
+      raw: "A solar array sits in the centre between green fields, with a road along the south edge.",
+      verified: "Long bright rows of low structures sit in the centre between green fields, with a road along the south edge.",
+    },
+  },
+];
+const GENERIC_TEXT = "An aerial view of a rural area with some structures.";
+const DISTRACTORS = [
+  "A residential neighbourhood with houses, gardens and a small park.",
+  "A river winding through farmland with scattered trees.",
+  "A large parking lot next to a shopping centre.",
+  "Rows of greenhouses beside irrigated fields.",
+];
+
+/* ───────────── The Harness (scripted stand-in for Nova Pro) ───────────── */
+// opts: { verify, peek, freeText, prompt: 'v1'|'v2'|'v3', repeat }
+function harnessCaption(c, opts) {
+  const r = opts.repeat ?? 0;
+  let objects, uncertain = [], text;
+  if (opts.peek) {
+    // ADR-0006 violation: copy the Answer Key straight into the Claims.
+    objects = c.case.reference_labels.map((l, i) => ({ id: `o${i + 1}`, object: l.object, count: l.count, position: l.position }));
+    text = objects.length
+      ? objects.map((o) => `${o.count} ${o.object.replace("_", " ")}${o.count > 1 ? "s" : ""} in the ${o.position.replace("_", "-")}`).join("; ") + "."
+      : "No solar arrays or wind turbines.";
+  } else {
+    const present = c.drafts.filter((d) => !d.repeats || d.repeats[r % d.repeats.length]);
+    const drafted = present.map((d) => ({ ...d, count: d.repeatCounts ? d.repeatCounts[r % d.repeatCounts.length] : d.count }));
+    if (opts.verify) {
+      objects = [];
+      for (const d of drafted) {
+        if (d.verify.result === "confirmed") objects.push(d);
+        else if (d.verify.result === "corrected") objects.push({ ...d, count: d.verify.correctedCount });
+        else if (d.verify.uncertain) uncertain.push(d.verify.uncertain);
+      }
+    } else {
+      objects = drafted;
+    }
+    objects = objects.map(({ id, object, count, position }) => ({ id, object, count, position }));
+    text = opts.verify ? c.text.verified : c.text.raw;
+  }
+  if (opts.prompt === "v3") text = GENERIC_TEXT;
+  if (opts.freeText) objects = objects.map((o) => ({ ...o, position: FREE_TEXT[o.position] || o.position }));
+  const ids = new Set(objects.map((o) => o.id));
+  const relations = opts.peek ? [] : c.relations.filter((x) => ids.has(x.subject) && ids.has(x.object));
+  return { case_id: c.case.id, text, objects, relations, uncertain };
+}
+
+/* ───────────── Grounding (deterministic, Claims vs Reference Labels) ───────────── */
+function cellDistance(a, b) {
+  const ia = GRID.indexOf(a), ib = GRID.indexOf(b);
+  return Math.max(Math.abs((ia % 3) - (ib % 3)), Math.abs(Math.floor(ia / 3) - Math.floor(ib / 3)));
+}
+function mean(xs) {
+  const v = xs.filter((x) => x !== null && x !== undefined);
+  return v.length ? v.reduce((s, x) => s + x, 0) / v.length : null;
+}
+function grounding(caption, c) {
+  const refs = c.case.reference_labels;
+  const claims = caption.objects.filter((o) => KEYED.has(o.object));
+  const unkeyed = caption.objects.filter((o) => !KEYED.has(o.object));
+  const rows = [];
+  let tp = 0;
+  const counts = [], positions = [];
+  let uncheckablePos = false;
+  for (const cl of claims) {
+    const ref = refs.find((r) => r.object === cl.object);
+    if (!ref) { rows.push({ claim: cl, verdict: "false positive" }); continue; }
+    tp += 1;
+    const rel = Math.abs(cl.count - ref.count) / ref.count;
+    const countScore = cl.count === ref.count ? 1 : rel <= 0.34 ? 0.5 : 0;
+    counts.push(countScore);
+    let posScore = null;
+    if (!GRID.includes(cl.position)) uncheckablePos = true;
+    else { const d = cellDistance(cl.position, ref.position); posScore = d === 0 ? 1 : d === 1 ? 0.5 : 0; positions.push(posScore); }
+    rows.push({ claim: cl, ref, verdict: "matched", countScore, posScore });
+  }
+  const missed = refs.filter((r) => !claims.some((cl) => cl.object === r.object));
+  const precision = claims.length ? tp / claims.length : refs.length ? 0 : 1;
+  const recall = refs.length ? (refs.length - missed.length) / refs.length : null;
+  const count = mean(counts);
+  const position = uncheckablePos ? null : mean(positions);
+  return {
+    precision, recall, count, position, uncheckablePos, rows, missed, unkeyed,
+    score: mean([precision, recall, count, position]),
+  };
+}
+
+/* ───────────── Fidelity (scripted stand-in for the Opus 5.5 Judge) ───────────── */
+// Land cover the Judge doesn't expect every Caption to name.
+const BACKGROUND = new Set(["bare_ground", "vegetation", "field"]);
+function fidelity(caption, c) {
+  let s = 1;
+  const notes = [];
+  for (const o of caption.objects) {
+    if (!(o.object in c.truth)) { s -= 0.35; notes.push(`mentions ${o.object.replace("_", " ")}, which isn't in the image`); }
+    else if (c.truth[o.object] > 1 && o.count !== c.truth[o.object]) { s -= 0.1; notes.push(`count of ${o.object.replace("_", " ")} is off`); }
+  }
+  const named = new Set(caption.objects.map((o) => o.object));
+  for (const t of Object.keys(c.truth)) {
+    if (!named.has(t) && !BACKGROUND.has(t)) { s -= 0.05; notes.push(`leaves out the ${t.replace("_", " ")}`); }
+  }
+  if (caption.text === GENERIC_TEXT) { s -= 0.45; notes.push("text is generic; names nothing specific"); }
+  if (!notes.length) notes.push("caption matches the image");
+  return { score: Math.max(0, Math.round(s * 100) / 100), notes };
+}
+
+/* ───────────── Retrieval (bag-of-concepts stand-in for a text embedding model) ───────────── */
+const CONCEPTS = {
+  solar: ["solar", "panel", "panels", "photovoltaic", "pv", "array", "arrays"],
+  wind: ["wind", "turbine", "turbines"],
+  greenhouse: ["greenhouse", "greenhouses"],
+  road: ["road", "roads", "highway"],
+  field: ["field", "fields", "farmland", "cropland"],
+  house: ["house", "houses", "residential", "neighbourhood"],
+  water: ["river", "lake", "water", "pond"],
+  parking: ["parking"],
+};
+function concepts(text) {
+  const toks = text.toLowerCase().replace(/[^a-z\s-]/g, " ").split(/[\s-]+/);
+  const v = {};
+  for (const [k, words] of Object.entries(CONCEPTS)) for (const t of toks) if (words.includes(t)) v[k] = (v[k] || 0) + 1;
+  return v;
+}
+function cosine(a, b) {
+  let dot = 0, na = 0, nb = 0;
+  for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) { dot += (a[k] || 0) * (b[k] || 0); na += (a[k] || 0) ** 2; nb += (b[k] || 0) ** 2; }
+  return na && nb ? dot / Math.sqrt(na * nb) : 0;
+}
+const QUERIES = [
+  { q: "find solar farms", target: "solar_array" },
+  { q: "find wind turbines", target: "wind_turbine" },
+];
+// corpus: [{id, text, relevantTo:Set(objects)}]; returns per-query ranking + MRR
+function retrieval(corpus) {
+  const perQuery = QUERIES.map(({ q, target }) => {
+    const qv = concepts(q);
+    // Ties rank pessimistically: a relevant doc that ties with others sits below them.
+    const ranked = corpus
+      .map((d) => ({ ...d, sim: cosine(qv, concepts(d.text)), rel: d.relevantTo.has(target) }))
+      .sort((a, b) => b.sim - a.sim || a.rel - b.rel);
+    const firstRel = ranked.findIndex((d) => d.rel);
+    return { q, target, ranked, rr: firstRel >= 0 ? 1 / (firstRel + 1) : 0 };
+  });
+  return { perQuery, mrr: mean(perQuery.map((p) => p.rr)) };
+}
+function corpusFor(opts, repeat) {
+  return [
+    ...CASES.map((c) => ({ id: c.case.id, text: harnessCaption(c, { ...opts, repeat }).text,
+      relevantTo: new Set(c.case.reference_labels.map((l) => l.object)) })),
+    ...DISTRACTORS.map((t, i) => ({ id: `distractor-${i + 1}`, text: t, relevantTo: new Set() })),
+  ];
+}
+
+/* ───────────── Batches, Compare, gate ───────────── */
+const REPEATS = 3;
+const CONFIGS = {
+  v1: { label: "v1 · one-shot prompt (Baseline)", verify: false, prompt: "v1" },
+  v2: { label: "v2 · verify, then write", verify: true, prompt: "v2" },
+  v3: { label: "v3 · verify, then write + terse prompt", verify: true, prompt: "v3" },
+};
+function runBatch(cfgKey, extra = {}) {
+  const cfg = { ...CONFIGS[cfgKey], ...extra };
+  const perCase = CASES.map((c) => {
+    const runs = [];
+    for (let r = 0; r < REPEATS; r++) {
+      const cap = harnessCaption(c, { ...cfg, repeat: r });
+      runs.push({ grounding: grounding(cap, c).score, fidelity: fidelity(cap, c).score });
+    }
+    const g = runs.map((x) => x.grounding);
+    return { key: c.key, id: c.case.id, runs, spread: Math.max(...g) - Math.min(...g) };
+  });
+  const ret = [];
+  for (let r = 0; r < REPEATS; r++) ret.push(retrieval(corpusFor(cfg, r)).mrr);
+  const all = perCase.flatMap((p) => p.runs);
+  return {
+    cfgKey, perCase,
+    means: { grounding: mean(all.map((x) => x.grounding)), fidelity: mean(all.map((x) => x.fidelity)), retrieval: mean(ret) },
+  };
+}
+function gate(base, cand, tolerance) {
+  const checks = ["grounding", "fidelity", "retrieval"].map((k) => {
+    const d = cand.means[k] - base.means[k];
+    return { k, base: base.means[k], cand: cand.means[k], delta: d, regressed: d < -tolerance, improved: d >= tolerance };
+  });
+  const keep = !checks.some((x) => x.regressed) && checks.some((x) => x.improved);
+  return { checks, keep };
+}
+
+/* ───────────── Browser UI (skipped when the file is loaded headless) ───────────── */
+if (typeof document !== "undefined") {
+  const STEPS = [
+    { key: "case", title: "1 · Case", sub: "Data and Cases", area: "data" },
+    { key: "draft", title: "2 · Draft Claims", sub: "Captioning", area: "captions" },
+    { key: "verify", title: "3 · Verify, then write", sub: "Captioning", area: "captions" },
+    { key: "score", title: "4 · Score", sub: "Evaluation", area: "evaluation" },
+    { key: "batch", title: "5 · Batch and Compare", sub: "Sandbox integration", area: "platform" },
+    { key: "gate", title: "6 · Gate", sub: "Decision", area: "decision" },
+  ];
+  const state = { step: 0, caseIdx: 0, cand: "v2", tolerance: 0.05 };
+  const $ = (id) => document.getElementById(id);
+  const opts = () => ({ verify: $("t-verify").checked, peek: $("t-peek").checked, freeText: $("t-free").checked, prompt: "v2" });
+  const pct = (x) => (x === null || x === undefined ? "n/a" : x.toFixed(2));
+  const esc = (s) => String(s).replace(/[&<>]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[ch]));
+  const json = (o) => `<pre>${esc(JSON.stringify(o, null, 2))}</pre>`;
+  const badge = (txt, kind) => `<span class="badge b-${kind}">${esc(txt)}</span>`;
+
+  /* Chip drawings (synthetic 300 × 300 "aerial" tiles) */
+  function chipSVG(c, markers) {
+    const grid = $("t-grid").checked
+      ? `<g stroke="#fff" stroke-opacity=".75" stroke-dasharray="4 4">
+           <line x1="100" y1="0" x2="100" y2="300"/><line x1="200" y1="0" x2="200" y2="300"/>
+           <line x1="0" y1="100" x2="300" y2="100"/><line x1="0" y1="200" x2="300" y2="200"/></g>` : "";
+    let body = "";
+    if (c.key === "solar") {
+      body = `<rect width="300" height="300" fill="#d9c49c"/>
+        ${[...Array(40)].map((_, i) => `<circle cx="${(i * 73) % 300}" cy="${(i * 131) % 300}" r="${2 + (i % 3)}" fill="#a79b6e" opacity=".6"/>`).join("")}
+        <rect x="0" y="34" width="300" height="16" fill="#8d8a86"/><line x1="0" y1="42" x2="300" y2="42" stroke="#e8e2c8" stroke-dasharray="10 8"/>
+        <g>${[...Array(9)].map((_, i) => `<rect x="96" y="${104 + i * 11}" width="108" height="7" fill="#2b3d66"/>`).join("")}</g>
+        <rect x="236" y="236" width="30" height="22" fill="#bdb6aa"/><rect x="236" y="236" width="30" height="8" fill="#a59d90"/>
+        ${[0, 1].map((i) => `<line x1="${222 + i * 22}" y1="60" x2="${232 + i * 22}" y2="78" stroke="#6d6553" stroke-width="2" opacity=".55"/>`).join("")}`;
+    } else if (c.key === "wind") {
+      const turbine = (x, y) => `<g><line x1="${x}" y1="${y}" x2="${x + 26}" y2="${y + 14}" stroke="#4d4a3a" stroke-width="3" opacity=".35"/>
+        <circle cx="${x}" cy="${y}" r="5" fill="#f4f4f2" stroke="#8a8a85"/>
+        <line x1="${x}" y1="${y}" x2="${x}" y2="${y - 18}" stroke="#f9f9f7" stroke-width="2.5"/>
+        <line x1="${x}" y1="${y}" x2="${x + 15}" y2="${y + 9}" stroke="#f9f9f7" stroke-width="2.5"/>
+        <line x1="${x}" y1="${y}" x2="${x - 15}" y2="${y + 9}" stroke="#f9f9f7" stroke-width="2.5"/></g>`;
+      body = `<rect width="300" height="300" fill="#b8b386"/>
+        ${[...Array(26)].map((_, i) => `<ellipse cx="${(i * 97) % 300}" cy="${(i * 59) % 300}" rx="${10 + (i % 4) * 4}" ry="${6 + (i % 3) * 3}" fill="#8f9a5f" opacity=".55"/>`).join("")}
+        <path d="M30 300 C 60 210, 40 140, 70 70 S 90 10, 110 0" stroke="#cdbb93" stroke-width="9" fill="none"/>
+        <path d="M70 120 C 140 130, 190 140, 236 150" stroke="#cdbb93" stroke-width="5" fill="none"/>
+        ${turbine(232, 62)}${turbine(248, 150)}${turbine(228, 240)}`;
+    } else {
+      body = `<rect width="300" height="300" fill="#9fb37a"/>
+        <rect x="0" y="0" width="96" height="138" fill="#7f9c58"/><rect x="0" y="146" width="96" height="120" fill="#b2a26c"/>
+        <rect x="210" y="0" width="90" height="266" fill="#86a35f"/>
+        <g>${[...Array(8)].map((_, i) => `<rect x="${104 + i * 13}" y="96" width="9" height="112" fill="#eef0ee" stroke="#c9ccc8"/>`).join("")}</g>
+        <rect x="0" y="266" width="300" height="18" fill="#8d8a86"/>`;
+    }
+    const pts = {
+      north_west: [50, 50], north: [150, 50], north_east: [250, 50], west: [50, 150], centre: [150, 150],
+      east: [250, 150], south_west: [50, 250], south: [150, 250], south_east: [250, 250],
+    };
+    const marks = (markers || []).map((m, i) => {
+      const p = pts[m.position];
+      if (!p) return "";
+      const fill = m.state === "kept" ? "#2f6b3a" : m.state === "dropped" ? "#a1352b" : "#9a4a35";
+      return `<g><circle cx="${p[0] + i * 6 - 6}" cy="${p[1] - 18}" r="11" fill="${fill}" stroke="#fff" stroke-width="2"/>
+        <text x="${p[0] + i * 6 - 6}" y="${p[1] - 14}" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">${m.label}</text></g>`;
+    }).join("");
+    return `<svg viewBox="0 0 300 300" role="img" aria-label="Synthetic chip: ${esc(c.title)}">${body}${grid}${marks}</svg>`;
+  }
+
+  function chipPanel(c, markers, note) {
+    const chip = c.case.chips[0];
+    return `<div class="chip-wrap">${chipSVG(c, markers)}
+      <div class="chip-caption mono">${esc(chip.id)} · ${chip.date} · 512 × 512 px at 0.6 m (≈300 m)</div>
+      ${note ? `<div class="chip-caption">${note}</div>` : ""}</div>`;
+  }
+
+  function renderFlow() {
+    $("flow").innerHTML = STEPS.map((s, i) => `<button type="button" class="area-${s.area}" data-i="${i}"
+      ${i === state.step ? 'aria-current="step"' : ""}>${s.title}<small>${s.sub}</small></button>`).join("");
+    $("flow").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => { state.step = +b.dataset.i; render(); }));
+  }
+
+  function renderBanners() {
+    const o = opts(), out = [];
+    if (o.peek) out.push(`<div class="banner bad"><strong>ADR-0006 broken.</strong> The Harness can read the ${term("Answer Key")}, so it copies
+      the ${term("Reference Label", "Reference Labels")} instead of looking at the ${term("Chip")}. Grounding becomes perfect and meaningless:
+      it now measures copying, not seeing.</div>`);
+    if (o.freeText) out.push(`<div class="banner warn"><strong>ADR-0007 broken.</strong> Positions are free text ("in the middle"), so grounding
+      can't compare them with the Answer Key's grid cell. Position becomes uncheckable.</div>`);
+    if (!o.verify && !o.peek) out.push(`<div class="banner warn"><strong>Verify, then write is off.</strong> Every drafted ${term("Claim")}
+      goes into the ${term("Caption")}, including ones no tool can confirm.</div>`);
+    $("banners").innerHTML = out.join("");
+  }
+
+  const STEP_RENDER = {
+    case(c) {
+      const { reference_labels, ...visible } = c.case;
+      return `<div class="stage">${chipPanel(c)}
+        <div><h2>A ${term("Case")}: a ${term("Chip")} plus what it's graded against</h2>
+        <p>Data and Cases picks places with LGND embeddings (two-step selection), cuts a 512 × 512 NAIP ${term("Chip")} inside each,
+          and attaches ${term("Reference Label", "Reference Labels")} from the USGS ${term("Answer Key")}.
+          This Case is in the <strong>dev</strong> region (Mojave / Tehachapi); the Texas test region stays untouched until the end.</p>
+        <h3>Case record · <code>cases/caption-dev.jsonl</code></h3>${json(visible)}
+        <div class="hidden-box"><div class="tag">reference_labels · hidden from the Harness, only scoring reads it (ADR-0006)</div>
+          ${reference_labels.length ? json(reference_labels) : `<p><code>[]</code> — a negative Case: nothing from the Answer Key is here.
+          Negatives catch look-alikes such as greenhouses read as solar.</p>`}</div>
+        <details><summary>Where the real data comes from</summary>
+          <p>NAIP (0.6 m, public domain) for Chips; USGS USPVDB and USWTDB for solar and wind Reference Labels; LGND embeddings
+          (Sentinel-2, 1,280 m cells) to choose diverse places. About 40 positives and 20 negatives per region.</p></details>
+        </div></div>`;
+    },
+    draft(c) {
+      const o = opts();
+      const cap = harnessCaption(c, { ...o, verify: false });
+      const marks = cap.objects.map((d, i) => ({ position: o.peek ? d.position : c.drafts.find((x) => x.id === d.id)?.position, label: i + 1, state: "draft" }));
+      const input = { case_id: c.case.id, chips: c.case.chips.map((ch) => ({ id: ch.id, uri: ch.uri })) };
+      if (o.peek) input.reference_labels = c.case.reference_labels;
+      return `<div class="stage">${chipPanel(c, marks, "Numbers mark where each drafted Claim says the object is.")}
+        <div><h2>The ${term("Harness")} drafts ${term("Claim", "Claims")}</h2>
+        <p>The ${term("Harness")} (Nova Pro in the plan) sees only the Chip. It drafts candidate Claims:
+          an object, a count, a cell of the 3×3 grid, and relations from a fixed vocabulary (ADR-0007).</p>
+        <h3>What the Harness receives</h3>
+        <div class="${o.peek ? "hidden-box leak" : ""}">${o.peek ? `<div class="tag">leaked: reference_labels reached the Harness</div>` : ""}${json(input)}</div>
+        <h3>Drafted Claims</h3>
+        <table><thead><tr><th>#</th><th>object</th><th class="num">count</th><th>position</th></tr></thead><tbody>
+        ${cap.objects.map((d, i) => `<tr><td>${i + 1}</td><td>${esc(d.object)}</td><td class="num">${d.count}</td><td class="mono">${esc(d.position)}</td></tr>`).join("")
+          || `<tr><td colspan="4">${badge("no Claims", "na")}</td></tr>`}
+        </tbody></table>
+        <p style="color:var(--muted)">Scripted output. General VLMs miscount from above, confuse look-alikes, and see objects that
+          aren't there; this draft has examples of each, depending on the Case.</p>
+        </div></div>`;
+    },
+    verify(c) {
+      const o = opts();
+      const cap = harnessCaption(c, o);
+      if (o.peek) {
+        return `<div class="stage">${chipPanel(c)}<div><h2>Verify, then write</h2>
+          <p>Nothing to verify: the Harness copied the Answer Key. This is the failure ADR-0006 exists to prevent, and why a
+          verifying tool must never be an Answer Key either.</p><h3>Caption</h3>${json(cap)}</div></div>`;
+      }
+      const drafts = c.drafts.filter((d) => !d.repeats || d.repeats[0]);
+      const marks = drafts.map((d, i) => ({ position: d.position, label: i + 1,
+        state: !o.verify || ["confirmed", "corrected"].includes(d.verify.result) ? "kept" : "dropped" }));
+      const kind = { confirmed: "ok", corrected: "warn", rejected: "bad", uncertain: "na" };
+      return `<div class="stage">${chipPanel(c, marks, "Green: kept in the Caption. Red: left out.")}
+        <div><h2>Verify, then write</h2>
+        <p>Each drafted Claim is checked by an <em>independent</em> tool: a detector, a segmenter, or an embedding search.
+          Only confirmed Claims are written into the ${term("Caption")}; the rest go to <code>uncertain</code>, which isn't scored.
+          A Claim no tool backs is an ${term("Unsupported Claim")}.</p>
+        <table><thead><tr><th>#</th><th>Claim</th><th>checked by</th><th>result</th></tr></thead><tbody>
+        ${drafts.map((d, i) => `<tr><td>${i + 1}</td><td>${d.count} × ${esc(d.object)} · <span class="mono">${esc(d.position)}</span></td>
+          <td>${esc(d.verify.tool)}<br><small style="color:var(--muted)">${esc(d.verify.note)}</small></td>
+          <td>${o.verify ? badge(d.verify.result, kind[d.verify.result]) : badge("not checked", "na")}</td></tr>`).join("")}
+        </tbody></table>
+        <h3>Caption · the format in caption-plan.md §5.2</h3>${json(cap)}
+        </div></div>`;
+    },
+    score(c) {
+      const o = opts();
+      const cap = harnessCaption(c, o);
+      const g = grounding(cap, c), f = fidelity(cap, c);
+      const ret = retrieval(corpusFor(o, 0));
+      const mine = ret.perQuery.filter((p) => c.case.reference_labels.some((l) => l.object === p.target));
+      const vrow = (r) => r.verdict === "false positive"
+        ? `<li>${badge("false positive", "bad")} ${esc(r.claim.object)}: not in the Answer Key</li>`
+        : `<li>${badge("matched", "ok")} ${esc(r.claim.object)} · count ${r.claim.count} vs ${r.ref.count} (${pct(r.countScore)}) ·
+             position ${r.posScore === null ? badge("uncheckable", "warn") : `${esc(r.claim.position)} vs ${r.ref.position} (${pct(r.posScore)})`}</li>`;
+      return `<div class="stage">${chipPanel(c)}
+        <div><h2>Three criteria, reported separately</h2>
+        <p>Clay hasn't set the rubric weights, so there is no combined caption score. Cost and label preparation time come later.</p>
+        <div class="cards">
+          <div class="card"><div>Grounding <small>(most important)</small></div><div class="big">${pct(g.score)} ${g.uncheckablePos ? badge("incomplete: position not scored", "warn") : ""}</div>
+            <ul><li>presence precision ${pct(g.precision)}</li><li>presence recall ${pct(g.recall)}</li>
+              <li>count ${pct(g.count)}</li><li>position ${g.uncheckablePos ? badge("uncheckable", "warn") : pct(g.position)}</li></ul>
+            <ul>${g.rows.map(vrow).join("")}
+              ${g.missed.map((m) => `<li>${badge("missed", "bad")} ${esc(m.object)} is in the Answer Key</li>`).join("")}
+              ${g.unkeyed.length ? `<li>${badge("not gradable yet", "na")} ${g.unkeyed.map((u) => esc(u.object)).join(", ")}: USGS has no such labels; needs OSM</li>` : ""}</ul>
+            <small>Deterministic: Claims vs ${term("Reference Label", "Reference Labels")}. Prototype formula: mean of the four parts.</small></div>
+          <div class="card"><div>Fidelity</div><div class="big">${pct(f.score)}</div>
+            <ul>${f.notes.map((n) => `<li>${esc(n)}</li>`).join("")}</ul>
+            <small>A ${term("Judge")} (Opus 5.5) sees the image and the Caption. Scripted here.</small></div>
+          <div class="card"><div>Retrieval</div><div class="big">${mine.length ? pct(mean(mine.map((p) => p.rr))) : "n/a"}</div>
+            ${mine.length ? mine.map((p) => `<p><strong>“${p.q}”</strong> ranks this Caption #${p.ranked.findIndex((d) => d.id === c.case.id) + 1}
+              of ${p.ranked.length}</p>`).join("") : "<p>No query targets a negative Case. It still competes as a distractor.</p>"}
+            <small>Text query only, no image. Stand-in for an off-the-shelf text embedding model; reciprocal rank.</small></div>
+        </div>
+        ${mine.length ? `<details open><summary>Ranking for “${mine[0].q}”</summary><table><tbody>
+          ${mine[0].ranked.map((d, i) => `<tr class="${d.id === c.case.id ? "rank-me" : ""}"><td class="num">${i + 1}</td>
+            <td>${esc(d.text)}</td><td>${d.rel ? badge("relevant", "ok") : ""}</td></tr>`).join("")}</tbody></table></details>` : ""}
+        </div></div>`;
+    },
+    batch() {
+      const base = runBatch("v1"), cand = runBatch(state.cand, { peek: opts().peek });
+      return `<h2>A ${term("Batch")} per configuration, then Compare</h2>
+        <p>Every prompt or pipeline change is a new ${term("Batch")}: each Case run ${REPEATS} times (${term("Repeat", "Repeats")}),
+          so you can see the ${term("Spread")} as well as the mean. The ${term("Baseline")} is the accepted Batch.</p>
+        <div class="bar"><label for="candpick">Candidate</label>
+          <select id="candpick">${["v2", "v3"].map((k) => `<option value="${k}" ${k === state.cand ? "selected" : ""}>${CONFIGS[k].label}</option>`).join("")}</select>
+          <span>vs Baseline: ${CONFIGS.v1.label}</span></div>
+        <table><thead><tr><th>criterion</th><th class="num">Baseline</th><th class="num">Candidate</th><th class="num">Δ</th></tr></thead><tbody>
+        ${["grounding", "fidelity", "retrieval"].map((k) => { const d = cand.means[k] - base.means[k];
+          return `<tr><td>${k}</td><td class="num">${pct(base.means[k])}</td><td class="num">${pct(cand.means[k])}</td>
+            <td class="num">${badge((d >= 0 ? "+" : "") + d.toFixed(2), d > 0.005 ? "ok" : d < -0.005 ? "bad" : "na")}</td></tr>`; }).join("")}
+        </tbody></table>
+        <h3>Grounding per Case, across ${REPEATS} Repeats</h3>
+        <table><thead><tr><th>Case</th><th class="num">Baseline runs</th><th class="num">Spread</th><th class="num">Candidate runs</th><th class="num">Spread</th></tr></thead><tbody>
+        ${base.perCase.map((b, i) => { const k = cand.perCase[i];
+          return `<tr><td class="mono">${esc(b.id)}</td><td class="num">${b.runs.map((r) => pct(r.grounding)).join(" · ")}</td>
+            <td class="num">${pct(b.spread)}</td><td class="num">${k.runs.map((r) => pct(r.grounding)).join(" · ")}</td><td class="num">${pct(k.spread)}</td></tr>`; }).join("")}
+        </tbody></table>
+        <p style="color:var(--muted)">The one-shot Baseline varies run to run (an imagined turbine pair comes and goes; the turbine count
+          wobbles). Verify, then write removes most of that spread.</p>`;
+    },
+    gate() {
+      const base = runBatch("v1"), cand = runBatch(state.cand, { peek: opts().peek });
+      const v = gate(base, cand, state.tolerance);
+      return `<h2>The regression gate keeps or rejects the change</h2>
+        <p>Prototype rule: <strong>keep</strong> the Candidate if no criterion drops by more than the tolerance
+          <em>and</em> at least one improves by at least the tolerance. Each criterion is checked on its own; a gain in one can't buy a loss in another.</p>
+        <div class="bar"><label for="cand2">Candidate</label>
+          <select id="cand2">${["v2", "v3"].map((k) => `<option value="${k}" ${k === state.cand ? "selected" : ""}>${CONFIGS[k].label}</option>`).join("")}</select>
+          <label for="tol">Tolerance</label><input id="tol" type="range" min="0" max="0.2" step="0.01" value="${state.tolerance}">
+          <span class="mono">${state.tolerance.toFixed(2)}</span></div>
+        <table><thead><tr><th>criterion</th><th class="num">Baseline</th><th class="num">Candidate</th><th class="num">Δ</th><th>check</th></tr></thead><tbody>
+        ${v.checks.map((x) => `<tr><td>${x.k}</td><td class="num">${pct(x.base)}</td><td class="num">${pct(x.cand)}</td>
+          <td class="num">${(x.delta >= 0 ? "+" : "") + x.delta.toFixed(2)}</td>
+          <td>${x.regressed ? badge("regressed", "bad") : x.improved ? badge("improved", "ok") : badge("within tolerance", "na")}</td></tr>`).join("")}
+        </tbody></table>
+        <div class="verdict ${v.keep ? "keep" : "reject"}">${v.keep ? "Keep: becomes the new Baseline" : "Reject: Baseline stays"}</div>
+        ${opts().peek ? `<div class="banner bad">The gate just judged a Candidate that reads the Answer Key. Its grounding looks perfect, so the gate
+          can wave it through. A score can't catch a broken rule; that is why ADR-0006 is a design rule, not a metric.</div>` : ""}
+        <div class="locked"><strong>Held-out test region · Texas</strong><br>Never used for tuning. Scored once, at the end, with the final
+          Baseline. A loop that tunes on the dev region and also peeks at the test region would overstate how well the captioner generalises.</div>`;
+    },
+  };
+
+  // Deep link: #<step>/<case>, e.g. #score/wind, so a step can be shared.
+  function readHash() {
+    const [s, k] = location.hash.slice(1).split("/");
+    const si = STEPS.findIndex((x) => x.key === s);
+    const ci = CASES.findIndex((x) => x.key === k);
+    if (si >= 0) state.step = si;
+    if (ci >= 0) state.caseIdx = ci;
+  }
+
+  function render() {
+    history.replaceState(null, "", `#${STEPS[state.step].key}/${CASES[state.caseIdx].key}`);
+    $("casepick").value = String(state.caseIdx);
+    renderFlow();
+    renderBanners();
+    const c = CASES[state.caseIdx];
+    const perCase = ["case", "draft", "verify", "score"].includes(STEPS[state.step].key);
+    $("casebar").style.display = perCase ? "" : "none";
+    $("caseid").textContent = c.case.id;
+    $("step").innerHTML = STEP_RENDER[STEPS[state.step].key](c);
+    $("prev").disabled = state.step === 0;
+    $("next").disabled = state.step === STEPS.length - 1;
+    for (const id of ["candpick", "cand2"]) { const el = $(id); if (el) el.addEventListener("change", (e) => { state.cand = e.target.value; render(); }); }
+    const tol = $("tol");
+    if (tol) tol.addEventListener("input", (e) => { state.tolerance = +e.target.value; render(); });
+    document.querySelectorAll(".term").forEach((el) => { el.title = TERMS[el.dataset.t] || ""; });
+  }
+
+  $("casepick").innerHTML = CASES.map((c, i) => `<option value="${i}">${esc(c.title)}</option>`).join("");
+  $("casepick").addEventListener("change", (e) => { state.caseIdx = +e.target.value; render(); });
+  $("prev").addEventListener("click", () => { state.step = Math.max(0, state.step - 1); render(); });
+  $("next").addEventListener("click", () => { state.step = Math.min(STEPS.length - 1, state.step + 1); render(); });
+  for (const id of ["t-verify", "t-peek", "t-free", "t-grid"]) $(id).addEventListener("change", render);
+  readHash();
+  render();
+}
+</script>
+</body>
+</html>
