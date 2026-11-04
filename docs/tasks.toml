@@ -230,10 +230,11 @@ step = "case"
 title = "Importer: a caption set becomes Cases, with Answer Keys attached by location and date"
 area = "Data and Cases"
 tier = "Must"
-status = "todo"
+status = "doing"
 closes = ["CAP-20"]
 start = "docs/caption-design.md §3.6; src/clayzer/cases.py"
 after = ["import-format"]
+notes = "Built 2026-11-04: `clayzer import` (src/clayzer/importer.py), JSON Lines and GeoParquet (import extra). Checked on our own Captions: the Baseline Batch's 12 Captions imported back give the same Reference Labels as the current Case builder on all 4 Cases (one differs from that old Batch's Case only because solar labels now come from USPVDB polygons). Waiting on the RSICD test: RSICD isn't on hand (and is never committed); unlocated rows like RSICD's are supported and tested offline."
 context = "Each record of an imported caption set becomes a Case; Answer Keys attach by footprint and date exactly as for our Chips (a label only counts if the site existed by the acquisition date), and ADR-0006 still applies. Captions may be Sentinel-2 rather than NAIP: compare each class's `min_visible_m` in the ontology with the row's `gsd_m` and flag Claims about objects too small to see. Build and test on RSICD's Reference Captions converted to the format, and on our own Caption files."
 done_when = [
   "`clayzer import <file>` creates Cases from GeoParquet or JSON Lines",
@@ -257,6 +258,7 @@ tier = "Must"
 status = "todo"
 closes = ["CAP-10"]
 start = "ontology/objects.toml"
+notes = "Raised 2026-11-04: construction_site, added as a candidate (claimable = false) at the end of ontology/objects.toml. 13 of the 19 stored Captions of fixed-dev-neg-1 call the scene a construction site or an excavation, and no other Case's ever do (LGND also called that Chip's false solar arrays a storage yard), and the extraction labels have no class for it. To decide: land use or built structure; whether NAIP Chips show it reliably; whether an Answer Key can score it (OSM landuse=construction, never readable by the Harness); and whether Clay's captions need it. Making it claimable changes the Claim vocabulary for every functional area (ADR-0007, ADR-0008)."
 context = "ADR-0008: every class a Claim can name is defined once, in ontology/objects.toml (v0.1: 11 claimable classes under five roots, plus candidates). tests/test_ontology.py fails if the code's lists drift from it. Review it as a team: are the look-alikes and minimum visible sizes right, and does any Case or benchmark need a class that's missing?"
 done_when = [
   "Reviewed with the contracts on Day 1",
@@ -914,9 +916,10 @@ step = "output"
 title = "Claims from free text: a model extracts Claims from captions that have none, recorded and calibrated like the Judge"
 area = "Evaluation"
 tier = "Must"
-status = "todo"
+status = "done"
 closes = ["CAP-20"]
 start = "docs/caption-design.md §3.6"
+notes = "Done 2026-11-04: `clayzer extract` (Opus 5.5 by default) and its calibration. Hand-made labels for 20 Captions in labels/extraction/sample.jsonl, made on the /label page (`clayzer ui --calibrate`): 15 from checked proposals (1 edited), 5 blind. Against them: types P 0.97 to 0.98, R 1.0; positions 0.95 to 1.0 exact, all within one cell. Caveats: the blind labels aren't fully blind (the labeller saw the extractor's answers for them while a page bug was being diagnosed; 4 were then adjudicated, counts set by Claude by rule at the labeller's request, recorded per label); the raw blind result is kept in the store (calibration/extraction/sample/agreement-raw-blind.json). Against the Harness's own Claims (24 Captions): types 0.88 to 0.94; about half of counts and a quarter of positions aren't in the prose at all. The position rule was refined with the labeller (one thing spanning cells, several things per area, a group with one total); label fixes under it are the follow-up label-fixups."
 context = "Most caption sets have text only, but grounding scores structured Claims. A model reads each caption and extracts Claims in the ADR-0007 format (object, count, grid cell, relations). The extraction is itself a model's judgement, so it's recorded in the Trace and calibrated against people's labels, like the Judge."
 done_when = [
   "Claims extracted from free-text captions in the ADR-0007 format",
@@ -927,6 +930,39 @@ refs = [
   "docs/caption-design.md §3.6",
   "docs/adr/0007-claims-use-a-grid-and-a-fixed-relation-vocabulary.md",
   "docs/caption-plan.md §5.2",
+]
+see_it = "CLI: `clayzer extract \"<caption>\"`, `clayzer extract --check <batch-id>`, `clayzer extract --labels labels/extraction/sample.jsonl`. Labelling: `clayzer ui --calibrate`, then /label (docs/cli.md, labels/extraction/README.md)."
+changes = [
+  "src/clayzer/extract.py: extraction from text only (counts and positions not stated stay null), calibration against reference Claims, per label source",
+  "src/clayzer/grounding.py: skips a count or position a Claim doesn't state, instead of scoring a guess",
+  "src/clayzer/ui/labels.py: the /label page's API; saving only with --calibrate; every label checked, and its source recorded (proposal accepted or edited, blind, blind adjudicated, by hand)",
+  "src/clayzer/ui/static/label/label.js: the labelling page: one caption at a time, text only, proposals to check, blind items, no pre-filled counts or positions",
+  "labels/extraction/sample.jsonl: 20 hand-made labels, with the rules in labels/extraction/README.md",
+  "ontology/objects.toml: construction_site added as a candidate for ontology-review",
+  "tests/test_extract.py: extraction, grounding without a guess, agreement, calibration",
+  "tests/test_labels.py: the API, label checks, sources, adjudication, and no class shared with the site stylesheet",
+]
+
+[[task]]
+id = "label-fixups"
+step = "output"
+title = "Finish the extraction labels under the refined position rule, and make the /label page safer"
+area = "Evaluation"
+tier = "Could"
+status = "todo"
+start = "labels/extraction/README.md"
+after = ["claims-from-text"]
+context = "The position rule was refined while labelling (labels/extraction/README.md): one thing spanning cells is one Claim; several things or spread land cover is one Claim per area; a group with one total is one Claim with that count. Labels #2, #5, #6, #10, #11, #14, #17, #18, #19 (and #12, a judgement call) still need fixing under it; a round of fixes on 2026-11-04 didn't save. Also: the page should offer to save, not only to discard, when leaving a caption with unsaved edits, and the server should log every save and refusal."
+done_when = [
+  "The listed labels follow the refined rule",
+  "Leaving a caption with unsaved edits offers to save them",
+  "Saves and refused saves are logged by the server",
+  "`clayzer extract --labels labels/extraction/sample.jsonl` re-run, noting edits that come from the rule change",
+]
+refs = [
+  "labels/extraction/README.md",
+  "src/clayzer/ui/static/label/label.js",
+  "src/clayzer/ui/labels.py",
 ]
 
 [[task]]

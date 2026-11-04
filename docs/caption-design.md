@@ -404,6 +404,12 @@ One row in JSON Lines:
 - `claims` is used when present; otherwise Claims are extracted from `caption` by a model, as
   described above.
 - `generator` lets one Caption Set mix pipelines and compare them, like Batches.
+- **As built** (`src/clayzer/importer.py`, 2026-11-04): a USGS site counts only if its
+  `p_year` is no later than the acquisition year; OSM has no history here, so OSM labels are
+  today's map and the Case says so. `geometry` may be `null` for sets without locations, such as
+  RSICD: the Case is kept with no Reference Labels (`located: false`), for fidelity and retrieval
+  only. A Claim is flagged too small when its class's `min_visible_m` is below the row's `gsd_m`.
+  Only `fixed` rows are imported until Change Cases exist.
 
 **If the real format differs,** only a small adapter changes: the importer maps any source onto
 these columns, and everything downstream stays the same. Until Clay's data arrives, the importer

@@ -16,6 +16,7 @@ clayzer compare <batch-a> <batch-b>         what changed, and by how much
 clayzer baseline accept <batch-id>          make a Batch the Baseline (baselines/<name>/)
 clayzer gate <batch-id>                     regression gate: exit 0 pass, 1 fail, 2 inconclusive
 clayzer ui [--allow-launch]                 the team web app on http://127.0.0.1:8770
+clayzer ui --calibrate                      also let /label save hand-made labels into labels/
 
 clayzer login lgnd                          sign in to an MCP server that needs it (browser, once)
 clayzer tools roda                          list an MCP server's tools
@@ -158,8 +159,27 @@ def main(argv: list[str] | None = None) -> int:
 
     ui = sub.add_parser("ui", help="the team web app: workflow, tasks, Cases, Batches")
     ui.add_argument("--allow-launch", action="store_true", help="let the browser run Batches")
+    ui.add_argument("--calibrate", action="store_true",
+                    help="let the /label page save hand-made labels into labels/")  # fmt: skip
     ui.add_argument("--host", default="127.0.0.1")
     ui.add_argument("--port", type=int, default=8770)
+
+    im = sub.add_parser("import", help="a Caption Set from any source becomes Cases")
+    im.add_argument(
+        "file", nargs="?", type=Path, help="JSON Lines or GeoParquet, one caption per row"
+    )
+    im.add_argument("--name", help="the Caption Set's name: Cases go to cases/import-<name>.jsonl")
+    im.add_argument("--from-batch", metavar="BATCH_ID",
+                    help="import a Batch's own Captions, to check the importer against known Cases")  # fmt: skip
+    im.add_argument("--export", type=Path, metavar="JSONL",
+                    help="with --from-batch: also write the Caption Set itself to this file")  # fmt: skip
+
+    ex = sub.add_parser("extract", help="the Claims a caption's text makes; or calibrate that")
+    ex.add_argument("text", nargs="?", help="a caption")
+    ex.add_argument("--check", metavar="BATCH_ID",
+                    help="extract from every Caption in a Batch; compare with its Claims")  # fmt: skip
+    ex.add_argument("--labels", type=Path, metavar="JSONL",
+                    help='compare with hand-made Claims: lines of {"id", "text", "claims"}')  # fmt: skip
 
     lg = sub.add_parser("login", help="sign in to an MCP server that needs it (opens a browser)")
     lg.add_argument("server")
@@ -358,6 +378,64 @@ def main(argv: list[str] | None = None) -> int:
         print(render_gate(result), end="")
         return result.exit_code
 
+    if a.cmd == "import":
+        from clayzer.importer import caption_rows, import_key, import_rows, read_rows
+
+        if a.from_batch:
+            from clayzer import batch as batches
+
+            rows, name = caption_rows(batches.load(store, a.from_batch)), a.name or a.from_batch
+            if a.export:
+                a.export.write_text("".join(json.dumps(r) + "\n" for r in rows))
+                print(f"wrote the Caption Set to {a.export}")
+        elif a.file:
+            rows, name = read_rows(a.file), a.name or a.file.stem
+        else:
+            print("give a Caption Set file, or --from-batch <batch-id>", file=sys.stderr)
+            return 2
+        print(f"{len(rows)} captions → {store.url(import_key(name))}")
+        result = import_rows(rows, name)
+        store.put(import_key(name), to_jsonl(result.cases), "application/x-ndjson")
+        located = sum(c["located"] for c in result.cases)
+        small = sum(1 for c in result.cases if c["imported"]["too_small"])
+        print(f"  {len(result.cases)} Cases ({located} located), {len(result.skipped)} skipped, "
+              f"{small} with Claims possibly too small for their imagery")  # fmt: skip
+        for s in result.skipped[:10]:
+            print(f"  skipped {s['caption_id']}: {s['reason']}")
+        return 0 if result.cases else 1
+
+    if a.cmd == "extract":
+        from clayzer.config import bedrock
+        from clayzer.extract import batch_items, calibrate, extract, extract_model
+
+        model = extract_model(settings)
+        client = bedrock(settings)
+        if a.text and not (a.check or a.labels):
+            claims, _ = extract(client, model, a.text)
+            print(json.dumps(claims, indent=2))
+            return 0
+        if a.check:
+            items, prefix = batch_items(store, a.check), f"batches/{a.check}/extraction"
+        elif a.labels:
+            rows = [json.loads(line) for line in a.labels.read_text().splitlines() if line.strip()]
+            items = [r for r in rows if r.get("claims")]  # lines nobody has labelled yet wait
+            prefix = f"calibration/extraction/{a.labels.stem}"
+        else:
+            print("give a caption, --check <batch-id>, or --labels <file>", file=sys.stderr)
+            return 2
+        print(f"{len(items)} captions, extracted by {model}")
+        r = calibrate(client, model, items, store, prefix)
+        keys = ("type_precision", "type_recall", "count_exact", "position_exact",
+                "position_within_one", "count_not_stated", "position_not_stated")  # fmt: skip
+        print("  " + " · ".join(f"{k.replace('_', ' ')} {r[k]}" for k in keys))
+        for source, g in r.get("by_source", {}).items():
+            print(f"  {source} ({g['captions']}): " + " · ".join(
+                f"{k.replace('_', ' ')} {g[k]}" for k in keys[:4]))  # fmt: skip
+        if r.get("edit_rate") is not None:
+            print(f"  proposals a person changed: {r['edit_rate']:.0%}")
+        print(f"  {r['failed']} failed; saved in {store.url(prefix)}/agreement.json")
+        return 0
+
     if a.cmd == "ui":
         try:
             from clayzer.ui.app import serve
@@ -365,8 +443,10 @@ def main(argv: list[str] | None = None) -> int:
             print("the web app needs the ui extra: uv sync --extra ui", file=sys.stderr)
             return 1
         mode = "can run Batches" if a.allow_launch else "read-only"
+        if a.calibrate:
+            mode += f"; labels at http://{a.host}:{a.port}/label"
         print(f"Clayzer on http://{a.host}:{a.port} ({mode}; store {store.url('').rstrip('/')})")
-        serve(settings, a.region, a.allow_launch, a.host, a.port)
+        serve(settings, a.region, a.allow_launch, a.host, a.port, a.calibrate)
         return 0
     return 1
 

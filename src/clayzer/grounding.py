@@ -56,8 +56,10 @@ def grounding(caption: dict, labels: list[dict]) -> dict:
             rows.append({"claim": cl, "verdict": "false positive"})
             continue
         row = {"claim": cl, "verdict": "matched", "ref_position": ref["position"]}
-        row["position"] = _position_score(cl["position"], ref["cells"])
-        positions.append(row["position"])
+        # A Claim extracted from free text may not say where (extract.py): skip, don't guess.
+        if cl.get("position") is not None:
+            row["position"] = _position_score(cl["position"], ref["cells"])
+            positions.append(row["position"])
         for key, value in (cl.get("attributes") or {}).items():
             if key in ref["attributes"]:
                 ok = 1.0 if value == ref["attributes"][key] else 0.0
@@ -67,13 +69,15 @@ def grounding(caption: dict, labels: list[dict]) -> dict:
 
     # A Caption may split one type over several Claims ("3 turbines north, 2 south"); the
     # count is their total against the label's.
-    claimed_counts: dict[str, int] = {}
+    # Likewise a type with any Claim that doesn't say how many isn't count-scored.
+    claimed_counts: dict[str, int | None] = {}
     for cl in claims:
-        claimed_counts[cl["object"]] = claimed_counts.get(cl["object"], 0) + cl["count"]
+        n, total = cl.get("count"), claimed_counts.get(cl["object"], 0)
+        claimed_counts[cl["object"]] = None if n is None or total is None else total + n
     count_by_type = {}
     for obj, n in claimed_counts.items():
         ref = refs.get(obj)
-        if ref is not None and ref["count"] is not None:
+        if ref is not None and ref["count"] is not None and n is not None:
             count_by_type[obj] = {"claimed": n, "reference": ref["count"]}
             counts.append(_count_score(n, ref["count"]))
 

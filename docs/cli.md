@@ -155,6 +155,42 @@ check catches wrong objects far better than a Claim one cell off.
 uv run clayzer batch --repeats 3 --verify --label verify
 ```
 
+## Importing a Caption Set
+
+A Caption Set from any source (Clay's, a benchmark's, another pipeline's) becomes Cases, one per
+caption, in the format of [caption-design.md §3.6](caption-design.md#36-evaluating-caption-data-from-any-source):
+JSON Lines, or GeoParquet with `uv sync --extra import`. Answer Keys attach by each row's
+footprint and date, as for our own Chips; a USGS site built after the acquisition year doesn't
+count. Rows without a location become Cases without Reference Labels. Claims about objects too
+small for the row's `gsd_m` are flagged.
+
+```sh
+uv run clayzer import captions.jsonl --name clay-v2         # → cases/import-clay-v2.jsonl
+uv run clayzer import --from-batch <batch-id> --export set.jsonl   # our own Captions, as a check
+```
+
+`--from-batch` turns a Batch's Captions into a Caption Set and imports it: the labels should
+match that Batch's Cases, since the footprints and dates are the same.
+
+## Claims from free text
+
+Grounding scores structured Claims, but most caption sets are text only. `clayzer extract` has a
+model (CLAYZER_EXTRACT_MODEL, default the Judge's) read a caption's text, never the image, and
+write the Claims it makes. A count or position the text doesn't give stays `null`, and grounding
+skips it rather than scoring a guess. Hedged things ("likely", "may be") go in `uncertain`.
+
+```sh
+uv run clayzer extract "A solar farm in the centre, with a dirt road along its west edge."
+uv run clayzer extract --check <batch-id>                         # against the Harness's own Claims
+uv run clayzer extract --labels labels/extraction/sample.jsonl    # against hand-made Claims
+```
+
+The extraction is calibrated like the Judge. `--check` compares it with the Claims the Harness
+wrote with the same text; `--labels` with Claims people made, labelled on the web app's
+`/label` page (`uv run clayzer ui --calibrate`; see
+[labels/extraction/README.md](../labels/extraction/README.md)). Each extraction is a `judge` Step
+(`role: scoring`); the Traces and `agreement.json` go to the store.
+
 ## The team web app
 
 ```sh
