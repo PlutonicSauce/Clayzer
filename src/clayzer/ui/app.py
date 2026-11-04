@@ -95,7 +95,9 @@ class Launch(BaseModel):
     only: list[str] | None = None
 
 
-def create_app(settings: Settings, region: str = "dev", allow_launch: bool = False) -> FastAPI:
+def create_app(
+    settings: Settings, region: str = "dev", allow_launch: bool = False, calibrate: bool = False
+) -> FastAPI:
     store = settings.store()
     app = FastAPI(title="Clayzer", docs_url=None, redoc_url=None)
     jobs: dict[str, dict] = {}
@@ -153,6 +155,7 @@ def create_app(settings: Settings, region: str = "dev", allow_launch: bool = Fal
             "store": store.url("").rstrip("/"),
             "region": region,
             "allow_launch": allow_launch,
+            "calibrate": calibrate,
             "caption_model": settings.caption_model,
             "judge_model": settings.judge_model,
             "embed_model": settings.embed_model,
@@ -504,12 +507,20 @@ def create_app(settings: Settings, region: str = "dev", allow_launch: bool = Fal
     def deck():
         return FileResponse(STATIC / "deck" / "index.html")
 
+    from clayzer.ui.labels import router as label_router
+
+    app.include_router(label_router(calibrate, STATIC))
+
     return app
 
 
-def serve(settings: Settings, region: str, allow_launch: bool, host: str, port: int) -> None:
+def serve(
+    settings: Settings, region: str, allow_launch: bool, host: str, port: int,
+    calibrate: bool = False,
+) -> None:  # fmt: skip
     import uvicorn
 
     uvicorn.run(
-        create_app(settings, region, allow_launch), host=host, port=port, log_level="warning"
-    )
+        create_app(settings, region, allow_launch, calibrate), host=host, port=port,
+        log_level="warning",
+    )  # fmt: skip

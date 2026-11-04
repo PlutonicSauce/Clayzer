@@ -26,6 +26,7 @@ DOCS = [
     ("GLOSSARY.md", "Glossary"),
     ("README.md", "README: getting started"),
     ("docs/cli.md", "CLI and configuration reference"),
+    ("labels/extraction/README.md", "Labelling Claims from free text"),
     ("docs/tech-hackathon.md", "Brief: technical"),
     ("docs/vision-hackathon.md", "Brief: vision"),
 ]

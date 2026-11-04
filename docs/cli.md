@@ -154,6 +154,25 @@ check catches wrong objects far better than a Claim one cell off.
 uv run clayzer batch --repeats 3 --verify --label verify
 ```
 
+## Claims from free text
+
+Grounding scores structured Claims, but most caption sets are text only. `clayzer extract` has a
+model (CLAYZER_EXTRACT_MODEL, default the Judge's) read a caption's text, never the image, and
+write the Claims it makes. A count or position the text doesn't give stays `null`, and grounding
+skips it rather than scoring a guess. Hedged things ("likely", "may be") go in `uncertain`.
+
+```sh
+uv run clayzer extract "A solar farm in the centre, with a dirt road along its west edge."
+uv run clayzer extract --check <batch-id>                         # against the Harness's own Claims
+uv run clayzer extract --labels labels/extraction/sample.jsonl    # against hand-made Claims
+```
+
+The extraction is calibrated like the Judge. `--check` compares it with the Claims the Harness
+wrote with the same text; `--labels` with Claims people made, labelled on the web app's
+`/label` page (`uv run clayzer ui --calibrate`; see
+[labels/extraction/README.md](../labels/extraction/README.md)). Each extraction is a `judge` Step
+(`role: scoring`); the Traces and `agreement.json` go to the store.
+
 ## The team web app
 
 ```sh
