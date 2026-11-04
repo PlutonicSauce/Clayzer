@@ -13,7 +13,7 @@ didn't write. A Caption Set is one row per caption in the format assumed in capt
 - Claims about objects too small for the row's imagery are flagged: an Object Class whose
   `min_visible_m` (the smallest it can be identified in NAIP) is below the row's `gsd_m` may not
   be visible at all, a wind turbine in 10 m Sentinel-2 for example. A flag is a warning, not a
-  verdict.
+  verdict. With `gsd_m` unknown (null, as for RSICD) the check can't be made: `too_small` is null.
 
 The caption itself is kept on the Case (`imported`), never shown to anything that builds labels
 (ADR-0006). Captions of one chip share one footprint, so its labels are built once.
@@ -62,16 +62,21 @@ def problems(row: dict) -> list[str]:
     if out:
         return out
     if row["kind"] != "fixed":
-        out.append(f"kind {row['kind']!r}: only fixed captions are imported until change-cases")
+        out.append(
+            f"kind {row['kind']!r}: only fixed captions are imported; a change row would need a Chip Pair"
+        )
     if not str(row["caption"]).strip():
         out.append("empty caption")
-    if not isinstance(row["gsd_m"], int | float) or row["gsd_m"] <= 0:
-        out.append("gsd_m must be a positive number")
+    gsd = row["gsd_m"]
+    if gsd is not None and (not isinstance(gsd, int | float) or gsd <= 0):
+        out.append("gsd_m must be a positive number, or null when unknown")
     g = row["geometry"]
     if g is not None and (
         not isinstance(g, dict) or g.get("type") not in ("Polygon", "MultiPolygon")
     ):
         out.append("geometry must be a GeoJSON Polygon, or null for an unlocated caption")
+    elif g is not None and not row["datetime"]:
+        out.append("a located caption needs its datetime: Answer Keys attach by date")
     return out
 
 
@@ -113,10 +118,13 @@ def reference_labels(chip) -> tuple[list[dict], dict]:
     return labels, sources
 
 
-def too_small(claims: dict | None, gsd_m: float) -> list[dict]:
-    """Claimed objects whose class may be too small to see at `gsd_m` (ontology min_visible_m)."""
+def too_small(claims: dict | None, gsd_m: float | None) -> list[dict] | None:
+    """Claimed objects whose class may be too small to see at `gsd_m` (ontology min_visible_m).
+    None when `gsd_m` is unknown: the check can't be made, which isn't the same as passing it."""
     from clayzer.ontology import load
 
+    if gsd_m is None:
+        return None
     if not claims:
         return []
     classes = load().classes
@@ -141,8 +149,9 @@ def import_rows(rows: list[dict], name: str, progress=print) -> ImportResult:
             continue
         started = time.monotonic()
         located = row["geometry"] is not None
+        date = str(row["datetime"])[:10] if row["datetime"] else None
         chip_record = {"id": str(row["chip_id"]), "uri": row.get("image_uri"),
-                       "date": str(row["datetime"])[:10], "bbox": None, "source": row["sensor"],
+                       "date": date, "bbox": None, "source": row["sensor"],
                        "gsd_m": row["gsd_m"]}  # fmt: skip
         labels, sources = [], {"located": False}
         if located:
@@ -165,7 +174,8 @@ def import_rows(rows: list[dict], name: str, progress=print) -> ImportResult:
             "imported": {
                 "caption_id": str(row["caption_id"]), "caption": row["caption"],
                 "claims": claims, "generator": row.get("generator"),
-                "stac_item": row.get("stac_item"), "too_small": too_small(claims, row["gsd_m"]),
+                "stac_item": row.get("stac_item"), "scene": row.get("scene"),
+                "too_small": too_small(claims, row["gsd_m"]),
             },
             "prep_seconds": round(time.monotonic() - started, 1),
         }  # fmt: skip

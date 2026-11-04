@@ -377,13 +377,14 @@ same.
 | `caption` | string | yes | The caption text |
 | `kind` | `fixed` or `change` | yes | One date or two |
 | `geometry` | polygon, EPSG:4326 | yes | The chip's footprint (WKB in GeoParquet, GeoJSON in JSON Lines) |
-| `datetime` | ISO date, or a list of two for `change` | yes | Acquisition date or dates |
+| `datetime` | ISO date, or a list of two for `change` | yes | Acquisition date or dates; null only for an unlocated caption |
 | `sensor` | string, e.g. `naip`, `sentinel-2-l2a` | yes | Which imagery the caption describes |
-| `gsd_m` | number | yes | Ground sample distance, metres per pixel |
+| `gsd_m` | number | yes | Ground sample distance, metres per pixel; null when unknown (RSICD), and then too-small Claims can't be checked |
 | `stac_item` | string | no | Source scene (STAC collection and item id), used to fetch the image |
 | `image_uri` | string | no | A direct link to the chip image, if there is one |
 | `generator` | string | no | The model or pipeline that wrote the caption, with its version |
 | `claims` | JSON | no | Structured Claims in the ADR-0007 format, if the source has them |
+| `scene` | string | no | A scene class the source gives the image (RSICD's `airport`, `pond`), kept for stratifying |
 
 One row in JSON Lines:
 

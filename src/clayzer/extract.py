@@ -288,34 +288,40 @@ def batch_items(store, batch_id: str) -> list[dict]:
     return items
 
 
-def _object_problems(where: str, o, object_ids: list[str], ids: set) -> list[str]:
+def _object_problems(where: str, o, object_ids, ids: set) -> list[str]:
+    """What's wrong with one hand-made object; records its id in `ids`."""
     if not isinstance(o, dict):
         return [f"{where} isn't an object"]
-    out = []
+    problems = []
     if o.get("object") not in object_ids:
-        out.append(f"{where}: {o.get('object')!r} isn't an ontology class")
-    out += [
-        f"{where}: give a {k}, or null for not stated" for k in ("count", "position") if k not in o
-    ]
+        problems.append(f"{where}: {o.get('object')!r} isn't an ontology class")
+    for key in ("count", "position"):
+        if key not in o:
+            problems.append(f"{where}: give a {key}, or null for not stated")
     count = o.get("count")
-    whole = isinstance(count, int) and not isinstance(count, bool) and count >= 1
-    if count is not None and not whole:
-        out.append(f"{where}: count must be a whole number of at least 1, or null")
+    if count is not None and not (isinstance(count, int) and not isinstance(count, bool)
+                                  and count >= 1):  # fmt: skip
+        problems.append(f"{where}: count must be a whole number of at least 1, or null")
     if o.get("position") is not None and o.get("position") not in GRID:
-        out.append(f"{where}: {o.get('position')!r} isn't a grid cell")
+        problems.append(f"{where}: {o.get('position')!r} isn't a grid cell")
     if not o.get("id") or o["id"] in ids:
-        out.append(f"{where}: needs its own id")
-    return out
+        problems.append(f"{where}: needs its own id")
+    ids.add(o.get("id"))
+    return problems
 
 
 def _relation_problems(where: str, r, ids: set) -> list[str]:
+    """What's wrong with one hand-made relation, given the ids of the objects."""
     if not isinstance(r, dict) or r.get("relation") not in RELATIONS:
         return [f"{where}: relation must be one of {', '.join(RELATIONS)}"]
-    out = [f"{where}: {side} {r.get(side)!r} isn't one of the objects"
-           for side in ("subject", "object") if r.get(side) not in ids]  # fmt: skip
+    problems = [
+        f"{where}: {side} {r.get(side)!r} isn't one of the objects"
+        for side in ("subject", "object")
+        if r.get(side) not in ids
+    ]
     if r.get("subject") == r.get("object"):
-        out.append(f"{where}: an object can't relate to itself")
-    return out
+        problems.append(f"{where}: an object can't relate to itself")
+    return problems
 
 
 def check_claims(claims) -> list[str]:
@@ -327,8 +333,6 @@ def check_claims(claims) -> list[str]:
     problems, ids = [], set()
     for i, o in enumerate(claims.get("objects", [])):
         problems += _object_problems(f"object {i + 1}", o, object_ids, ids)
-        if isinstance(o, dict):
-            ids.add(o.get("id"))
     for i, r in enumerate(claims.get("relations", [])):
         problems += _relation_problems(f"relation {i + 1}", r, ids)
     uncertain = claims.get("uncertain", [])
