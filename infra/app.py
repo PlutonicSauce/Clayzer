@@ -111,14 +111,17 @@ class ClayzerStack(cdk.Stack):
         # Least privilege (AWS-13): the read-only app only reads its own prefix of the store.
         bucket.grant_read(service.task_definition.task_role, f"{prefix}/*")
 
-        # Only CloudFront reaches the load balancer.
-        cloudfront_prefixes = ec2.PrefixList.from_lookup(
-            self,
-            "CloudFrontOrigins",
-            prefix_list_name="com.amazonaws.global.cloudfront.origin-facing",
+        # Only CloudFront reaches the load balancer. The lookup needs an account, so CI's
+        # credential-free synth passes a placeholder as `-c cloudfront_prefix_list=pl-...`.
+        cloudfront_prefixes = self.node.try_get_context("cloudfront_prefix_list") or (
+            ec2.PrefixList.from_lookup(
+                self,
+                "CloudFrontOrigins",
+                prefix_list_name="com.amazonaws.global.cloudfront.origin-facing",
+            ).prefix_list_id
         )
         service.load_balancer.connections.allow_from(
-            ec2.Peer.prefix_list(cloudfront_prefixes.prefix_list_id), ec2.Port.tcp(80)
+            ec2.Peer.prefix_list(cloudfront_prefixes), ec2.Port.tcp(80)
         )
 
         distribution = cloudfront.Distribution(

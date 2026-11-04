@@ -69,7 +69,7 @@ jobs:
       - name: CDK synth (no account needed)
         working-directory: infra
         run: |
-          npx --yes aws-cdk@2 synth -q -c store=s3://example-bucket/caption
+          npx --yes aws-cdk@2 synth -q -c store=s3://example-bucket/caption -c cloudfront_prefix_list=pl-00000000
           npx --yes aws-cdk@2 --app "uv run --group infra python github_oidc.py" synth -q
 
   # Pushes to main and manual runs deploy into the account behind the `aws` environment.
