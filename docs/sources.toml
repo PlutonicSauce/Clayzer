@@ -250,19 +250,24 @@ name = "Global Renewables Watch v1.0"
 group = "Retrieval answer keys"
 url = "https://github.com/microsoft/global-renewables-watch/releases/tag/v1.0"
 license = "MIT"
-status = "planned"
+status = "used"
 data = "Model-detected solar PV farms (86,410 polygons) and onshore wind turbines (375,197 points) worldwide, each with an estimated construction quarter (Q4 2017 – Q2 2024) and the land use before it."
 format = "Two GeoPackages: solar_all_2024q2_v1.gpkg (395 MB), wind_all_2024q2_v1.gpkg (58 MB)."
 access = "GitHub release download."
-sample_from = "the release assets, listed 2026-11-03 (columns not yet read)"
+sample_from = "the wind GeoPackage, read 2026-11-04"
 sample = '''
-solar_all_2024q2_v1.gpkg   395,395,072 bytes   polygons + construction date + prior land use
-wind_all_2024q2_v1.gpkg     58,085,376 bytes   points   + construction date + prior land use'''
+solar_all_2024q2: fid, geom (POLYGON, EPSG:3857), layer, COUNTRY, construction_year,
+  construction_quarter, landcover_in_2018, area                    86,410 arrays
+wind_all_2024q2:  fid, geom (POINT, EPSG:3857), construction_year, construction_quarter,
+  landcover_in_2018, local_utm_crs, local_utm_x, local_utm_y, COUNTRY   375,197 turbines
+(1, 2020.0, 4.0, 'landcover_30', 'EPSG:32604', 597686.8, 2390613.3, 'United States')
+2017 Q4 is the first quarter: 147,250 turbines and 32,927 arrays, "already there by then".'''
 images = [
   { src = "https://raw.githubusercontent.com/microsoft/global-renewables-watch/main/images/Figure1.jpg", caption = "Figure 1 from the GRW repo: detected solar (yellow) and wind (blue) worldwide, and a close-up" },
 ]
 used_in = [
   { path = "ontology/objects.toml", symbol = "\"grw\"", what = "solar_array and wind_turbine list GRW as a future key" },
+  { path = "src/clayzer/grw.py", symbol = "dating", what = "dates a Change Case's Chip Pair, and cross-checks USGS's install year" },
 ]
 notes = "Should: construction dates for Change Cases. Could: an Answer Key outside the US, where USGS has nothing. Model-detected, so less exact than USGS within the US."
 tasks = ["change-cases", "grw-change-dates"]
