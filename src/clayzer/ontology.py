@@ -33,6 +33,9 @@ class ObjectClass:
     rsicd_scenes: tuple[str, ...] = ()
     land_cover: dict = field(default_factory=dict)
     caption_exemplars: tuple[str, ...] = ()
+    # Other classes this one is typically found near (a directed "is typically found near"
+    # relation, distinct from the is-a hierarchy; ADR-0012). e.g. parking_lot -> building.
+    near: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -87,6 +90,13 @@ class Ontology:
                     pairs.append((cid, other))
         return pairs
 
+    def near_pairs(self, class_ids: list[str] | None = None) -> list[tuple[str, str]]:
+        """Directed "is typically found near" pairs (a, b): class a is typically found near b
+        (ADR-0012). Restrict the subjects with `class_ids`; defaults to all classes."""
+        focus = set(class_ids) if class_ids is not None else set(self.classes)
+        return [(cid, other) for cid in self.classes if cid in focus
+                for other in self.classes[cid].near]  # fmt: skip
+
 
 # ── prompt context (Layers A and C, ADR-0010) ─────────────────────────────────────────────
 #
@@ -102,12 +112,13 @@ def prompt_context(
     *,
     include_confusers: bool = True,
     confusers: list[tuple[str, str]] | None = None,
+    include_near: bool = True,
     per_class: int = 1,
     max_total: int = 4,
 ) -> str:
-    """Class-level guidance for the captioner: look-alikes (Layer A) and example phrasings
-    (Layer C). General knowledge only — never a Case's Answer Key (ADR-0006). Returns "" when
-    there is nothing to add.
+    """Class-level guidance for the captioner: look-alikes (Layer A), typical spatial neighbours
+    (ADR-0012), and example phrasings (Layer C). General knowledge only — never a Case's Answer
+    Key (ADR-0006). Returns "" when there is nothing to add.
 
     `confusers`, when given, overrides the hand-curated look-alikes from the ontology file with
     pairs measured from embeddings (prototypes.learned_confuser_pairs) — that is what makes
@@ -119,6 +130,12 @@ def prompt_context(
         if pairs:
             joined = "; ".join(f"{ont.name_of(a)} vs {ont.name_of(b)}" for a, b in pairs)
             lines.append(f"Easily-confused look-alikes to tell apart: {joined}.")
+    if include_near:
+        near = ont.near_pairs(focus)
+        if near:
+            joined = "; ".join(f"{ont.name_of(a)} near {ont.name_of(b)}" for a, b in near)
+            lines.append("Typical spatial neighbours (only state a relation you can see in the "
+                         f"image, not just because it's typical): {joined}.")  # fmt: skip
     examples: list[str] = []
     for cid in order:
         cls = ont.classes.get(cid)
@@ -163,6 +180,7 @@ def load(path: str | Path = DEFAULT) -> Ontology:
             rsicd_scenes=_tuple(entry, "rsicd_scenes"),
             land_cover=dict(entry.get("land_cover", {})),
             caption_exemplars=_tuple(entry, "caption_exemplars"),
+            near=_tuple(entry, "near"),
         )
         if cls.id in classes:
             raise ValueError(f"duplicate class {cls.id!r}")
@@ -170,4 +188,9 @@ def load(path: str | Path = DEFAULT) -> Ontology:
     for cls in classes.values():
         if cls.parent and cls.parent not in classes:
             raise ValueError(f"{cls.id}: unknown parent {cls.parent!r}")
+        for other in cls.near:
+            if other not in classes:
+                raise ValueError(f"{cls.id}: unknown near class {other!r}")
+            if other == cls.id:
+                raise ValueError(f"{cls.id}: near itself")
     return Ontology(version=str(raw.get("version", "")), classes=classes)

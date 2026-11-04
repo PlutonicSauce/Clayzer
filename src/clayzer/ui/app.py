@@ -324,7 +324,7 @@ def create_app(
                 {
                     "id": c.id, "name": c.name, "parent": c.parent, "claimable": c.claimable,
                     "synonyms": list(c.synonyms), "confusers": list(c.confusers),
-                    "keyed": c.id in keyed,
+                    "near": list(c.near), "keyed": c.id in keyed,
                 }
                 for c in ont.classes.values()
             ],

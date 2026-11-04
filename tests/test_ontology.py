@@ -87,6 +87,24 @@ def test_attributes_are_ones_the_harness_prompt_offers():
                 assert value in harness.PROMPT, f"{cls.id}.{name}={value} not in the prompt"
 
 
+def test_near_relations_point_at_known_classes():
+    for cls in ONT.classes.values():
+        assert set(cls.near) <= set(ONT.classes), f"{cls.id}: unknown near class"
+        assert cls.id not in cls.near, f"{cls.id}: near itself"
+
+
+def test_near_is_distinct_from_is_a_and_captures_the_customer_example():
+    # "a parking lot is typically found near a building" — distinct from the is-a parent.
+    assert "building" in ONT.classes["parking_lot"].near
+    assert ONT.classes["parking_lot"].parent == "transportation"  # is-a is unchanged
+    assert ("parking_lot", "building") in ONT.near_pairs()
+
+
+def test_prompt_context_states_typical_neighbours():
+    ctx = prompt_context(ONT, focus=["parking_lot"])
+    assert "Typical spatial neighbours" in ctx and "Parking lot near Building" in ctx
+
+
 def test_hierarchy_gives_distances_for_partial_credit():
     assert ONT.is_a("greenhouse", "building")
     assert ONT.distance("greenhouse", "building") == 1

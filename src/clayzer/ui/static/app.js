@@ -1135,90 +1135,111 @@ async function ontologyPage(focus) {
       </details>`;
   };
 
-  // ── Step: example ontology graph ───────────────────────────────────────────
+  // ── Step: example ontology graph (rendered with Mermaid) ────────────────────
   const rootOf = (id, byId) => { let c = byId[id]; while (c && c.parent) c = byId[c.parent]; return c ? c.id : id; };
-  const layoutOnt = (classes) => {
-    const byId = {}; classes.forEach((c) => (byId[c.id] = c));
-    const kids = {}; classes.forEach((c) => { const p = c.parent || ""; (kids[p] = kids[p] || []).push(c.id); });
-    const depth = (id) => { let d = 0, p = byId[id].parent; while (p) { d++; p = byId[p].parent; } return d; };
-    const rowH = 42, colW = 215, padX = 14, padY = 14, nodeH = 30, nodeW = 160;
-    let leaf = 0; const y = {};
-    const assign = (id) => {
-      const ks = kids[id] || [];
-      if (!ks.length) { y[id] = padY + leaf * rowH + nodeH / 2; leaf++; }
-      else { ks.forEach(assign); y[id] = (y[ks[0]] + y[ks[ks.length - 1]]) / 2; }
-    };
-    (kids[""] || []).sort().forEach(assign);
-    const maxDepth = Math.max(0, ...classes.map((c) => depth(c.id)));
-    const nodes = classes.map((c) => ({ ...c, x: padX + depth(c.id) * colW, y: y[c.id] }));
-    const edges = classes.filter((c) => c.parent).map((c) => ({ from: c.parent, to: c.id }));
-    return { nodes, edges, byId, nodeW, nodeH, width: padX * 2 + maxDepth * colW + nodeW, height: padY * 2 + leaf * rowH };
+  const MERMAID_URL = "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js";
+  const loadMermaid = () => window.mermaid
+    ? Promise.resolve(window.mermaid)
+    : new Promise((resolve, reject) => {
+        const s = document.createElement("script");
+        s.src = MERMAID_URL; s.onload = () => resolve(window.mermaid); s.onerror = reject;
+        document.head.appendChild(s);
+      });
+  // Per top-level group: [node fill, border], from the app palette.
+  const ONTO_GROUP = {
+    energy_infrastructure: ["#f4dcd4", "#b06a4f"], transportation: ["#dde7e9", "#4a7a86"],
+    built_structure: ["#efe8e3", "#8a7a63"], hydrography: ["#dbe6ec", "#4a6a86"],
+    land_cover: ["#dfe9df", "#5a7a4a"],
+  };
+  const mermaidDef = (classes, showNear) => {
+    const byId = Object.fromEntries(classes.map((c) => [c.id, c]));
+    const isRoot = (c) => !c.parent;
+    const roots = classes.filter(isRoot);
+    const membersOf = (rid) => classes.filter((c) => !isRoot(c) && rootOf(c.id, byId) === rid);
+    const label = (c) => `${c.name.replace(/["|]/g, "")}${c.keyed ? " ★" : ""}`;
+    const L = ["flowchart LR"];
+    // One subgraph per top-level group holds that group's classes, so the is-a hierarchy reads as
+    // tidy clusters instead of a fan of root→child arrows. Within a group, stack top to bottom.
+    for (const r of roots) {
+      L.push(`  subgraph ${r.id}["${r.name.replace(/["|]/g, "")}"]`);
+      L.push("    direction TB");
+      for (const c of membersOf(r.id)) L.push(`    ${c.id}["${label(c)}"]`);
+      L.push("  end");
+    }
+    // is-a edges only *between* real classes (e.g. Building → Greenhouse); root→child is grouping.
+    let i = 0; const nearIdx = [];
+    for (const c of classes) if (c.parent && !isRoot(byId[c.parent])) { L.push(`  ${c.parent} --> ${c.id}`); i++; }
+    if (showNear) for (const c of classes) for (const t of c.near || []) {
+      if (byId[t]) { L.push(`  ${c.id} -. near .-> ${t}`); nearIdx.push(i++); }
+    }
+    for (const [g, [fill, line]] of Object.entries(ONTO_GROUP))
+      L.push(`  classDef ${g} fill:${fill},stroke:${line},stroke-width:1px,color:#252323;`);
+    for (const r of roots) {
+      const ids = membersOf(r.id).map((c) => c.id);
+      if (ONTO_GROUP[r.id] && ids.length) L.push(`  class ${ids.join(",")} ${r.id};`);
+    }
+    if (nearIdx.length) L.push(`  linkStyle ${nearIdx.join(",")} stroke:#b06a4f,stroke-width:2px,stroke-dasharray:6 4;`);
+    for (const c of classes) if (!isRoot(c)) L.push(`  click ${c.id} call ontoNode("${c.id}")`);
+    return L.join("\n");
   };
   const renderGraph = (host) => {
     if (!ont) { host.innerHTML = `<p class="empty">Couldn't load the ontology.</p>`; return; }
-    const lay = layoutOnt(ont.classes);
-    const byId = lay.byId;
-    const edgeEls = lay.edges.map((e) => {
-      const a = byId[e.from], b = byId[e.to];
-      // Stop a few px short of the child so the arrowhead sits just before the box, not under it.
-      const x1 = a.x + lay.nodeW, y1 = a.y, x2 = b.x - 4, y2 = b.y, mx = (x1 + x2) / 2;
-      return `<path class="onto-edge" marker-end="url(#onto-arrow)" d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}"/>`;
-    }).join("");
-    const nodeEls = lay.nodes.map((n) => {
-      const col = ONTO_ROOTCOLOR[rootOf(n.id, byId)] || "#999";
-      return `<g class="onto-node" data-id="${esc(n.id)}" tabindex="0" role="button"
-        aria-label="${esc(n.name)}" transform="translate(${n.x},${n.y - lay.nodeH / 2})">
-        <rect width="${lay.nodeW}" height="${lay.nodeH}" rx="8" style="stroke:${col}"/>
-        <text x="11" y="${lay.nodeH / 2 + 4}">${esc(n.name)}${n.keyed ? " ★" : ""}</text>
-      </g>`;
-    }).join("");
-    host.innerHTML = `
-      <p class="onto-lead">A real slice of the guide (Layer A), straight from the project's
-        ontology file — classes and their sub-classes. <b>Click any box</b> to see its other names
-        (synonyms) and what it's confused with.</p>
-      <div class="onto-graph-wrap">
-        <div class="onto-graph-scroll">
-          <svg viewBox="0 0 ${lay.width} ${lay.height}" width="${lay.width}" height="${lay.height}"
-            class="onto-graph-svg" role="group" aria-label="Ontology class hierarchy">
-            <defs>
-              <marker id="onto-arrow" viewBox="0 0 10 10" refX="9" refY="5"
-                markerWidth="12" markerHeight="12" markerUnits="userSpaceOnUse" orient="auto">
-                <path d="M0,0 L10,5 L0,10 z" fill="#6b6461"/>
-              </marker>
-            </defs>
-            ${edgeEls}${nodeEls}
-          </svg>
-        </div>
-        <aside id="onto-node-detail" class="onto-node-detail"><p class="sub">Pick a box to see its details.</p></aside>
-      </div>
-      <p class="sub onto-legend">★ = scored against an answer key · colour = top-level group ·
-        ontology v${esc(ont.version)}.</p>`;
+    const byId = Object.fromEntries(ont.classes.map((c) => [c.id, c]));
     const showNode = (id) => {
       const c = byId[id]; if (!c) return;
+      state.node = id;
       const chain = []; let p = c.parent; while (p) { chain.unshift(byId[p].name); p = byId[p].parent; }
       const chips = (arr, kind) => arr.length
         ? `<div class="onto-chips">${arr.map((x) => `<span class="onto-chip ${kind}">${esc(byId[x] ? byId[x].name : x)}</span>`).join("")}</div>`
         : `<p class="sub">—</p>`;
-      document.getElementById("onto-node-detail").innerHTML = `
+      const el = document.getElementById("onto-node-detail");
+      if (el) el.innerHTML = `
         <h3>${esc(c.name)} ${c.keyed ? '<span class="onto-star">★ scored</span>' : '<span class="onto-star muted">not scored</span>'}</h3>
         <p class="sub onto-chain">${chain.length ? esc(chain.join(" › ")) + " › " : ""}<b>${esc(c.name)}</b></p>
         <p class="onto-dl-label">Other names (synonyms)</p>
         ${c.synonyms.length ? `<div class="onto-chips">${c.synonyms.map((s) => `<span class="onto-chip syn">${esc(s)}</span>`).join("")}</div>` : '<p class="sub">none listed</p>'}
         <p class="onto-dl-label">Easily confused with</p>
-        ${chips(c.confusers, "conf")}`;
+        ${chips(c.confusers, "conf")}
+        <p class="onto-dl-label">Typically found near</p>
+        ${chips(c.near || [], "near")}`;
     };
-    host.querySelectorAll(".onto-node").forEach((g) => {
-      const sel = () => {
-        host.querySelectorAll(".onto-node").forEach((x) => x.classList.toggle("selected", x === g));
-        state.node = g.dataset.id; showNode(g.dataset.id);
-      };
-      g.addEventListener("click", sel);
-      g.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); sel(); } });
-    });
-    if (state.node && byId[state.node]) {
-      host.querySelector(`.onto-node[data-id="${state.node}"]`)?.classList.add("selected");
-      showNode(state.node);
-    }
+    window.ontoNode = showNode;  // Mermaid node clicks call this (securityLevel: loose)
+    host.innerHTML = `
+      <p class="onto-lead">A real slice of the guide, straight from the project's ontology file —
+        the classes grouped by family, with sub-classes linked by <b>is-a</b> arrows (e.g.
+        Building → Greenhouse). <b>Click any box</b> for its synonyms, look-alikes, and typical
+        neighbours. Tick the box below to overlay the <b>“is typically found near”</b> relations.</p>
+      <label class="onto-neartoggle"><input type="checkbox" id="onto-shownear">
+        Show “is typically found near” relations (dashed amber)</label>
+      <div class="onto-graph-wrap">
+        <div id="onto-graph" class="onto-graph-scroll onto-mermaid"><p class="sub">Loading diagram…</p></div>
+        <aside id="onto-node-detail" class="onto-node-detail"><p class="sub">Pick a box to see its details.</p></aside>
+      </div>
+      <p class="sub onto-legend">★ = scored against an answer key · colour = top-level group ·
+        <b class="onto-near-key">⤏ dashed</b> = typically found near · ontology v${esc(ont.version)}.</p>`;
+    const draw = async () => {
+      const box = document.getElementById("onto-graph");
+      if (!box) return;
+      let mermaid;
+      try { mermaid = await loadMermaid(); }
+      catch { box.innerHTML = `<p class="sub">The diagram needs the Mermaid library (a network fetch). Click any class name in the list instead, or retry online.</p>`; return; }
+      if (stale(me) || !document.getElementById("onto-graph")) return;
+      mermaid.initialize({ startOnLoad: false, theme: "neutral", securityLevel: "loose",
+        flowchart: { curve: "basis", useMaxWidth: true, nodeSpacing: 40, rankSpacing: 70 } });
+      const showNear = document.getElementById("onto-shownear")?.checked ?? false;
+      try {
+        const gid = "ontoG" + Math.random().toString(36).slice(2);
+        const { svg, bindFunctions } = await mermaid.render(gid, mermaidDef(ont.classes, showNear));
+        if (stale(me) || !document.getElementById("onto-graph")) return;
+        box.innerHTML = svg;
+        bindFunctions?.(box);
+      } catch (e) {
+        box.innerHTML = `<p class="empty">Couldn't render the diagram: ${esc(e.message || e)}</p>`;
+      }
+    };
+    document.getElementById("onto-shownear")?.addEventListener("change", draw);
+    if (state.node && byId[state.node]) showNode(state.node);
+    draw();
   };
 
   // ── Step: measuring similarity ─────────────────────────────────────────────

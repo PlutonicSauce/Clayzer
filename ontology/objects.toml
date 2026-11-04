@@ -28,6 +28,10 @@
 #                     generic ("rows of dark solar panels…"), never a label for a scored Chip,
 #                     and are written by hand or from a source we do NOT score against. They
 #                     teach phrasing and help retrieval; they never state what is in THIS image.
+#   near              other classes this one is TYPICALLY FOUND NEAR (ADR-0012): a directed
+#                     "is typically found near" relation, separate from the is-a parent. e.g.
+#                     parking_lot near building. A prior about the world, not a claim about any
+#                     Chip — the captioner must still only state a relation it can see.
 #
 # The data-driven Layer B (embedding prototypes per class, learned look-alikes, and co-occurrence
 # statistics) is a generated sidecar, not this file: ontology/prototypes/<version>.json, built by
@@ -98,6 +102,7 @@ attributes = { size = ["small", "medium", "large"] }
 queries = ["find solar farms"]
 rsicd_scenes = []
 caption_exemplars = ["Rows of dark blue-grey photovoltaic panels fill the centre of the tile.", "A large ground-mounted solar array in regular rectangular blocks, set in open land."]
+near = ["substation", "road"]
 
 [[class]]
 id = "wind_turbine"
@@ -113,6 +118,7 @@ min_visible_m = 5
 queries = ["find wind turbines"]
 rsicd_scenes = []
 caption_exemplars = ["Several white wind turbines, each casting a long thin shadow, stand spaced across open ground.", "Wind turbines set in a loose line through farmland."]
+near = ["road", "field"]
 
 [[class]]
 id = "substation"
@@ -122,6 +128,7 @@ claimable = false
 definition = "A fenced yard of electrical switchgear and transformers."
 osm_reference = [{ power = "substation" }]
 synonyms = ["switchyard"]
+near = ["solar_array", "transmission_tower"]
 confusers = ["building", "parking_lot"]
 min_visible_m = 20
 
@@ -133,6 +140,7 @@ claimable = false
 definition = "A lattice or pole tower carrying high-voltage power lines."
 osm_reference = [{ power = "tower" }]
 synonyms = ["pylon", "power line tower"]
+near = ["substation"]
 confusers = ["wind_turbine"]
 min_visible_m = 5
 
@@ -188,6 +196,7 @@ min_visible_m = 10
 queries = ["find parking lots"]
 rsicd_scenes = ["parking"]
 caption_exemplars = ["A paved parking lot with marked rows of spaces, some holding cars.", "An open paved lot beside a building, lined with parking bays."]
+near = ["building", "road"]
 
 [[class]]
 id = "runway"
@@ -217,6 +226,7 @@ min_visible_m = 4
 queries = ["find buildings"]
 rsicd_scenes = ["denseresidential", "mediumresidential", "sparseresidential", "commercial", "industrial", "school", "church", "center"]
 caption_exemplars = ["A cluster of rectangular building roofs with a road alongside.", "A large industrial building with a flat rectangular roof."]
+near = ["road", "parking_lot"]
 
 [[class]]
 id = "greenhouse"
@@ -232,6 +242,7 @@ min_visible_m = 5
 queries = ["find greenhouses"]
 rsicd_scenes = []
 caption_exemplars = ["Long pale greenhouse roofs in parallel rows, brighter and more reflective than solar panels.", "A block of glasshouses with light, translucent roofs."]
+near = ["building", "road"]
 
 [[class]]
 id = "storage_tank"
@@ -241,6 +252,7 @@ claimable = false
 definition = "A cylindrical tank for liquids or gas, seen from above as a circle."
 osm_reference = [{ man_made = "storage_tank" }]
 synonyms = ["oil tank", "silo"]
+near = ["building", "road"]
 confusers = ["building"]
 min_visible_m = 5
 rsicd_scenes = ["storagetanks"]

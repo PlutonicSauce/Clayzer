@@ -553,3 +553,18 @@ abbr { text-decoration: underline dotted; cursor: help; }
 @media (max-width: 900px) { .case-view { grid-template-columns: 1fr; } }
 
 audio { width: 100%; max-width: 32rem; }
+
+/* "is typically found near" relations in the ontology graph (ADR-0012) */
+.onto-near-edge { fill: none; stroke: #b06a4f; stroke-width: 1.5; stroke-dasharray: 5 4; opacity: .85; }
+.onto-graph-svg.hide-near .onto-near-edges { display: none; }
+.onto-neartoggle { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--muted); margin: 0 0 12px; cursor: pointer; }
+.onto-neartoggle input { accent-color: #b06a4f; }
+.onto-near-key { color: #b06a4f; font-size: 16px; }
+.onto-chip.near { background: #f0ddd3; border-color: #e0bca9; }
+
+/* Mermaid-rendered ontology graph */
+.onto-mermaid { padding: 14px; background: var(--paper); display: block; min-height: 220px; overflow: auto; }
+.onto-mermaid svg { max-width: 100%; height: auto; }
+.onto-mermaid .node { cursor: pointer; }
+.onto-mermaid .node:hover rect, .onto-mermaid .node:hover polygon { filter: brightness(0.96); }
+.onto-mermaid .edgeLabel { font-size: 11px; }

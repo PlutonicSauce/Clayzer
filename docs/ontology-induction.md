@@ -63,7 +63,7 @@ validator's checks. Their three **fundamental rules** frame everything:
 | 2. **Reuse** existing ontologies | The anchor (keyed classes + OSM/USGS/NLCD/WorldCover/RSICD crosswalks) is the reuse; the agent maps onto it, never reinvents it (§5) |
 | 3. **Enumerate terms** | MAP step: list candidate object noun-phrases from captions, overlaps and all |
 | 4. **Classes & hierarchy** | REDUCE step: is-a hierarchy, combination approach, with N&M's structural rules (§4.2) |
-| 5. **Properties (slots)** | Attributes (`size`, `surface`) and the relationship vocabulary (ADR-0007) |
+| 5. **Properties (slots)** | Attributes (`size`, `surface`), the relationship vocabulary (ADR-0007), and the "is typically found near" relation between classes (ADR-0012) — which the agent can propose from how often classes co-occur in captions |
 | 6. **Facets** | Allowed attribute values (enumerated) and count cardinality |
 | 7. **Instances** | N/A to the ontology — chips and their Claims are the instances, created downstream |
 

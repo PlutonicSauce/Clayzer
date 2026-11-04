@@ -33,6 +33,13 @@ look-alike line is drawn from those **measured** pairs instead of the hand-typed
 Layer A becomes data-driven too, falling back to the ontology file when no prototypes exist.
 (`min_visible_m` stays a physical sensor fact, not learned.)
 
+**Beyond is-a: an "is typically found near" relation (ADR-0012).** Classes can also carry a
+`near` field — directed proximity associations between classes (parking_lot near building),
+separate from the is-a hierarchy. It gives the captioner a relational prior (framed "state it only
+if you can see it", so verify-then-write and grounding still gate unsupported relations), shows as
+dashed amber arrows in the Ontology-explainer graph, and is what Layer B co-occurrence / the
+induction agent can learn and cross-check later.
+
 Layer C exemplars remain hand-written for now: LGND and Clay give embeddings, not a caption
 corpus, and the 60 fixtures carry structured labels but no caption text — so data-driving C needs
 a *caption* source (a human-captioned set like RSICD, or VLM-generated captions from a disjoint
