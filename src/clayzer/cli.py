@@ -9,7 +9,7 @@ clayzer batch --repeats 3 --label base      run every Case 3 times; writes a Bat
 clayzer batch --resume <batch-id>           finish a Batch (expired credentials, failures)
 clayzer batches                             list Batches
 clayzer report <batch-id>                   rebuild a Batch's report.md and report.html
-clayzer rescore <batch-id>                  score stored Captions again with the current scorer
+clayzer rescore <batch-id>                  replay a recorded Batch offline: rescore, rebuild reports
 clayzer trace <batch-id> <case-id> [-r N]   show one Run's summary and Trace, Step by Step
 clayzer summarize <batch-id>                rebuild every Run's summary from its Trace, offline
 clayzer compare <batch-a> <batch-b>         what changed, and by how much
@@ -125,7 +125,11 @@ def main(argv: list[str] | None = None) -> int:
     rp = sub.add_parser("report", help="rebuild a Batch's reports")
     rp.add_argument("batch_id")
 
-    rs = sub.add_parser("rescore", help="score a Batch's stored Captions again, no model calls")
+    rs = sub.add_parser(
+        "rescore",
+        help="replay a recorded Batch: score its stored Captions again and rebuild its reports, "
+        "offline (no model, credentials, or network)",
+    )
     rs.add_argument("batch_id")
 
     tr = sub.add_parser("trace", help="show one Run's Trace, Step by Step")
@@ -262,7 +266,16 @@ def main(argv: list[str] | None = None) -> int:
         from clayzer.batch import rescore
 
         print(f"rescored {a.batch_id}")
-        _print_summary(rescore(a.batch_id, store))
+        summary = rescore(a.batch_id, store)
+        _print_summary(summary)
+        v = summary["replay"]["judge_verdicts"]
+        print(
+            f"  replayed offline: Judge verdicts {v['reused']} reused, {v['recovered']} recovered "
+            f"from Traces, {v['missing']} missing; {summary['replay']['summaries_rebuilt']} "
+            f"Run summaries rebuilt; retrieval kept for "
+            f"{summary['replay']['retrieval_repeats_kept']} Repeats"
+        )
+        print(f"open {_local_report(store, settings, a.batch_id)}")
         return 0
 
     if a.cmd == "trace":

@@ -1068,9 +1068,10 @@ step = "report"
 title = "Recorded-Trace replay: rescore stored Captions without calling the Harness"
 area = "Platform"
 tier = "Must"
-status = "todo"
+status = "done"
 closes = ["REQ-09"]
 start = "batches/<id>/captions.jsonl"
+notes = "Done 2026-11-04: `clayzer rescore <batch-id>` is the replay. It rescores grounding and the Workflow Score, reuses the stored Judge verdicts (recovering one a Run lost from the Judge Step in its Trace), rebuilds every Run's summary from its Trace, shows saved narratives as written, and rewrites all reports. Retrieval is kept as stored, because re-embedding needs a model. Proved with a real network namespace and an empty environment: a Batch with its summaries, reports, and one verdict deleted came back with fidelity unchanged."
 context = "The brief's fallback: a recorded Trace can be scored and reported with no model, MCP server, credentials, or network, with Judge verdicts replayed from saved results. `clayzer rescore` already re-scores stored Captions; extend it so reports rebuild fully offline, and prove it with the network off."
 done_when = [
   "A Batch rescored and reported with the network disabled",
@@ -1080,6 +1081,13 @@ done_when = [
 refs = [
   "docs/caption-design.md §2.3 (REQ-09)",
   "src/clayzer/batch.py (rescore)",
+]
+see_it = "`clayzer rescore <batch-id>` prints how many Judge verdicts were reused, recovered from Traces, or missing, how many Run summaries it rebuilt, and where the report is. The counts are kept in the Batch's summary.json under `replay`."
+changes = [
+  "src/clayzer/batch.py: rescore reuses or recovers Judge verdicts, rebuilds every Run's summary from its Trace (_write_summaries), and records the counts under `replay`",
+  "src/clayzer/judge.py: recorded_verdict reads a verdict back from a Run's Judge Step",
+  "src/clayzer/cli.py: rescore reports what it replayed and where the report is",
+  "tests/test_replay.py: replays a Batch with the network and AWS credentials cut off, from the library and the command line",
 ]
 
 [[task]]

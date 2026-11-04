@@ -67,7 +67,7 @@ Other options: `--caption-model`, `--only <case-id> ...`, `--no-judge`, `--no-na
 |---|---|
 | `clayzer batches` | list Batches |
 | `clayzer report <batch-id>` | rebuild a Batch's reports |
-| `clayzer rescore <batch-id>` | score its stored Captions again with the current scorer, no model calls |
+| `clayzer rescore <batch-id>` | replay a recorded Batch offline: score its stored Captions again with the current scorer, reuse its Judge verdicts (recovering lost ones from the Traces), rebuild every summary and report. Needs no model, credentials, or network; retrieval is kept as stored |
 | `clayzer trace <batch-id> <case-id> --repeat 1` | one Run, Step by Step (`--json` for the raw Trace) |
 | `clayzer summarize <batch-id>` | rebuild every Run's summary offline (`--narrate` writes missing narratives) |
 

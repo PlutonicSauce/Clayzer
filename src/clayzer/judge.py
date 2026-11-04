@@ -42,6 +42,23 @@ VERDICT_TOOL = {
 }
 
 
+def recorded_verdict(steps) -> dict | None:
+    """The fidelity verdict a Run's Trace recorded, or None if it recorded none.
+
+    Replay reads this instead of asking the Judge again (REQ-09): the Judge Step keeps the
+    model's full response, so the verdict can be recovered from the Trace alone.
+    """
+    for step in reversed(steps):
+        if step.kind != "judge" or step.name != "fidelity" or step.error:
+            continue
+        for block in (step.output or {}).get("content", []):
+            call = block.get("toolUse") or {}
+            verdict = call.get("input") or {}
+            if call.get("name") == "submit_verdict" and "score" in verdict:
+                return {"score": float(verdict["score"]), "issues": verdict.get("issues", [])}
+    return None
+
+
 def fidelity(
     client, model: str, caption: dict, png: bytes, tracer=None, image_key: str | None = None
 ) -> tuple[dict, dict]:

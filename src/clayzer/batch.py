@@ -483,19 +483,28 @@ def summarize(cfg: BatchConfig, cases: list[dict], results: list[dict], retr: li
 
 
 def rescore(batch_id: str, store) -> dict:
-    """Score a Batch's stored Captions again with the current scorer, without calling any model.
+    """Replay a recorded Batch: score its stored Captions again and rebuild every report, with
+    no model, MCP server, credentials, or network (REQ-09).
 
-    Grounding is recomputed against the Batch's frozen Cases, and the Workflow Score from each
-    Run's stored Trace (Runs from before Traces get none); fidelity and retrieval are kept (they
-    don't depend on the scorers). Harness Faults stay scored as 0.
+    - Grounding is recomputed against the Batch's frozen Cases, and the Workflow Score from each
+      Run's stored Trace (Runs from before Traces get none). Harness Faults stay scored as 0.
+    - Judge verdicts are reused, never requested again: the stored verdict is kept, and one a
+      Run lost is recovered from the Judge Step in its Trace. A Run with neither has no
+      fidelity score, and is counted as missing.
+    - Retrieval is kept as stored: it needs the embedding model, so it can't be replayed.
+    - Each Run's summary is rebuilt from its Trace, and the saved narratives are shown as they
+      were written.
+    The counts are kept in the summary under `replay`.
     """
     from dataclasses import replace
 
+    from clayzer.judge import recorded_verdict
     from clayzer.trace import loads, trace_key
 
     b = load(store, batch_id)
     labels = {c["id"]: c["reference_labels"] for c in b["cases"]}
     captions = {(c["case_id"], c["repeat"]): c for c in b["captions"]}
+    verdicts = {"reused": 0, "recovered": 0, "missing": 0}
     for r in b["results"]:
         cap = captions.get((r["case_id"], r["repeat"]))
         if r["status"] == OK and cap is not None:
@@ -508,8 +517,17 @@ def rescore(batch_id: str, store) -> dict:
                 "coverage": 0.0 if labels[r["case_id"]] else None,
             }
         tkey = trace_key(batch_id, r["case_id"], r["repeat"])
-        if r["status"] in (OK, HARNESS_FAULT) and store.exists(tkey):
-            r["workflow"] = workflow_score(*loads(store.get(tkey)))
+        recorded = loads(store.get(tkey)) if store.exists(tkey) else None
+        if r["status"] in (OK, HARNESS_FAULT) and recorded:
+            r["workflow"] = workflow_score(*recorded)
+        if r["status"] == OK and b["config"].judge_model:
+            if r.get("fidelity") is not None:
+                verdicts["reused"] += 1
+            elif recorded and (verdict := recorded_verdict(recorded[1])):
+                r["fidelity"] = verdict
+                verdicts["recovered"] += 1
+            else:
+                verdicts["missing"] += 1
     cfg = replace(b["config"], scorer_version=SCORER_VERSION)
     store.put(
         _key(batch_id, "batch.json"), (json.dumps(asdict(cfg), indent=2) + "\n").encode(), JSON
@@ -518,6 +536,11 @@ def rescore(batch_id: str, store) -> dict:
     summary = summarize(cfg, b["cases"], b["results"], b["retrieval"])
     summary["stopped"] = (b["summary"] or {}).get("stopped")
     summary["rescored"] = datetime.now(UTC).isoformat(timespec="seconds")
+    summary["replay"] = {
+        "judge_verdicts": verdicts,
+        "summaries_rebuilt": _write_summaries(store, batch_id, b["results"]),
+        "retrieval_repeats_kept": len(b["retrieval"]),
+    }
     store.put(_key(batch_id, "summary.json"), (json.dumps(summary, indent=2) + "\n").encode(), JSON)
     write_reports(store, batch_id)
     return summary
@@ -550,16 +573,22 @@ def load_narratives(store, batch_id: str, results: list[dict]) -> dict:
 def resummarize(batch_id: str, store) -> int:
     """Rebuild every Run's summary from its recorded Trace, with no model or network beyond the
     store. Returns how many were written."""
+    n = _write_summaries(store, batch_id, _load_jsonl(store, _key(batch_id, "results.jsonl")))
+    write_reports(store, batch_id)
+    return n
+
+
+def _write_summaries(store, batch_id: str, results: list[dict]) -> int:
+    """Write each Run's summary from its recorded Trace. Returns how many were written."""
     from clayzer.summarize import SummarySink
     from clayzer.trace import loads, trace_key
 
     sink, n = SummarySink(store), 0
-    for r in _load_jsonl(store, _key(batch_id, "results.jsonl")):
+    for r in results:
         key = trace_key(batch_id, r["case_id"], r["repeat"])
         if store.exists(key):
             sink.write(*loads(store.get(key)))
             n += 1
-    write_reports(store, batch_id)
     return n
 
 
