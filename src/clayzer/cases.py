@@ -130,14 +130,27 @@ def change_labels(before: Chip, after: Chip) -> list[dict]:
     """Reference Labels for a Chip Pair. USGS records carry the year they were built, so each
     USGS label says whether its object appeared, disappeared, or was there on both dates; the
     count and position are those of the date it's present on (the later, unless it
-    disappeared). OSM is today's map with no history, so OSM labels are the later Chip's with
-    `change: unknown`, which grounding doesn't score for change."""
+    disappeared). A USGS record with no year is dated by GRW's construction quarter where it
+    has one (grw.py), and otherwise counted on both dates. OSM is today's map with no history,
+    so OSM labels are the later Chip's with `change: unknown`, which grounding doesn't score for
+    change."""
+    from clayzer import grw
+
     solar, turbines = ak.usgs_near(after.bbox, ak.SOLAR_SEARCH_DEG, turbine_buffer_deg=0.0)
+    built = {"uspvdb": grw.built_on("uspvdb", solar), "uswtdb": grw.built_on("uswtdb", turbines)}
+
+    def existed(records: list[dict], key: str, chip: Chip) -> list[dict]:
+        dates = built[key]
+        undated = [r for r in records if str(r["case_id"]) not in dates]
+        return ak.existed_by(undated, int(chip.date[:4])) + [
+            r for r in records if dates.get(str(r["case_id"]), "9999") <= chip.date
+        ]
 
     def at(chip: Chip) -> dict[str, dict]:
-        year = int(chip.date[:4])
-        built = ak.usgs_labels(chip, ak.existed_by(solar, year), ak.existed_by(turbines, year))
-        return {lb["object"]: lb for lb in built}
+        labels = ak.usgs_labels(
+            chip, existed(solar, "uspvdb", chip), existed(turbines, "uswtdb", chip)
+        )
+        return {lb["object"]: lb for lb in labels}
 
     then, now = at(before), at(after)
     labels = []
@@ -151,21 +164,25 @@ def change_labels(before: Chip, after: Chip) -> list[dict]:
 
 
 def build_change(
-    answer_key: str, source_id: int, region: str, store, naip_source: str = "pc"
-) -> dict:
+    answer_key: str, source_id: int, region: str, store, naip_source: str = "pc",
+    dated_by: str | None = None,
+) -> dict:  # fmt: skip
     """A Change Case: the same place before and after a USGS site was built, a Chip Pair cut
-    around the same point with the same offset, so both Chips share one footprint."""
+    around the same point with the same offset, so both Chips share one footprint. The site is
+    dated by USGS's install year, or by GRW's construction quarter when USGS has none
+    (grw.dating). When the two disagree it refuses, until `dated_by` says which a person chose
+    after a look; the Case records which dated it, and the flag."""
+    from clayzer import grw
+
     started = time.monotonic()
     rec = ak.uspvdb_site(source_id) if answer_key == "uspvdb" else ak.uswtdb_turbine(source_id)
-    year = rec.get("p_year")
-    if not year:
-        raise ValueError(f"{answer_key} {source_id} has no install year (p_year)")
+    dated = grw.dating(answer_key, rec, dated_by)
     state = rec.get("p_state") or rec.get("t_state")
     lon, lat = rec["xlong"], rec["ylat"]
     offset = offset_for(f"{answer_key}-{source_id}")
     prefix = f"{state.lower()}-{answer_key}-{source_id}"
-    early = find_naip(lon, lat, before_year=year, offset_m=offset)
-    late = find_naip(lon, lat, after_year=year, offset_m=offset)
+    early = find_naip(lon, lat, before_date=dated["before"], offset_m=offset)
+    late = find_naip(lon, lat, after_date=dated["after"], offset_m=offset)
     before = cut_chip(early, lon, lat, prefix, store, naip_source, offset)
     after = cut_chip(late, lon, lat, prefix, store, naip_source, offset)
     labels = change_labels(before, after)
@@ -173,6 +190,8 @@ def build_change(
     case["kind"] = "change"
     case["chips"] = [_chip_record(before), _chip_record(after)]  # earlier first
     case["answer_keys"]["osm"] = "today's map: no history, so OSM labels have change unknown"
+    case["answer_keys"]["grw"] = grw.VERSION
+    case["dating"] = dated
     case["prep_seconds"] = round(time.monotonic() - started, 1)
     return case
 

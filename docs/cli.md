@@ -56,6 +56,21 @@ change. The Harness gets both images (earlier first) and `harness.CHANGE_PROMPT`
 Batch records as `change_prompt_sha`. Change Cases aren't verified with LGND Geo: its images
 aren't dated to the pair.
 
+The site is dated by USGS's install year, or by Global Renewables Watch's construction quarter
+when USGS has none (`src/clayzer/grw.py`; the two GeoPackages, 450 MB, download once into
+`~/.cache/clayzer/grw/`). GRW also cross-checks every USGS year. When they're more than a year
+apart, `clayzer case` refuses to build: on the dev sites, each source was wrong at times. Look at
+the site's NAIP images, then choose:
+
+```sh
+uv run clayzer case uspvdb 400117 --change                 # refused: USGS 2013, GRW 2018Q1
+uv run clayzer case uspvdb 400117 --change --dated-by usgs  # panels are in NAIP 2016: USGS is right
+```
+
+GRW's first quarter, 2017 Q4, means "already there when GRW started", not a date, so it can't
+bracket a pair (it can still contradict a USGS year of 2019 or later). Each Change Case records
+how it was dated in `dating`, and GRW's release under `answer_keys`.
+
 Positives use the latest NAIP image taken after the site was built. Site and turbine ids come
 from the USGS APIs (`https://energy.usgs.gov/api/uspvdb/v1/projects`,
 `https://energy.usgs.gov/api/uswtdb/v1/turbines`).

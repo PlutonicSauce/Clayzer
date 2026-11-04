@@ -102,6 +102,8 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument("kind", choices=["uspvdb", "uswtdb", "neg"])
     c.add_argument("args", nargs="+", help="a USGS case_id, or lon lat for a negative")
     c.add_argument("--n", type=int, default=1, help="negative number")
+    c.add_argument("--dated-by", choices=["usgs", "grw"],
+                   help="with --change: which date to use when USGS and GRW disagree, after a look")  # fmt: skip
     c.add_argument("--change", action="store_true",
                    help="a Change Case: the site before and after its install year (a Chip Pair)")  # fmt: skip
     c.add_argument("--state", default="CA", help="state code for a negative")
@@ -240,7 +242,14 @@ def main(argv: list[str] | None = None) -> int:
             if a.kind == "neg":
                 print("--change needs a USGS site: uspvdb or uswtdb", file=sys.stderr)
                 return 2
-            case = build_change(a.kind, int(a.args[0]), a.region, store, settings.naip_source)
+            from clayzer.grw import Flagged
+
+            try:
+                case = build_change(a.kind, int(a.args[0]), a.region, store,
+                                    settings.naip_source, a.dated_by)  # fmt: skip
+            except Flagged as e:
+                print(f"not built: {e}", file=sys.stderr)
+                return 2
         elif a.kind == "neg":
             lon, lat = map(float, a.args)
             case = build_negative(lon, lat, a.n, a.state, a.region, store, settings.naip_source)
@@ -255,6 +264,11 @@ def main(argv: list[str] | None = None) -> int:
         chips = " → ".join(f"{c['id']} ({c['source']})" for c in case["chips"])
         print(f"{case['id']}: chip {chips}, {case['prep_seconds']} s")
         print("  labels: " + (", ".join(labels) or "none"))
+        if d := case.get("dating"):
+            print(f"  dated by {d['source']}: USGS {d['usgs_year'] or 'no year'}, "
+                  f"GRW {', '.join(d['grw']) or 'no match'}")  # fmt: skip
+            if d["flag"]:
+                print(f"  flagged: {d['flag']}; dated by {d['source']}, chosen by {d['chosen_by']}")
         print(f"  stored in {store.url(key)}")
         return 0
 

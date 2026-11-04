@@ -275,11 +275,21 @@ step = "case"
 title = "Change Cases from Global Renewables Watch construction dates, where USGS has no install year"
 area = "Data and Cases"
 tier = "Should"
-status = "todo"
+status = "done"
 closes = ["CAP-02"]
 start = "src/clayzer/cases.py (build_change, change_labels)"
 after = ["change-cases"]
+notes = "Done 2026-11-04. In California USGS dates almost everything (all 893 USPVDB sites; all but 14 of 4,947 USWTDB turbines), so GRW's main use here is the cross-check. Run on the 43 USGS sites of the dev Cases: 22 GRW-dated, 20 only \"by 2017 Q4\", 1 unmatched, and 15 more than a year from USGS. By eye, each source is wrong at times: Pine Tree's panels are in NAIP 2016 though GRW says 2018 Q1 (GRW's early quarters miss sites), and Antelope Expansion 1B is bare land in NAIP 2020 though USGS says 2016. So a flagged site isn't built until a person chooses with `--dated-by`. The one California turbine only GRW dates (USWTDB 3088586, Victory Garden, 2018 Q2) shows no visible change between NAIP 2016 and 2022, so it wasn't kept. GRW-dated and checked by eye: North Rosamond Solar (USPVDB 406675, 2019 Q2), NAIP 2018 racking without panels to 2022 panels, solar array appeared. Per-class labels can't show one new turbine among old ones (it reads unchanged): pick sites whose class is absent before."
+see_it = "`uv run clayzer case uspvdb 406675 --change --dated-by grw`, and `uv run clayzer case uspvdb 400117 --change`, which is refused until `--dated-by` chooses."
 context = "Change Cases date a Chip Pair from USGS's install year (`p_year`) only. Global Renewables Watch v1.0 (MIT) estimates a construction quarter for 86,410 solar farms and 375,197 wind turbines worldwide (Q4 2017 to Q2 2024), and the land use before each, so it can date sites USGS has no year for and confirm the ones it has. A quarter is finer than a year, so a Pair's NAIP dates can bracket it more tightly. GRW is model-detected, so less exact than USGS inside the US: where both date a site and disagree by more than a year, flag the Case for a look by eye instead of picking one. Read the GeoPackages' columns first (docs/sources.toml has only the release listing); download at run time, never commit."
+changes = [
+  "src/clayzer/grw.py: reads GRW's GeoPackages with sqlite3 and their R-tree; matches USGS records to GRW detections; dates a Chip Pair, refusing when USGS and GRW disagree until a person chooses",
+  "src/clayzer/cases.py: build_change dates by grw.dating and records `dating` and GRW's release; change_labels dates USGS records with no year by GRW",
+  "src/clayzer/chips.py: find_naip takes day-level bounds for a construction quarter",
+  "src/clayzer/cli.py: `clayzer case ... --change --dated-by usgs|grw`, and a refused build says why",
+  "docs/sources.toml: GRW's columns, and that 2017 Q4 means already there",
+  "tests/test_grw.py: a small GeoPackage read back, dating, the cross-check, and change labels for a turbine USGS has no year for",
+]
 done_when = [
   "GRW's construction quarter read for the sites near a Chip, with the release version recorded on each Case as an Answer Key",
   "`clayzer case ... --change` brackets the quarter with two NAIP dates when USGS has no year, and says which source dated it",
