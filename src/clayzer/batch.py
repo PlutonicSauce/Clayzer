@@ -35,6 +35,7 @@ import statistics
 from contextlib import nullcontext
 from dataclasses import asdict, dataclass, field, fields
 from datetime import UTC, datetime
+from uuid import uuid4
 
 from botocore.exceptions import BotoCoreError, ClientError
 
@@ -304,7 +305,11 @@ def create(
     """Write a new Batch's configuration, prompt, and frozen Cases. Returns the Batch id."""
     # Labels become part of store keys, so only letters, digits, dashes and underscores.
     label = re.sub(r"[^A-Za-z0-9_-]+", "-", label).strip("-")[:40]
-    batch_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ") + (f"-{label}" if label else "")
+    batch_id = (
+        datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
+        + f"-{uuid4().hex}"
+        + (f"-{label}" if label else "")
+    )
     frozen = to_jsonl(cases)
     judge_prompt = provenance.judge_prompt().encode()
     chips = (json.dumps(provenance.chip_manifest(store, cases), indent=2) + "\n").encode()

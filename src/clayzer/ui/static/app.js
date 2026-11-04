@@ -115,8 +115,8 @@ const FLOW = [
     key: "gate", phase: "improve", title: "Regression gate", sub: "keep or reject the change", area: "Evaluation",
     what: `The candidate Batch against the accepted ${term("Baseline")}. A Case regresses when its correctness, coverage, or fidelity drops more than max(0.05, the Baseline's Spread). Exit 0 pass, 1 fail, 2 inconclusive. Next, saved for later: a Proposer that reads a failure digest, proposes one change to the prompt, model, or tools, and lets the gate decide.`,
     why: "This is the improvement loop the pitch rests on: every change to the captioner is measured and kept only if nothing got worse.",
-    code: ["uv run clayzer baseline accept <id>", "uv run clayzer gate <id>", "src/clayzer/gate.py"],
-    docs: [{ href: "/docs/docs/caption-plan.md#6-approach", label: "Plan §6: the improvement loop" }, { href: "/docs/docs/caption-plan.md#8-risks", label: "Plan §8: the gate's rules and their risks" }, { href: "/docs/docs/caption-plan.md#10-decisions-behind-this-plan", label: "Plan §10: decisions" }],
+    code: ["uv run clayzer baseline accept <id>", "uv run clayzer gate <id>", 'uv run clayzer experiment <id> --hypothesis "Expected improvement" [--accept]', "src/clayzer/gate.py", "src/clayzer/experiments.py"],
+    docs: [{ href: "/docs/docs/regression-gate.md", label: "Run and record a prompt experiment" }, { href: "/docs/docs/caption-plan.md#6-approach", label: "Plan §6: the improvement loop" }, { href: "/docs/docs/caption-plan.md#8-risks", label: "Plan §8: the gate's rules and their risks" }, { href: "/docs/docs/caption-plan.md#10-decisions-behind-this-plan", label: "Plan §10: decisions" }],
   },
   {
     key: "ship", phase: "ship", title: "Ship", sub: "AWS, demo, readiness", area: "Demo and delivery",
