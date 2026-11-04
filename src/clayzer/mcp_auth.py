@@ -154,6 +154,9 @@ def stored_token_auth(name: str, url: str, directory: Path | None = None):
             self.storage = FileTokenStorage(name, directory, url)
             self._lock = asyncio.Lock()
 
+        def signed_in(self) -> bool:
+            return self.storage.signed_in()
+
         async def _token(self, force: bool = False) -> str | None:
             async with self._lock:
                 token = await self.storage.get_tokens(force_refresh=force)
@@ -172,6 +175,30 @@ def stored_token_auth(name: str, url: str, directory: Path | None = None):
                     yield request
 
     return StoredTokenAuth()
+
+
+TOKEN_SOURCES = ("file", "agentcore")
+
+
+def token_source() -> str:
+    """Where non-interactive connections get a sign-in: `file` (the default: what `clayzer login`
+    saved on this machine) or `agentcore` (held by AgentCore Identity, set up once with
+    `clayzer agentcore login`). Chosen by CLAYZER_TOKEN_SOURCE, so the same code runs on a laptop
+    and inside an AgentCore Runtime."""
+    source = os.environ.get("CLAYZER_TOKEN_SOURCE", "file")
+    if source not in TOKEN_SOURCES:
+        raise ValueError(f"CLAYZER_TOKEN_SOURCE must be one of {TOKEN_SOURCES}, not {source!r}")
+    return source
+
+
+def sign_in_auth(name: str, url: str):
+    """httpx2 auth for a saved sign-in from the configured source. Check `.signed_in()`."""
+    if token_source() == "agentcore":
+        from clayzer.agentcore.identity import IdentitySettings, IdentityTokens, identity_token_auth
+
+        tokens = IdentityTokens(IdentitySettings.from_env(name), name)
+        return identity_token_auth(name, tokens)
+    return stored_token_auth(name, url)
 
 
 def wait_for_callback(port: int, timeout: float = SIGN_IN_TIMEOUT) -> dict[str, str]:

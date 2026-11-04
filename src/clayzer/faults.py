@@ -26,7 +26,7 @@ ENVIRONMENT_CODES = {
     "ExpiredToken", "ExpiredTokenException", "UnrecognizedClientException", "InvalidClientTokenId",
     "InvalidSignatureException", "AccessDeniedException",
     "EndpointConnectionError", "ConnectTimeoutError", "ReadTimeoutError", "ConnectionClosedError",
-    "SSLError", "ProxyConnectionError", "TimeoutError", "ConnectionError",
+    "SSLError", "ProxyConnectionError", "TimeoutError", "ConnectionError", "AuthorizationRequired",
 }  # fmt: skip
 # Codes that mean the Harness's own request was wrong.
 HARNESS_CODES = {"ValidationException", "ResourceNotFoundException", "ModelErrorException"}

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import os
 
+from clayzer import allowlist
 from clayzer.trace import RunInfo, Step
 
 WEIGHTS = {
@@ -26,9 +27,10 @@ WEIGHTS = {
     "cost": 0.10,
 }
 
-# MCP servers the caption Harness must never call: they read an Answer Key (ADR-0006,
-# caption-plan.md §3). Matched against a tool Step's server and tool name.
-FORBIDDEN = ("openstreetmap", "osm", "nominatim", "overture")
+# MCP servers the caption Harness must never call are listed in allowlist.py. Batches refuse to
+# start with one; this checks what a Run actually called, so a forbidden call still shows in the
+# score if one gets through some other way (a recorded Trace, an imported Harness).
+FORBIDDEN = allowlist.FORBIDDEN
 
 # Runs without a valid score get no Workflow Score either.
 NO_SCORE = {"sandbox_failure", "stopped", "running"}
@@ -59,7 +61,7 @@ def _tool_plan(info: RunInfo, llm: list[Step], tools: list[Step]) -> dict:
     checks = [(bool(llm) and _submitted(llm[-1]), "finished through submit_caption")]
     bad = sorted({
         s.attributes.get("server") or s.name for s in tools
-        if any(f in f"{s.attributes.get('server', '')} {s.name}".lower() for f in FORBIDDEN)
+        if allowlist.is_forbidden(s.attributes.get("server"), s.name)
     })  # fmt: skip
     checks.append((not bad, "called no forbidden MCP server" if not bad
                    else f"called {', '.join(bad)}, which reads an Answer Key (ADR-0006)"))  # fmt: skip

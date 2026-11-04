@@ -23,6 +23,7 @@ ui = [
 ]
 tools = [
     "mcp>=2.3,<3",
+    "httpx2>=2.16,<3",
 ]
 import = [
     "pyarrow>=15",

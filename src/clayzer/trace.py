@@ -87,13 +87,14 @@ def trace_key(batch_id: str, case_id: str, repeat: int) -> str:
     return f"batches/{batch_id}/traces/{case_id}--r{repeat}.jsonl"
 
 
-def dumps(run: RunInfo, steps: list[Step]) -> bytes:
+def dumps(run: RunInfo, steps: list[Step], *, final: bool = True) -> bytes:
     def line(event: str, data: Any) -> str:
         return json.dumps({"event": event, "data": data}, default=str) + "\n"
 
     start = {**asdict(run), "status": "running", "ended_at": None, "final_answer": None}
     body = [line("run_start", start)] + [line("step", asdict(s)) for s in steps]
-    body.append(line("run_end", asdict(run)))
+    if final:
+        body.append(line("run_end", asdict(run)))
     return "".join(body).encode()
 
 

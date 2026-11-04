@@ -78,12 +78,12 @@ def test_a_refused_or_missing_sign_in_raises():
 
 
 def test_tls_follows_the_settings(monkeypatch, tmp_path):
+    import certifi
+
     monkeypatch.delenv("CLAYZER_MCP_SYSTEM_TRUST", raising=False)
     monkeypatch.delenv("SSL_CERT_FILE", raising=False)
     assert tls_context() is True
-    monkeypatch.setenv("SSL_CERT_FILE", ssl.get_default_verify_paths().openssl_cafile)
-    if not ssl.get_default_verify_paths().openssl_cafile:
-        pytest.skip("no default CA file to point at")
+    monkeypatch.setenv("SSL_CERT_FILE", certifi.where())
     assert isinstance(tls_context(), ssl.SSLContext)
     monkeypatch.setenv("CLAYZER_MCP_SYSTEM_TRUST", "1")
     assert isinstance(tls_context(), ssl.SSLContext)
