@@ -110,6 +110,7 @@ def create_app(
         if request.url.path.startswith("/static/"):
             resp.headers["Cache-Control"] = "no-cache"
         return resp
+
     jobs: dict[str, dict] = {}
     lock = threading.Lock()
     # A finished Batch never changes, so its summary and showcase are read from the store once.
@@ -196,10 +197,15 @@ def create_app(
             claims = [
                 {"object": row["claim"]["object"], "count": row["claim"]["count"],
                  "position": row["claim"]["position"], "verdict": row["verdict"],
-                 "position_score": row.get("position")}
+                 "position_score": row.get("position"), "outcome": row.get("outcome")}
                 for row in g.get("rows", [])
             ]  # fmt: skip
-            right = sum(c["verdict"] == "matched" and c["position_score"] == 1.0 for c in claims)
+            right = sum(
+                c["verdict"] == "matched"
+                and c["position_score"] == 1.0
+                and c.get("outcome") != "contradicted"
+                for c in claims
+            )
             out.append({
                 "case_id": case_id, "run_id": r["run_id"], "chip": case["chips"][-1],
                 "text": cap["text"], "claims": claims,
@@ -270,8 +276,9 @@ def create_app(
                 "correctness": bb.get("correctness"),
                 "coverage": bb.get("coverage"),
                 "fidelity": bb["fidelity"],
+                "fidelity_self_judged": bb.get("fidelity_self_judged"),
                 "retrieval": bb["retrieval_mrr"],
-                "retrieval_top1": (bb.get("retrieval_recall_at_1") or {}).get("mean"),
+                "retrieval_top1": (bb.get("retrieval_hit_at_1") or {}).get("mean"),
                 "label_prep_seconds": bb.get("label_prep_seconds"),
                 "workflow": bb.get("workflow"),
                 "tools": base["config"].tools if hasattr(base["config"], "tools") else [],
@@ -448,7 +455,75 @@ def create_app(
         kind = ("application/json" if name.endswith(".json")
                 else "text/html; charset=utf-8" if name.endswith(".html")
                 else "text/plain; charset=utf-8")  # fmt: skip
+        from clayzer.report_safety import redact
+
+        body = store.get(key)
+        if name.endswith(".json"):
+            body = json.dumps(redact(json.loads(body))).encode()
+        elif name.endswith(".jsonl"):
+            body = b"".join(
+                (json.dumps(redact(json.loads(line))) + "\n").encode()
+                for line in body.splitlines()
+                if line.strip()
+            )
+        else:
+            body = redact(body.decode()).encode()
+        return Response(body, media_type=kind)
+
+    @app.get("/api/datasets")
+    def datasets():
+        cards = []
+        for name in sorted(store.list_dirs("datasets/")):
+            if not SAFE_ID.fullmatch(name) or ".." in name:
+                continue
+            key = f"datasets/{name}/dataset-card.json"
+            if store.exists(key):
+                card = json.loads(store.get(key))
+                cards.append(
+                    {
+                        "id": name,
+                        "name": card["dataset"].get("name"),
+                        "captions": card["counts"]["captions"],
+                        "scorer_version": card.get("scorer_version"),
+                    }
+                )
+        return cards
+
+    @app.get("/api/datasets/{dataset_id}/{name}")
+    def dataset_file(dataset_id: str, name: str):
+        if name not in {
+            "dataset-card.json",
+            "dataset-card.html",
+            "output-score.json",
+            "output-score.html",
+        }:
+            raise HTTPException(404, "not a dataset report")
+        key = f"datasets/{_safe(dataset_id)}/{name}"
+        if not store.exists(key):
+            raise HTTPException(404, "dataset report unavailable")
+        kind = "application/json" if name.endswith(".json") else "text/html; charset=utf-8"
         return Response(store.get(key), media_type=kind)
+
+    @app.get("/api/batches/{batch_id}/replay.json")
+    def replay_provenance(batch_id: str):
+        key = f"batches/{_safe(batch_id)}/replay.json"
+        if not store.exists(key):
+            raise HTTPException(404, "not an offline replay")
+        return json.loads(store.get(key))
+
+    @app.get("/api/batches/{batch_id}/traces/{name}.jsonl")
+    def recorded_trace(batch_id: str, name: str):
+        from clayzer.report_safety import redact
+
+        key = f"batches/{_safe(batch_id)}/traces/{_safe(name)}.jsonl"
+        if not store.exists(key):
+            raise HTTPException(404, "Trace unavailable")
+        body = b"".join(
+            (json.dumps(redact(json.loads(line))) + "\n").encode()
+            for line in store.get(key).splitlines()
+            if line.strip()
+        )
+        return Response(body, media_type="text/plain")
 
     @app.get("/api/batches/{batch_id}/report.html", response_class=HTMLResponse)
     def report(batch_id: str):

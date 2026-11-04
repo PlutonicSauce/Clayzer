@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 from html import escape
 
+from clayzer.report_cost import evidence_yield
 from clayzer.report_html import (
     SCRIPT,
     STYLE,
@@ -22,7 +23,9 @@ from clayzer.report_html import (
     _f,
     _trace_summary,
 )
+from clayzer.report_safety import redact
 from clayzer.trace import loads, trace_key
+from clayzer.trace_link import xray_link
 
 STEP_STYLE = """
 .steps { list-style: none; margin: 6px 0; padding: 0; }
@@ -52,7 +55,7 @@ def run_keys(batch_id: str, case_id: str, repeat: int) -> tuple[str, str]:
 
 
 def _clip_json(value, limit: int = 20_000) -> str:
-    text = json.dumps(value, indent=2, default=str)
+    text = json.dumps(redact(value), indent=2, default=str)
     return text if len(text) <= limit else text[:limit] + f"\n…[{len(text) - limit} characters cut]"
 
 
@@ -68,7 +71,7 @@ def _steps_html(steps) -> str:
             tags.append("<span class='badge b-na'>evaluation, not the Harness</span>")
         if fault:
             label = {"harness": "Harness Fault", "environment": "Environment Fault",
-                     "sandbox": "Sandbox Failure"}[fault["attribution"]]  # fmt: skip
+                     "sandbox": "Sandbox Failure"}.get(fault.get("attribution"), "Unclassified fault")  # fmt: skip
             cls = "b-bad" if fault["attribution"] == "harness" else "b-warn"
             tags.append(f"<span class='badge {cls}' title='{escape(fault['reason'])}'>{label}"
                         f"{' (soft)' if fault['soft'] else ''}</span>")  # fmt: skip
@@ -160,6 +163,9 @@ def build(store, b: dict, result: dict) -> tuple[str, dict]:
                     "relations",
                     "change",
                     "unscored_share",
+                    "denominators",
+                    "evidence_policy",
+                    "specificity",
                 )
             },
             "grounding_detail": {
@@ -173,7 +179,15 @@ def build(store, b: dict, result: dict) -> tuple[str, dict]:
                     "relations_unscored",
                 )
             },
-            "fidelity": {"score": fid.get("score"), "issues": fid.get("issues", [])},
+            "fidelity": {
+                **fid,
+                "score": fid.get("score"),
+                "issues": fid.get("issues", []),
+                "kind": "model_opinion",
+            },
+            "retrieval": next((r for r in b.get("retrieval", []) if r["repeat"] == repeat), None),
+            "cost": result.get("cost"),
+            "label_preparation": result.get("label_preparation"),
         },
         "faults": result.get("faults"),
         "workflow": result.get("workflow"),
@@ -184,6 +198,9 @@ def build(store, b: dict, result: dict) -> tuple[str, dict]:
         "caption": cap,
         "chip": chip,
         "trace": tkey if steps else None,
+        "trace_navigation": xray_link(info.metadata if info else {}),
+        "replay": cfg.extra.get("replay"),
+        "metric_provenance": result.get("replay"),
         "config": {
             "caption_model": cfg.caption_model,
             "judge_model": cfg.judge_model,
@@ -199,13 +216,30 @@ def build(store, b: dict, result: dict) -> tuple[str, dict]:
     cards = [
         ("Grounding: right", g.get("correctness"), "of what was claimed checks out"),
         ("Grounding: enough", g.get("coverage"), "of what the map shows was mentioned"),
-        ("Fidelity", fid.get("score"), "the Judge's rating against the image"),
+        (
+            "Fidelity",
+            fid.get("score"),
+            "model opinion" + ("; SELF-JUDGED" if fid.get("self_judged") else ""),
+        ),
         (
             "Workflow Score",
             (result.get("workflow") or {}).get("score"),
             "how well the Harness worked, from its Trace",
         ),
     ]
+    from clayzer.output_score import cost_observation, preparation
+
+    record["scores"]["cost"] = result.get("cost") or cost_observation(
+        seconds=result.get("seconds_to_caption"), tokens=result.get("caption_tokens")
+    )
+    record["scores"]["label_preparation"] = result.get("label_preparation") or preparation(
+        case, result.get("seconds_to_caption")
+    )
+    record["scores"]["evidence_yield"] = evidence_yield(
+        g,
+        observed_cost=record["scores"]["cost"],
+        dollar_measurement=result.get("dollar_measurement"),
+    )
     if g.get("change") is not None:  # a Change Case
         cards.insert(
             2,
@@ -218,6 +252,7 @@ def build(store, b: dict, result: dict) -> tuple[str, dict]:
     png = store.get(chip["uri"]) if store.exists(chip["uri"]) else None
     html = [
         "<!doctype html><html lang='en'><head><meta charset='utf-8'>",
+        "<meta name='viewport' content='width=device-width, initial-scale=1'>",
         f"<title>Run {escape(result['run_id'])}</title>",
         "<link rel='icon' href='/static/favicon.ico'>",
         f"<style>{STYLE}{STEP_STYLE}</style></head><body>",
@@ -226,12 +261,22 @@ def build(store, b: dict, result: dict) -> tuple[str, dict]:
         f" · prompt <code>{escape(record['config']['prompt_sha'])}</code></p>"),
         (f"<p class='status-row'><span class='badge {status_cls}'>{escape(result['status'].replace('_', ' '))}</span>"
         f"<b>{escape(verdict)}</b></p></header><main>"),
+        "<nav aria-label='Report navigation'><a href='../report.html'>← Batch report</a> · "
+        f"<a href='{escape(run_name(case_id, repeat))}.json'>Run JSON</a> · "
+        + (f"<a href='../traces/{escape(run_name(case_id, repeat))}.jsonl'>Recorded Trace</a>"
+           if info else "Recorded Trace unavailable") + "</nav>",
+        ("<p role='note'><strong>OFFLINE REPLAY</strong> — deterministic scores recomputed; "
+         "recorded model opinions retained when available. See Batch replay provenance.</p>"
+         if cfg.extra.get("replay") else ""),
+        (f"<p><a href='{escape(record['trace_navigation']['url'])}' target='_blank' rel='noopener noreferrer'>Open exported trace in AWS X-Ray</a></p>"
+         if record['trace_navigation']['url'] else
+         f"<p class='sub'>AWS X-Ray unavailable: {escape(record['trace_navigation']['reason'])}</p>"),
         "<div class='scores'>" + "".join(
             f"<div class='card'><small>{escape(t)}</small><div class='big'>{_f(v)}</div><small>{escape(n)}</small></div>"
             for t, v, n in cards) + "</div>",
         "<section class='case'><div class='chip'>",
         _chip_svg(png, case["reference_labels"], g.get("rows", [])),
-        f"<div class='meta mono'>{escape(chip['id'])} · NAIP {escape(chip['date'])} · {escape(chip['source'])}</div>",
+        f"<div class='meta mono'>{escape(chip['id'])} · {escape(chip['date'])} · {escape(chip['source'])}</div>",
         "</div><div>",
         "<h2>Caption</h2>",
         f"<blockquote>{escape(cap['text'] if cap and cap.get('text') else '(no Caption)')}</blockquote>",
@@ -246,6 +291,13 @@ def build(store, b: dict, result: dict) -> tuple[str, dict]:
         html += [f"<li>{escape(i)}</li>" for i in fid["issues"]] + ["</ul>"]
     html += [
         "</div></section>",
+        (
+            "<section class='block'><h2>Retrieval, GPU cost and preparation time</h2>"
+            "<p>Retrieval is measured over the Repeat's corpus. GPU seconds, count and type are unavailable "
+            "on Bedrock. Case-building time includes imagery and reference queries; caption generation "
+            "time is separate. Missing measurements are unavailable.</p>"
+            f"<pre>{escape(_clip_json({k: record['scores'][k] for k in ('retrieval', 'cost', 'label_preparation', 'evidence_yield')}))}</pre></section>"
+        ),
         _workflow_html(result.get("workflow")),
         "<section class='block'><h2>What happened</h2>",
         _trace_summary(summary, narrative) or "<p class='sub'>No summary for this Run.</p>",
@@ -260,7 +312,7 @@ def build(store, b: dict, result: dict) -> tuple[str, dict]:
     ]
     if info is not None:
         record["trace_status"] = info.status
-    return "\n".join(html), record
+    return redact("\n".join(html)), redact(record)
 
 
 def write_run_reports(store, b: dict) -> int:
