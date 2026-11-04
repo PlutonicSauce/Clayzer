@@ -523,7 +523,12 @@ def create_app(
         base = baseline_or_none(_safe(baseline))
         if base is None:
             raise HTTPException(404, f"no Baseline named {baseline!r}; accept one first")
-        result = gate(base, light(batch_id), tolerance)
+        try:
+            result = gate(base, batches.load(store, _safe(batch_id)), tolerance)
+        except FileNotFoundError as e:
+            raise HTTPException(404, "candidate Batch files not found") from e
+        except ValueError as e:
+            raise HTTPException(400, str(e)) from e
         return {**asdict(result), "exit_code": result.exit_code}
 
     @app.post("/api/batches")

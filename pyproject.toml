@@ -27,6 +27,9 @@ tools = [
 import = [
     "pyarrow>=15",
 ]
+embeddings = [
+    "duckdb>=1.1",
+]
 
 [project.scripts]
 clayzer = "clayzer.cli:main"

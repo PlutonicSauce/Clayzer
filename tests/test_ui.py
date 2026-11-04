@@ -50,6 +50,30 @@ def test_batches_report_gate_and_compare(client):
     assert c.get(f"/api/compare?a={bid}&b={bid}").json()["settings"] == []
 
 
+@pytest.mark.parametrize("tolerance", ["-0.1", "nan", "inf"])
+def test_gate_refuses_invalid_tolerance(client, tolerance):
+    c, bid = client
+    assert c.get(f"/api/gate/{bid}", params={"tolerance": tolerance}).status_code == 400
+
+
+def test_gate_api_checks_actual_results_instead_of_a_stale_summary(client, tmp_path):
+    import json
+
+    c, bid = client
+    path = tmp_path / "batches" / bid / "results.jsonl"
+    rows = [json.loads(line) for line in path.read_text().splitlines()]
+    rows[0]["grounding"]["correctness"] = 0
+    path.write_text("".join(json.dumps(row) + "\n" for row in rows))
+    response = c.get(f"/api/gate/{bid}")
+    assert response.status_code == 400
+    assert "summary disagrees" in response.json()["detail"]
+
+
+def test_gate_api_reports_a_missing_batch(client):
+    c, _ = client
+    assert c.get("/api/gate/does-not-exist").status_code == 404
+
+
 def test_cases_and_chips(client):
     c, _ = client
     cases = c.get("/api/cases").json()

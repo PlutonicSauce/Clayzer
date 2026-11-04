@@ -1,7 +1,7 @@
 # Output Score and Report handoff
 
-The final feature branch `feat/output-score-report-ready` starts at `149528d`, refreshed
-from `origin/main` on 2026-11-04. It transfers the hash-verified 41-file Step 6/7 patch from
+The feature branch `feat/output-score-report-ready` was refreshed through `b53ce32`
+from `origin/main` on 2026-11-04, retaining its published history through a feature-branch merge. It transfers the hash-verified 41-file Step 6/7 patch from
 the earlier `0f20505` handoff into a new isolated worktree. Both original worktrees and all
 prior backups are preserved. Publication evidence, final patch and backup manifests are
 kept in a separate local handoff package, outside the PR.
@@ -14,12 +14,12 @@ USGS/OSM/manual references, the geospatial and RSICD importers, extraction/label
 Change Cases, the Texas holdout, look-alike negatives, ontology 0.2, verifier routing/spread, GRW dating, GitHub Actions/OIDC and the extractor complexity fix are upstream teammate contributions.
 The PR preserves these features and does not introduce their fixtures or historical results.
 
-The accepted `baselines/default/` files remain byte-identical to `149528d`: the upstream
+The accepted `baselines/default/` files remain byte-identical to `b53ce32`: the upstream
 63-Case, 189-Run `20261104T164843Z-dev63-base` Batch under `grounding-4+workflow-1`.
 New scores retain `output-1+grounding-5+retrieval-2+workflow-1`. Historical results are not
-relabelled, rescored or replaced. The existing gate warns about measurement changes; its
-thresholds and decision policy remain unchanged. A cross-version gate PASS cannot establish
-improvement. Establish comparable measurements deliberately before accepting a new Baseline.
+relabelled, rescored or replaced. Upstream regression-gate hardening is preserved: measurement changes make otherwise
+passing evidence inconclusive, including scorer and frozen retrieval-query changes. The Step 6/7
+contribution adds only the query-hash measurement field; upstream thresholds and decisions remain intact. Establish comparable measurements deliberately before accepting a new Baseline.
 
 The 61 held-out Texas Cases are untouched. Full-suite validation checks their static fixture
 integrity and metadata; neither the tests nor this demo evaluate their Captions or tune on them.
@@ -195,11 +195,11 @@ git diff --check
 uv run --no-sync python scripts/report_demo.py --output /tmp/clayzer-report-demo-new
 ```
 
-Clean-branch validation: **388 passed total (385 application + 3 infrastructure); 0 failed, 0 skipped**, including all 12 independent
-audit regression cases. Coverage is **85.19%**, above the unchanged upstream 75% gate.
-Forty Shapely deprecation warnings remain (the existing three plus upstream GRW tests/code). Ruff lint and formatting (89 Python files),
-Vulture, JavaScript syntax, deck smoke test, duplication (0.32% lines; threshold 3%), Git diff
-checks, the three upstream IAM trust-policy tests, both credential-free CDK synthesis checks and the complete offline Report demo pass. No infrastructure was deployed or modified. Earlier 151/229/241/255/289/327/342-test counts
+Clean-branch validation: **509 passed total (506 application + 3 infrastructure); 0 failed, 0 skipped**, including all 12 independent
+audit regression cases. Coverage is **85.64%**, above the unchanged upstream 75% gate.
+Forty Shapely deprecation warnings remain (the existing three plus upstream GRW tests/code). Ruff lint and formatting (98 Python files),
+Vulture, JavaScript syntax, deck smoke test, duplication (0.28% lines; threshold 3%), Git diff
+checks, the three upstream IAM trust-policy tests, both credential-free CDK synthesis checks and the complete offline Report demo pass. No infrastructure was deployed or modified. Earlier 151/229/241/255/289/327/342/388-test counts
 are historical checkpoints, not evidence for the refreshed base.
 
 The demo produced six scripted Runs with fixture correctness/coverage 1.0 and Fidelity 0.75,

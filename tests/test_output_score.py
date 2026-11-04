@@ -450,6 +450,14 @@ def test_native_batch_five_criteria_and_version_warnings(env):  # noqa: F811
 
     old = {**b, "config": replace(b["config"], scorer_version="grounding-3")}
     assert any("scorer_version" in w for w in gate(old, b).warnings)
+    assert gate(old, b).verdict == "inconclusive"
+    changed_queries = {
+        **b,
+        "config": replace(b["config"], retrieval_queries_sha="different-query-evidence"),
+    }
+    result = gate(b, changed_queries)
+    assert result.verdict == "inconclusive"
+    assert any("retrieval_queries_sha" in reason for reason in result.reasons)
     assert env[0].exists(f"batches/{b['config'].batch_id}/retrieval-queries.jsonl")
     assert b["retrieval"][0]["recording"]["queries"]
 

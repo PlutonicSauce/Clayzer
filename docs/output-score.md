@@ -49,9 +49,9 @@ Score. Workflow Score code and weights are unchanged. New native Batches use sco
   and per-scope totals. Caption generation time is a separate observation. Clay's interpretation
   of the fifth criterion is still unconfirmed; both scopes are exposed rather than conflated.
 
-Historical scores and the committed Baseline are untouched. The regression gate warns on scorer,
-Judge rubric and retrieval-query changes; it retains its existing warning-only comparability
-policy. Re-evaluate a new, explicitly labelled Batch before accepting a scientifically comparable
+Historical scores and the committed Baseline are untouched. The upstream hardened regression gate treats scorer,
+Judge rubric and retrieval-query changes as measurement incompatibilities: otherwise passing
+evidence is inconclusive. This contribution preserves that upstream decision policy. Re-evaluate a new, explicitly labelled Batch before accepting a scientifically comparable
 Baseline. Do not treat a cross-version gate PASS as proof of improved caption accuracy.
 
 ## Imported-caption interface

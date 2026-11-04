@@ -153,6 +153,15 @@ def test_a_change_case_runs_end_to_end(tmp_path, monkeypatch):
     assert record["config"]["prompt_sha"] == cfg.change_prompt_sha
     assert "Grounding: change" in html and record["scores"]["grounding"]["change"] is not None
 
+    # The Step 9 Baseline and gate also support the paired-image Batch and keep its change score.
+    from clayzer.gate import accept_baseline, gate, load_baseline
+
+    batch = batches.load(store, bid)
+    accept_baseline(batch, settings.baselines_dir, "change")
+    baseline = load_baseline(settings.baselines_dir, "change")
+    assert baseline["results"][0]["grounding"]["change"] == result["grounding"]["change"]
+    assert gate(baseline, batch).exit_code == 0
+
 
 def test_a_chip_pair_step_is_summarized_and_digested():
     from clayzer.narrate import digest

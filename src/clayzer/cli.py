@@ -15,6 +15,7 @@ clayzer summarize <batch-id>                rebuild every Run's summary from its
 clayzer compare <batch-a> <batch-b>         what changed, and by how much
 clayzer baseline accept <batch-id>          make a Batch the Baseline (baselines/<name>/)
 clayzer gate <batch-id>                     regression gate: exit 0 pass, 1 fail, 2 inconclusive
+clayzer experiment <id> --hypothesis TEXT   record a gated attempt; --accept keeps it if it passes
 clayzer ui [--allow-launch]                 the team web app on http://127.0.0.1:8770
 clayzer ui --calibrate                      also let /label save hand-made labels into labels/
 
@@ -187,6 +188,16 @@ def main(argv: list[str] | None = None) -> int:
     g.add_argument("--tolerance", type=float, default=None)
     g.add_argument("--max-token-increase", type=float, default=None, help="0.5 = +50%%")
 
+    ex = sub.add_parser("experiment", help="record one labelled prompt experiment, offline")
+    ex.add_argument("batch_id")
+    ex.add_argument("--hypothesis", required=True, help="what this one change should improve")
+    ex.add_argument("--baseline", default="default")
+    ex.add_argument("--tolerance", type=float, default=None)
+    ex.add_argument("--max-token-increase", type=float, default=None, help="0.5 = +50%%")
+    ex.add_argument("--accept", action="store_true", help="keep a passing, comparable candidate")
+    recovery = sub.add_parser("experiment-recover", help="recover a kept log after a store failure")
+    recovery.add_argument("--baseline", default="default")
+
     ui = sub.add_parser("ui", help="the team web app: workflow, tasks, Cases, Batches")
     ui.add_argument("--allow-launch", action="store_true", help="let the browser run Batches")
     ui.add_argument("--calibrate", action="store_true",
@@ -215,6 +226,9 @@ def main(argv: list[str] | None = None) -> int:
     rs.add_argument(
         "--out", type=Path, help="JSON Lines to write (default data/rsicd-<split>.jsonl)"
     )
+
+    sub.add_parser("embeddings",
+                   help="LGND's Clay embeddings for the region's Chips (anonymous; CC BY 4.0)")  # fmt: skip
 
     ex = sub.add_parser("extract", help="the Claims a caption's text makes; or calibrate that")
     ex.add_argument("text", nargs="?", help="a caption")
@@ -496,7 +510,10 @@ def main(argv: list[str] | None = None) -> int:
         from clayzer.batch import load
         from clayzer.gate import accept_baseline
 
-        target = accept_baseline(load(store, a.batch_id), settings.baselines_dir, a.name)
+        try:
+            target = accept_baseline(load(store, a.batch_id), settings.baselines_dir, a.name)
+        except (ValueError, OSError) as e:
+            p.error(str(e))
         print(f"Baseline {a.name!r} is now {a.batch_id}: {target} (commit it to share)")
         return 0
 
@@ -504,14 +521,53 @@ def main(argv: list[str] | None = None) -> int:
         from clayzer.batch import load
         from clayzer.gate import DEFAULT_TOLERANCE, gate, load_baseline, render_gate
 
-        result = gate(
-            load_baseline(settings.baselines_dir, a.baseline),
-            load(store, a.batch_id),
-            DEFAULT_TOLERANCE if a.tolerance is None else a.tolerance,
-            a.max_token_increase,
-        )
+        try:
+            result = gate(
+                load_baseline(settings.baselines_dir, a.baseline),
+                load(store, a.batch_id),
+                DEFAULT_TOLERANCE if a.tolerance is None else a.tolerance,
+                a.max_token_increase,
+            )
+        except (ValueError, FileNotFoundError) as e:
+            p.error(str(e))
         print(render_gate(result), end="")
         return result.exit_code
+
+    if a.cmd == "experiment":
+        from clayzer.batch import load
+        from clayzer.experiments import record_experiment
+        from clayzer.gate import DEFAULT_TOLERANCE, render_gate
+
+        try:
+            result, record = record_experiment(
+                load(store, a.batch_id),
+                store,
+                settings.baselines_dir,
+                a.hypothesis,
+                baseline_name=a.baseline,
+                accept=a.accept,
+                tolerance=DEFAULT_TOLERANCE if a.tolerance is None else a.tolerance,
+                max_token_increase=a.max_token_increase,
+            )
+        except (ValueError, OSError) as e:
+            p.error(str(e))
+        print(render_gate(result), end="")
+        print(f"Experiment record: {store.url(record + '.json')}")
+        print(f"PR log: {store.url(record + '.md')}")
+        if a.accept and result.verdict == "pass":
+            print(f"Kept {a.batch_id} as Baseline {a.baseline!r} (commit it to share)")
+        return result.exit_code
+
+    if a.cmd == "experiment-recover":
+        from clayzer.experiments import recover_experiment
+
+        try:
+            record = recover_experiment(store, settings.baselines_dir, a.baseline)
+        except (ValueError, OSError) as e:
+            p.error(str(e))
+        print(f"Recovered experiment: {store.url(record + '.json')}")
+        print(f"PR log: {store.url(record + '.md')}")
+        return 0
 
     if a.cmd == "import":
         from clayzer.importer import caption_rows, import_key, import_rows, read_rows
@@ -552,6 +608,21 @@ def main(argv: list[str] | None = None) -> int:
         print(f"{len(rows)} captions of {images} RSICD {a.split} images → {out}")
         print("  never commit it (no license stated; cite Lu et al. 2017). Next:")
         print(f"  uv run clayzer import {out} --name rsicd-{a.split}")
+        return 0
+
+    if a.cmd == "embeddings":
+        from clayzer import embeddings as emb
+
+        points = emb.chip_points(load_cases(store, cases_key(a.region)))
+        print(f"{len(points)} Chips in {cases_key(a.region)}; reading {emb.ROOT} anonymously")
+        rows = emb.for_chips(points)
+        store.put(emb.embeddings_key(a.region), to_jsonl(rows), "application/x-ndjson")
+        missing = [r for r in rows if "missing" in r]
+        print(f"  {len(rows) - len(missing)} joined to a cell, {len(missing)} without one; "
+              f"saved in {store.url(emb.embeddings_key(a.region))}")  # fmt: skip
+        for r in missing:
+            print(f"  {r['chip_id']}: {r['missing']}")
+        print(f"  {emb.ATTRIBUTION}")
         return 0
 
     if a.cmd == "extract":

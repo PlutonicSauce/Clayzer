@@ -268,7 +268,7 @@ this review used only its isolated temporary store.
    implementation defect, not an external data blocker; no code was changed during this review.
 2. **New and old scores are not interchangeable.** The scorer is now
    `output-1+grounding-4+retrieval-2+workflow-1` for native Batches. The Judge prompt hash also changed.
-   The gate warns on measurement changes but does not prohibit a cross-version PASS. Older
+   The upstream hardened gate makes otherwise passing measurement-incompatible comparisons inconclusive. Older
    unfinished judged Batches can refuse resume when their saved rubric differs from the current one.
 3. **Real evaluation is still outstanding.** The new extraction, calibration, RSICD and VRSBench
    interfaces have synthetic tests, not validated human agreement or real benchmark results.

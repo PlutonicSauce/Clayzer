@@ -230,14 +230,33 @@ def _summary(cases: dict) -> dict:
     """A minimal Batch summary for gate tests: {case_id: {metric: (mean, spread)}}."""
     return {
         "batch": {"retrieval_mrr": {"mean": None, "spread": None}, "tokens_per_caption": 100,
-                  "runs": {"sandbox_failures": 0}},
-        "cases": {cid: {m: {"mean": v[0], "spread": v[1]} for m, v in ms.items()}
+                  "runs": {"planned": len(cases) * 3, "ok": len(cases) * 3,
+                           "harness_faults": 0, "sandbox_failures": 0}},
+        "cases": {cid: {"runs": 3, "harness_faults": 0, "sandbox_failures": 0,
+                        **{m: {"mean": v[0], "spread": v[1]} for m, v in ms.items()}}
                   for cid, ms in cases.items()},
     }  # fmt: skip
 
 
 def _cfg(repeats=3):
-    return batches.BatchConfig("id", "", "", "dev", repeats, [], "c", "cap", "j", "e", "p", "b")
+    return batches.BatchConfig(
+        "id",
+        "",
+        "",
+        "dev",
+        repeats,
+        ["x"],
+        "c",
+        "cap",
+        "j",
+        "e",
+        "p",
+        "b",
+        judge_prompt_sha="rubric",
+        chips_sha="chips",
+        ontology_version="1",
+        ontology_sha="ontology",
+    )
 
 
 def test_a_noisy_candidate_cannot_loosen_its_own_gate():
