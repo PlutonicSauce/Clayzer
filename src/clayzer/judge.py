@@ -42,23 +42,40 @@ VERDICT_TOOL = {
 }
 
 
-def fidelity(client, model: str, caption: dict, png: bytes) -> tuple[dict, dict]:
+def fidelity(
+    client, model: str, caption: dict, png: bytes, tracer=None, image_key: str | None = None
+) -> tuple[dict, dict]:
+    """Judge one Caption. With a `tracer`, the call is recorded as a `judge` Step (scoring,
+    not Harness activity)."""
+    from clayzer.trace import image_ref
+
     claims = json.dumps({"objects": caption["objects"], "relations": caption["relations"]})
-    started = time.monotonic()
-    resp = client.converse(
-        modelId=model,
-        messages=[
+    prompt = PROMPT.format(text=caption["text"], claims=claims)
+    request = {
+        "modelId": model,
+        "messages": [
             {
                 "role": "user",
                 "content": [
                     {"image": {"format": "png", "source": {"bytes": png}}},
-                    {"text": PROMPT.format(text=caption["text"], claims=claims)},
+                    {"text": prompt},
                 ],
             }
         ],
-        toolConfig={"tools": [VERDICT_TOOL]},
-        inferenceConfig={"maxTokens": 1000},
-    )
+        "toolConfig": {"tools": [VERDICT_TOOL]},
+        "inferenceConfig": {"maxTokens": 1000},
+    }
+    started = time.monotonic()
+    if tracer is None:
+        resp = client.converse(**request)
+    else:
+        recorded = {
+            "prompt": prompt,
+            "image": image_ref(image_key or "chip", png),
+            "tools": ["submit_verdict"],
+            "max_tokens": 1000,
+        }
+        resp = tracer.converse(client, "judge", "fidelity", request, recorded)
     blocks = resp["output"]["message"]["content"]
     verdict = next((b["toolUse"]["input"] for b in blocks if "toolUse" in b), None)
     step = {

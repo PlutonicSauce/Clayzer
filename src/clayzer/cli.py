@@ -10,6 +10,7 @@ clayzer batch --resume <batch-id>           finish a Batch (expired credentials,
 clayzer batches                             list Batches
 clayzer report <batch-id>                   rebuild a Batch's report.md and report.html
 clayzer rescore <batch-id>                  score stored Captions again with the current scorer
+clayzer trace <batch-id> <case-id> [-r N]   show one Run's Trace, Step by Step
 clayzer compare <batch-a> <batch-b>         what changed, and by how much
 clayzer baseline accept <batch-id>          make a Batch the Baseline (baselines/<name>/)
 clayzer gate <batch-id>                     regression gate: exit 0 pass, 1 fail, 2 inconclusive
@@ -111,6 +112,12 @@ def main(argv: list[str] | None = None) -> int:
 
     rs = sub.add_parser("rescore", help="score a Batch's stored Captions again, no model calls")
     rs.add_argument("batch_id")
+
+    tr = sub.add_parser("trace", help="show one Run's Trace, Step by Step")
+    tr.add_argument("batch_id")
+    tr.add_argument("case_id")
+    tr.add_argument("-r", "--repeat", type=int, default=1)
+    tr.add_argument("--json", action="store_true", help="print the raw Trace")
 
     cp = sub.add_parser("compare", help="compare two Batches")
     cp.add_argument("a")
@@ -224,6 +231,35 @@ def main(argv: list[str] | None = None) -> int:
 
         print(f"rescored {a.batch_id}")
         _print_summary(rescore(a.batch_id, store))
+        return 0
+
+    if a.cmd == "trace":
+        from clayzer.trace import loads, trace_key
+
+        key = trace_key(a.batch_id, a.case_id, a.repeat)
+        if not store.exists(key):
+            print(f"no Trace at {store.url(key)}", file=sys.stderr)
+            return 1
+        body = store.get(key)
+        if a.json:
+            print(body.decode(), end="")
+            return 0
+        info, steps = loads(body)
+        took = (info.ended_at or info.started_at) - info.started_at
+        print(f"Run {info.run_id} · {info.status} · {took:.1f} s · {info.model_id}")
+        if info.error:
+            print(f"  error: {info.error}")
+        print(f"  {'#':>2} {'kind':<6} {'name':<10} {'ms':>7} {'tokens':>7} {'retries':>7}  result")
+        for st in steps:
+            at = st.attributes
+            tokens = (at.get("usage") or {}).get("totalTokens", "")
+            result = st.error or (st.output or {}).get("stop_reason", "")
+            print(
+                f"  {st.index:>2} {st.kind:<6} {st.name:<10} {at.get('latency_ms', ''):>7} "
+                f"{tokens:>7} {at.get('retries', ''):>7}  {str(result)[:70]}"
+            )
+        if info.final_answer:
+            print(f"  Caption: {info.final_answer}")
         return 0
 
     if a.cmd == "compare":

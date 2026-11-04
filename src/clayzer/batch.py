@@ -17,7 +17,8 @@ Store layout, under batches/<batch-id>/:
     cases.jsonl      the Cases as scored, frozen at the start
     results.jsonl    one row per Run: outcome and scores
     captions.jsonl   one Caption per Run
-    trace.jsonl      one Step per model call
+    traces/          one Trace per Run (<case-id>--r<repeat>.jsonl): every model call as a Step
+                     with its full request and response, timing, tokens, and retries (trace.py)
     retrieval.jsonl  retrieval over each Repeat's Captions
     summary.json     per-Case means and Spreads, and Batch-level scores
     report.md, report.html
@@ -38,6 +39,7 @@ from clayzer.config import Settings, bedrock
 from clayzer.grounding import grounding
 from clayzer.judge import fidelity
 from clayzer.retrieval import retrieval
+from clayzer.trace import RunInfo, StoreSink, Tracer, watch_retries
 
 # Bump when grounding or summary logic changes, so the regression gate warns that scores from
 # before and after aren't comparable.
@@ -127,7 +129,11 @@ def _classify(e: Exception) -> str:
 
 
 def _run_one(client, cfg: BatchConfig, prompt: str, case: dict, repeat: int, store):
-    """One Run: caption the Case's Chip, then score it. Returns (result, caption, steps)."""
+    """One Run: caption the Case's Chip, then score it. Returns (result, caption).
+
+    Every model call is recorded in the Run's Trace, which is written whatever the outcome,
+    including when expired credentials stop the Batch mid-Run.
+    """
     chip = case["chips"][0]
     run_id = f"{case['id']}#{repeat}"
     base = {"run_id": run_id, "case_id": case["id"], "repeat": repeat}
@@ -136,47 +142,60 @@ def _run_one(client, cfg: BatchConfig, prompt: str, case: dict, repeat: int, sto
     if not chip["uri"].startswith("chips/"):
         raise ValueError(f"Chip uri must be a chips/ key: {chip['uri']}")
     png = store.get(chip["uri"])
-    steps = []
+    tracer = Tracer(
+        RunInfo(run_id=run_id, task="caption", case_id=case["id"], repeat=repeat,
+                batch_id=cfg.batch_id, model_id=cfg.caption_model, prompt_sha=cfg.prompt_sha,
+                tools=[], metadata={"chip_id": chip["id"], "judge_model": cfg.judge_model}),
+        [StoreSink(store)],
+    )  # fmt: skip
     try:
-        cap, step = harness.caption(client, cfg.caption_model, chip["id"], png, prompt)
-    except harness.HarnessFault as e:
-        steps.append({**e.step, **base})
-        empty = {"text": "", "objects": [], "relations": [], "uncertain": []}
-        result = {
-            **base, "status": HARNESS_FAULT, "error": str(e),
-            "grounding": {
-                **grounding(empty, case["reference_labels"]),
-                "correctness": 0.0,
-                "coverage": 0.0 if case["reference_labels"] else None,
-            },
-            "fidelity": {"score": 0.0, "issues": ["no Caption"]} if cfg.judge_model else None,
-            "seconds_to_caption": e.step["seconds"],
-            "caption_tokens": e.step["usage"].get("totalTokens"),
-        }  # fmt: skip
-        return result, {**base, **empty}, steps
-    except (ClientError, BotoCoreError) as e:
-        return {**base, "status": _classify(e), "error": str(e)[:500]}, None, steps
-
-    steps.append({**step, **base})
-    cap = {**base, **cap}
-    result = {
-        **base, "status": OK, "error": None,
-        "grounding": grounding(cap, case["reference_labels"]),
-        "fidelity": None,
-        "seconds_to_caption": step["seconds"],
-        "caption_tokens": step["usage"].get("totalTokens"),
-    }  # fmt: skip
-    if cfg.judge_model:
         try:
-            verdict, jstep = fidelity(client, cfg.judge_model, cap, png)
-            steps.append({**jstep, **base})
-            result["fidelity"] = verdict
-        except (ClientError, BotoCoreError, RuntimeError) as e:
-            if isinstance(e, ClientError | BotoCoreError):
-                _classify(e)
-            # A Judge that fails leaves the Run without a valid fidelity score.
-            return {**base, "status": SANDBOX_FAILURE, "error": f"judge: {e}"[:500]}, cap, steps
-    return result, cap, steps
+            cap, step = harness.caption(
+                client, cfg.caption_model, chip["id"], png, prompt, tracer, chip["uri"]
+            )
+        except harness.HarnessFault as e:
+            empty = {"text": "", "objects": [], "relations": [], "uncertain": []}
+            result = {
+                **base, "status": HARNESS_FAULT, "error": str(e),
+                "grounding": {
+                    **grounding(empty, case["reference_labels"]),
+                    "correctness": 0.0,
+                    "coverage": 0.0 if case["reference_labels"] else None,
+                },
+                "fidelity": {"score": 0.0, "issues": ["no Caption"]} if cfg.judge_model else None,
+                "seconds_to_caption": e.step["seconds"],
+                "caption_tokens": e.step["usage"].get("totalTokens"),
+            }  # fmt: skip
+            tracer.finish(HARNESS_FAULT, None, str(e))
+            return result, {**base, **empty}
+        except (ClientError, BotoCoreError) as e:
+            status = _classify(e)
+            tracer.finish(status, None, str(e)[:500])
+            return {**base, "status": status, "error": str(e)[:500]}, None
+
+        cap = {**base, **cap}
+        result = {
+            **base, "status": OK, "error": None,
+            "grounding": grounding(cap, case["reference_labels"]),
+            "fidelity": None,
+            "seconds_to_caption": step["seconds"],
+            "caption_tokens": step["usage"].get("totalTokens"),
+        }  # fmt: skip
+        if cfg.judge_model:
+            try:
+                verdict, _ = fidelity(client, cfg.judge_model, cap, png, tracer, chip["uri"])
+                result["fidelity"] = verdict
+            except (ClientError, BotoCoreError, RuntimeError) as e:
+                if isinstance(e, ClientError | BotoCoreError):
+                    _classify(e)
+                # A Judge that fails leaves the Run without a valid fidelity score.
+                tracer.finish(SANDBOX_FAILURE, cap["text"], f"judge: {e}"[:500])
+                return {**base, "status": SANDBOX_FAILURE, "error": f"judge: {e}"[:500]}, cap
+        tracer.finish(OK, cap["text"])
+        return result, cap
+    except CredentialsExpired as e:
+        tracer.finish("stopped", None, f"credentials expired: {e}"[:500])
+        raise
 
 
 def start(
@@ -241,27 +260,25 @@ def resume(batch_id: str, settings: Settings, store, progress=print) -> dict:
     cfg, cases = b["config"], b["cases"]
     prompt = store.get(_key(batch_id, "prompt.txt")).decode()
     client = bedrock(settings)  # models come from the Batch's own config, not the settings
+    watch_retries(client)
     done = {(r["case_id"], r["repeat"]) for r in b["results"] if r["status"] != SANDBOX_FAILURE}
     results = [r for r in b["results"] if r["status"] != SANDBOX_FAILURE]
     captions = [c for c in b["captions"] if (c["case_id"], c["repeat"]) in done]
-    trace = _load_jsonl(store, _key(batch_id, "trace.jsonl"))
 
     todo = [(c, r) for r in range(1, cfg.repeats + 1) for c in cases if (c["id"], r) not in done]
     stopped = None
     for i, (case, repeat) in enumerate(todo, 1):
         try:
-            result, cap, steps = _run_one(client, cfg, prompt, case, repeat, store)
+            result, cap = _run_one(client, cfg, prompt, case, repeat, store)
         except CredentialsExpired as e:
             stopped = f"credentials expired after {i - 1} of {len(todo)} Runs: {e}"[:300]
             break
         results.append(result)
         if cap is not None and result["status"] != SANDBOX_FAILURE:
             captions.append(cap)
-        trace += steps
         progress(f"  [{i}/{len(todo)}] {result['run_id']}: {_one_line(result)}")
         store.put(_key(batch_id, "results.jsonl"), to_jsonl(results), NDJSON)
         store.put(_key(batch_id, "captions.jsonl"), to_jsonl(captions), NDJSON)
-        store.put(_key(batch_id, "trace.jsonl"), to_jsonl(trace), NDJSON)
 
     retr = [] if stopped else _retrieval(client, cfg, cases, captions)
     store.put(_key(batch_id, "retrieval.jsonl"), to_jsonl(retr), NDJSON)

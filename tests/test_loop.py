@@ -43,9 +43,9 @@ class FakeBedrock:
     """Captions from CAPTIONS (keyed by the Chip's image bytes), fixed Judge verdicts, and
     bag-of-words embeddings. `fail` maps a call number to an exception to raise."""
 
-    def __init__(self, fail=None, wrong=False, no_caption=()):
+    def __init__(self, fail=None, wrong=False, no_caption=(), retries=0):
         self.calls, self.fail = 0, fail or {}
-        self.wrong, self.no_caption = wrong, set(no_caption)
+        self.wrong, self.no_caption, self.retries = wrong, set(no_caption), retries
 
     def converse(self, modelId, messages, toolConfig, inferenceConfig):
         self.calls += 1
@@ -65,7 +65,14 @@ class FakeBedrock:
         else:
             tool_input = {"score": 0.8, "issues": []}
         block = {"toolUse": {"toolUseId": "t", "name": name, "input": tool_input}}
-        return {"output": {"message": {"content": [block]}}, "usage": usage}
+        return {
+            "output": {"message": {"content": [block]}},
+            "usage": usage,
+            "stopReason": "tool_use",
+            "metrics": {"latencyMs": 1234},
+            "ResponseMetadata": {"HTTPStatusCode": 200, "RequestId": f"req-{self.calls}",
+                                 "RetryAttempts": self.retries},
+        }  # fmt: skip
 
     def invoke_model(self, modelId, body):
         text = json.loads(body)["inputText"].lower()
@@ -239,3 +246,70 @@ def test_a_steady_candidate_is_not_warned_about_spread():
     result = gate(base, same)
     assert result.verdict == "pass"
     assert not any("erratic" in w for w in result.warnings)
+
+
+# ── Traces ─────────────────────────────────────────────────────────────────────────────
+
+
+def _trace(env, batch_id, case_id, repeat):
+    from clayzer.trace import loads, trace_key
+
+    return loads(env[0].get(trace_key(batch_id, case_id, repeat)))
+
+
+def test_every_run_has_a_trace_with_full_inputs_and_outputs(env):
+    b = run(env, "traced", repeats=2, retries=2)
+    bid = b["config"].batch_id
+    for case in (SOLAR, WIND):
+        for repeat in (1, 2):
+            info, steps = _trace(env, bid, case["id"], repeat)
+            assert info.status == "ok" and info.final_answer
+            assert [(s.kind, s.name) for s in steps] == [("llm", "caption"), ("judge", "fidelity")]
+            cap, judge = steps
+            assert "aerial image" in cap.input["prompt"]  # the full prompt, not a hash
+            assert set(cap.input["image"]) == {"key", "sha256", "bytes"}  # no image bytes
+            assert cap.input["image"]["key"] == case["chips"][0]["uri"]
+            assert cap.output["content"][0]["toolUse"]["name"] == "submit_caption"
+            assert cap.output["stop_reason"] == "tool_use"
+            a = cap.attributes
+            assert a["usage"]["totalTokens"] == 100 and a["provider_latency_ms"] == 1234
+            assert a["retries"] == 2 and a["request_id"].startswith("req-")
+            assert a["latency_ms"] >= 0 and a["cost"]["gpu_seconds"] is None
+            assert judge.attributes["role"] == "scoring"
+            assert [s.index for s in steps] == [0, 1]
+
+
+def test_failed_and_faulted_runs_are_traced_too(env):
+    b = run(env, no_caption={"c-wind"}, fail={1: throttled()})
+    bid = b["config"].batch_id
+    info, steps = _trace(env, bid, SOLAR["id"], 1)  # call 1 throttled
+    assert info.status == "sandbox_failure"
+    assert steps[0].error.startswith("ClientError") and steps[0].output is None
+    assert steps[0].attributes["error_code"] == "ThrottlingException"
+    info, steps = _trace(env, bid, WIND["id"], 1)
+    assert info.status == "harness_fault" and len(steps) == 1  # no Judge call after a fault
+    assert "toolUse" not in steps[0].output["content"][0]
+
+
+def test_expired_credentials_leave_a_stopped_trace(env):
+    b = run(env, fail={3: expired()})  # call 3 is wind#1's caption
+    info, steps = _trace(env, b["config"].batch_id, WIND["id"], 1)
+    assert info.status == "stopped" and "credentials expired" in info.error
+    assert steps[0].attributes["error_code"] == "ExpiredTokenException"
+
+
+def test_retry_hook_records_each_failed_attempt():
+    from clayzer import trace
+
+    class Http:
+        status_code = 429
+
+    trace._attempts.log = []
+    trace._on_needs_retry(response=(Http(), {"Error": {"Code": "ThrottlingException"}}), attempts=1)
+    trace._on_needs_retry(response=None, attempts=2, caught_exception=TimeoutError())
+    assert trace._attempts.log == [
+        {"attempt": 1, "http_status": 429, "error": "ThrottlingException"},
+        {"attempt": 2, "error": "TimeoutError"},
+    ]
+    trace._attempts.log = None
+    assert trace._on_needs_retry(response=None, attempts=1) is None  # no Step being recorded

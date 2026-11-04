@@ -89,19 +89,28 @@ class HarnessFault(Exception):
 
 
 def caption(
-    client, model: str, chip_id: str, png: bytes, prompt_template: str = PROMPT
+    client,
+    model: str,
+    chip_id: str,
+    png: bytes,
+    prompt_template: str = PROMPT,
+    tracer=None,
+    image_key: str | None = None,
 ) -> tuple[dict, dict]:
-    """Caption one Chip. Returns the Caption (minus `case_id`) and a Trace Step.
+    """Caption one Chip. Returns the Caption (minus `case_id`) and a summary of the call.
 
-    `prompt_template` may use {grid}, {objects}, and {relations}.
+    `prompt_template` may use {grid}, {objects}, and {relations}. With a `tracer`, the call is
+    recorded as a Step in the Run's Trace: the full prompt and response, the image by key and
+    hash, timing, tokens, and retries.
     """
+    from clayzer.trace import image_ref
+
     prompt = prompt_template.format(
         grid=", ".join(GRID), objects=", ".join(OBJECTS), relations=", ".join(RELATIONS)
     )
-    started = time.monotonic()
-    resp = client.converse(
-        modelId=model,
-        messages=[
+    request = {
+        "modelId": model,
+        "messages": [
             {
                 "role": "user",
                 "content": [
@@ -110,9 +119,21 @@ def caption(
                 ],
             }
         ],
-        toolConfig={"tools": [CAPTION_TOOL], "toolChoice": {"tool": {"name": "submit_caption"}}},
-        inferenceConfig={"maxTokens": 1500},
-    )
+        "toolConfig": {"tools": [CAPTION_TOOL], "toolChoice": {"tool": {"name": "submit_caption"}}},
+        "inferenceConfig": {"maxTokens": 1500},
+    }
+    started = time.monotonic()
+    if tracer is None:
+        resp = client.converse(**request)
+    else:
+        recorded = {
+            "prompt": prompt,
+            "image": image_ref(image_key or f"chips/{chip_id}.png", png),
+            "tools": ["submit_caption"],
+            "tool_choice": "submit_caption",
+            "max_tokens": 1500,
+        }
+        resp = tracer.converse(client, "llm", "caption", request, recorded)
     seconds = round(time.monotonic() - started, 2)
     blocks = resp["output"]["message"]["content"]
     submitted = next((b["toolUse"]["input"] for b in blocks if "toolUse" in b), None)
