@@ -9,6 +9,7 @@ clayzer batch --repeats 3 --label base      run every Case 3 times; writes a Bat
 clayzer batch --resume <batch-id>           finish a Batch (expired credentials, failures)
 clayzer batches                             list Batches
 clayzer report <batch-id>                   rebuild a Batch's report.md and report.html
+clayzer replay <batch-id> [--cases KEY]     rescore a recorded Batch against updated Cases, offline
 clayzer rescore <batch-id>                  score stored Captions again with the current scorer
 clayzer trace <batch-id> <case-id> [-r N]   show one Run's summary and Trace, Step by Step
 clayzer summarize <batch-id>                rebuild every Run's summary from its Trace, offline
@@ -181,6 +182,13 @@ def main(argv: list[str] | None = None) -> int:
                     help="let the /label page save hand-made labels into labels/")  # fmt: skip
     ui.add_argument("--host", default="127.0.0.1")
     ui.add_argument("--port", type=int, default=8770)
+
+    rp2 = sub.add_parser("replay", help="a recorded Batch rescored against updated Cases, offline")
+    rp2.add_argument("batch_id")
+    rp2.add_argument("--cases", metavar="KEY",
+                     help="the store's Case file to score against (default: the region's)")  # fmt: skip
+    rp2.add_argument("--label", default="replay", help="a short name for the new Batch")
+    rp2.add_argument("--no-reports", action="store_true", help="skip the per-Run reports")
 
     im = sub.add_parser("import", help="a Caption Set from any source becomes Cases")
     im.add_argument(
@@ -497,6 +505,18 @@ def main(argv: list[str] | None = None) -> int:
             p.error(str(e))
         print(f"Recovered experiment: {store.url(record + '.json')}")
         print(f"PR log: {store.url(record + '.md')}")
+        return 0
+
+    if a.cmd == "replay":
+        from clayzer import batch as batches
+
+        cases_file = a.cases or key
+        new_id = batches.replay(a.batch_id, store, load_cases(store, cases_file), a.label,
+                                reports=not a.no_reports)  # fmt: skip
+        print(
+            f"replayed {a.batch_id} against {store.url(cases_file)} as {new_id}, with no model calls"
+        )
+        _print_summary(batches.load(store, new_id)["summary"])
         return 0
 
     if a.cmd == "import":

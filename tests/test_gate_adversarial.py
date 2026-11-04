@@ -71,6 +71,29 @@ def test_partial_metric_samples_do_not_pass_as_complete(env):  # noqa: F811
         gate(b, c)
 
 
+def _no_gradable_claims(env, precision):  # noqa: F811
+    from clayzer.batch import summarize
+
+    _, settings, _ = setup(env)
+    c = run(env, "candidate")
+    # A Caption whose every Claim is ungradable: grounding leaves precision and correctness None.
+    c["results"][0]["grounding"].update(correctness=None, precision=precision)
+    c["summary"] = summarize(c["config"], c["cases"], c["results"], c["retrieval"])
+    return c, settings
+
+
+def test_a_run_with_nothing_to_grade_is_a_complete_correctness_sample(env):  # noqa: F811
+    c, settings = _no_gradable_claims(env, precision=None)
+    accept_baseline(c, settings.baselines_dir)
+    assert gate(load_baseline(settings.baselines_dir), c).verdict == "pass"
+
+
+def test_a_missing_correctness_with_gradable_claims_is_still_incomplete(env):  # noqa: F811
+    c, settings = _no_gradable_claims(env, precision=1.0)
+    with pytest.raises(ValueError, match="incomplete score samples"):
+        accept_baseline(c, settings.baselines_dir)
+
+
 @pytest.mark.parametrize("mutation", ["missing_run", "duplicate_run", "stale_mean", "wrong_case"])
 def test_experiment_cannot_promote_stale_or_inconsistent_results(env, mutation):  # noqa: F811
     store, settings, base = setup(env)

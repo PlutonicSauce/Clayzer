@@ -99,6 +99,8 @@ class BatchConfig:
     # A hash of ontology/verifiers.toml, the route each class's Claims are verified by; None
     # without verification.
     verifiers_sha: str | None = None
+    # A replayed Batch: the recorded Batch whose Captions it rescored (replay), else None.
+    replayed_from: str | None = None
     # Settings this version doesn't know, from a Batch another branch wrote to the shared store.
     extra: dict = field(default_factory=dict)
 
@@ -597,6 +599,116 @@ def rescore(batch_id: str, store) -> dict:
     store.put(_key(batch_id, "summary.json"), (json.dumps(summary, indent=2) + "\n").encode(), JSON)
     write_reports(store, batch_id)
     return summary
+
+
+def _rerank(rows: list[dict], cases: list[dict]) -> tuple[list[dict], list[str]]:
+    """Retrieval rows rescored for new Reference Labels, offline. A stored row keeps each
+    query's full ranking, which depends only on Caption text, so only relevance changes. A query
+    that had nothing relevant before was never ranked; it's returned as not replayable."""
+    from clayzer.retrieval import QUERIES
+
+    labels = {c["id"]: {lb["object"] for lb in c["reference_labels"]} for c in cases}
+    out, missing = [], set()
+    for row in rows:
+        k = next((key for key in row if key.startswith("recall@")), "recall@1")
+        n = int(k.split("@")[1])
+        stored = {q["query"]: q for q in row["queries"]}
+        docs = stored[next(iter(stored))]["ranked"] if stored else []
+        queries = []
+        for query, target in QUERIES.items():
+            relevant = {cid for cid in docs if target in labels.get(cid, set())}
+            if not relevant:
+                continue
+            if query not in stored:
+                missing.add(query)
+                continue
+            ids = stored[query]["ranked"]
+            first = next(i for i, cid in enumerate(ids) if cid in relevant)
+            queries.append({"query": query, "relevant": sorted(relevant), "ranked": ids,
+                            "reciprocal_rank": 1 / (first + 1),
+                            k: len(relevant & set(ids[:n])) / len(relevant)})  # fmt: skip
+        m = len(queries)
+        out.append({"repeat": row["repeat"], "queries": queries,
+                    "mrr": sum(q["reciprocal_rank"] for q in queries) / m if m else None,
+                    k: sum(q[k] for q in queries) / m if m else None})  # fmt: skip
+    return out, sorted(missing)
+
+
+def replay(batch_id: str, store, cases: list[dict], label: str = "", reports: bool = True) -> str:
+    """A new Batch from a recorded one, scored against `cases`: the same Cases and Chips with
+    updated Reference Labels. No model, MCP server, credentials, or network beyond the store
+    (REQ-09). Returns the new Batch's id.
+
+    The Harness never sees Reference Labels (ADR-0006) and the Judge doesn't either, so the
+    recorded Captions, Traces, fidelity verdicts, summaries, and narratives all stand. Grounding
+    and the Workflow Score are recomputed, and retrieval is re-ranked from the stored rankings.
+    Raises if the Cases or their Chips differ, or a retrieval query can't be replayed.
+    """
+    from dataclasses import replace
+
+    from clayzer.narrate import narrative_key
+    from clayzer.summarize import summary_key
+    from clayzer.trace import loads, trace_key
+
+    b = load(store, batch_id)
+    old = {c["id"]: c for c in b["cases"]}
+    new = {c["id"]: c for c in cases}
+    if set(old) != set(new):
+        raise ValueError(f"replay needs the same Cases: {sorted(set(old) ^ set(new))[:5]} differ")
+    for cid, c in new.items():
+        if [x["uri"] for x in c["chips"]] != [x["uri"] for x in old[cid]["chips"]]:
+            raise ValueError(f"{cid}'s Chips differ from the recorded Batch's")
+    retr, missing = _rerank(b["retrieval"], cases)
+    if missing:
+        raise ValueError(f"can't replay retrieval for {missing}: nothing was relevant before")
+
+    label = re.sub(r"[^A-Za-z0-9_-]+", "-", label).strip("-")[:40]
+    new_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ") + (f"-{label}" if label else "")
+    frozen = to_jsonl(cases)
+    cfg = replace(b["config"], batch_id=new_id, label=label, scorer_version=SCORER_VERSION,
+                  created=datetime.now(UTC).isoformat(timespec="seconds"),
+                  cases_sha=_sha(frozen), replayed_from=batch_id)  # fmt: skip
+    captions = {(c["case_id"], c["repeat"]): c for c in b["captions"]}
+    results = []
+    for r in b["results"]:
+        r = dict(r)
+        labels, cap = (
+            new[r["case_id"]]["reference_labels"],
+            captions.get((r["case_id"], r["repeat"])),
+        )
+        if r["status"] == OK and cap is not None:
+            r["grounding"] = grounding(cap, labels)
+        elif r["status"] == HARNESS_FAULT:
+            empty = {"text": "", "objects": [], "relations": [], "uncertain": []}
+            r["grounding"] = {**grounding(empty, labels), "correctness": 0.0,
+                              "coverage": 0.0 if labels else None}  # fmt: skip
+        tkey = trace_key(batch_id, r["case_id"], r["repeat"])
+        if store.exists(tkey):
+            body = store.get(tkey)
+            store.put(trace_key(new_id, r["case_id"], r["repeat"]), body, NDJSON)
+            if r["status"] in (OK, HARNESS_FAULT):
+                r["workflow"] = workflow_score(*loads(body))
+        for key in (summary_key, narrative_key):
+            src = key(batch_id, r["case_id"], r["repeat"])
+            if store.exists(src):
+                store.put(key(new_id, r["case_id"], r["repeat"]), store.get(src), JSON)
+        results.append(r)
+
+    store.put(_key(new_id, "batch.json"), (json.dumps(asdict(cfg), indent=2) + "\n").encode(), JSON)
+    store.put(_key(new_id, "cases.jsonl"), frozen, NDJSON)
+    for name in ("prompt.txt", "judge-prompt.txt", "chips.json"):
+        if store.exists(_key(batch_id, name)):
+            store.put(_key(new_id, name), store.get(_key(batch_id, name)))
+    store.put(_key(new_id, "results.jsonl"), to_jsonl(results), NDJSON)
+    store.put(_key(new_id, "captions.jsonl"), to_jsonl(b["captions"]), NDJSON)
+    store.put(_key(new_id, "retrieval.jsonl"), to_jsonl(retr), NDJSON)
+    summary = summarize(cfg, cases, results, retr)
+    summary["stopped"] = (b["summary"] or {}).get("stopped")
+    summary["replayed_from"] = batch_id
+    store.put(_key(new_id, "summary.json"), (json.dumps(summary, indent=2) + "\n").encode(), JSON)
+    if reports:
+        write_reports(store, new_id)
+    return new_id
 
 
 def load_summaries(store, batch_id: str, results: list[dict]) -> dict:

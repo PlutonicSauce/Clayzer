@@ -1,5 +1,5 @@
 {
-  "batch_id": "20261104T193330Z-dev74-base",
+  "batch_id": "20261104T211847Z-dev74-base",
   "cases": {
     "fixed-dev-neg-1": {
       "runs": 3,
@@ -1806,8 +1806,8 @@
       "harness_faults": 0,
       "sandbox_failures": 0,
       "correctness": {
-        "mean": 0.6419753086419753,
-        "spread": 0.042766686606638946
+        "mean": 0.7098765432098766,
+        "spread": 0.10850861624226511
       },
       "workflow": {
         "mean": 1.0,
@@ -1824,8 +1824,8 @@
       "components": {
         "precision": 1.0,
         "recall": 0.8333333333333334,
-        "count": 0.16666666666666666,
-        "position": 0.7592592592592592,
+        "count": 0.3333333333333333,
+        "position": 0.7962962962962963,
         "attributes": null,
         "relations": null
       },
@@ -2223,7 +2223,7 @@
     }
   },
   "batch": {
-    "correctness": 0.7461599044932379,
+    "correctness": 0.7470774887441554,
     "workflow": 1.0,
     "coverage": 0.759313725490196,
     "fidelity": 0.5624324324324323,
@@ -2273,5 +2273,6 @@
       "soft": 0
     }
   },
-  "stopped": null
+  "stopped": null,
+  "replayed_from": "20261104T193330Z-dev74-base"
 }
