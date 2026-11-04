@@ -38,7 +38,7 @@ from datetime import UTC, datetime
 
 from botocore.exceptions import BotoCoreError, ClientError
 
-from clayzer import harness, provenance
+from clayzer import harness, lgnd, provenance, verifiers
 from clayzer.cases import parse_jsonl, to_jsonl
 from clayzer.config import Settings, bedrock
 from clayzer.grounding import grounding
@@ -94,6 +94,9 @@ class BatchConfig:
     code_commit: str | None = None
     code_dirty: bool | None = None
     summary_model: str | None = None
+    # A hash of ontology/verifiers.toml, the route each class's Claims are verified by; None
+    # without verification.
+    verifiers_sha: str | None = None
     # Settings this version doesn't know, from a Batch another branch wrote to the shared store.
     extra: dict = field(default_factory=dict)
 
@@ -334,6 +337,7 @@ def create(
         code_commit=commit,
         code_dirty=dirty,
         summary_model=summary_model(),
+        verifiers_sha=_sha(verifiers.DEFAULT.read_bytes()) if verify else None,
     )
     store.put(
         _key(batch_id, "batch.json"), (json.dumps(asdict(cfg), indent=2) + "\n").encode(), JSON
@@ -379,6 +383,13 @@ def resume(batch_id: str, settings: Settings, store, progress=print, narrate: bo
     with tools as box:
         model_tools = box.view(cfg.tools) if box is not None and cfg.tools else None
         verifier = box.view([cfg.verify]) if box is not None and cfg.verify else None
+        routes = verifiers.load()
+        if verifier is not None and routes.uses_classifier():
+            # Classifiers are saved per LGND account: build it once, before the first Run.
+            # If that fails, classifier-routed Claims stay, unverified (verify.py).
+            error = lgnd.ensure_classifier(verifier.call, routes.classifier, routes.examples)
+            if error:
+                progress(f"  the LGND classifier {routes.classifier} isn't available: {error}")
         for i, (case, repeat) in enumerate(todo, 1):
             try:
                 result, cap = _run_one(

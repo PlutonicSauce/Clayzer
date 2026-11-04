@@ -31,6 +31,7 @@ SETTINGS = [
     ("prompt_source", "Prompt source", "What was tested"),
     ("tools", "MCP servers", "What was tested"),
     ("max_turns", "Turn budget", "What was tested"),
+    ("verifiers_sha", "Verifier routes", "What was tested"),
     ("judge_model", "Judge model", "What it was judged with"),
     ("judge_prompt_sha", "Judge rubric", "What it was judged with"),
     ("embed_model", "Embedding model", "What it was judged with"),

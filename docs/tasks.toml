@@ -120,6 +120,28 @@ changes = [
 ]
 
 [[task]]
+id = "case-spread"
+step = "case"
+title = "Measure how varied the Cases' surroundings are, and fill the gaps"
+area = "Data and Cases"
+tier = "Should"
+status = "doing"
+closes = ["CAP-01", "CAP-18"]
+start = "uv run clayzer spread --suggest"
+after = ["dev-cases"]
+notes = "First measure 2026-11-04 (63 dev Cases, 50 LGND calls): wind 11 of 13 in desert scrub (evenness 0.28), no farmland, grassland or town turbines; solar 8 desert scrub, 11 farmland, 7 industrial, 4 grassland, and no woodland or town; negatives evenest (0.70), half desert scrub. LGND's solar misses were 39% rooftop or car-park arrays and 39% woodland ground-mounts, exactly the settings the solar Cases lack."
+context = "LGND found accurate but narrow seeds (wind turbines nearly all on dry rangeland) cap what a model can learn. A Case set has the same risk for the gate: a captioner change that breaks woodland or rooftop arrays scores as no change if no Case shows one. `clayzer spread` labels one subject-free cell of each Chip with an LGND settings classifier (desert scrub, farmland, grassland, woodland, town, industrial, mountains; text examples in src/clayzer/spread.py), counts each group's settings, and with --suggest searches LGND for each gap and prints `clayzer case` commands for the nearest USGS sites at least 1 km from every Case."
+done_when = [
+  "Solar Cases in woodland and town (rooftop or car-park arrays), and wind Cases in grassland or farmland, each checked by eye",
+  "`clayzer spread` evenness for wind above 0.5",
+  "A new Baseline accepted on the larger set",
+]
+refs = [
+  "src/clayzer/spread.py",
+  "docs/cli.md (Build Cases: setting spread)",
+]
+
+[[task]]
 id = "fixtures"
 step = "case"
 title = "Commit fixtures/caption/ (Cases + ~50 Chips) with an ODbL notice for OSM labels"
@@ -255,11 +277,21 @@ step = "case"
 title = "Change Cases from Global Renewables Watch construction dates, where USGS has no install year"
 area = "Data and Cases"
 tier = "Should"
-status = "todo"
+status = "done"
 closes = ["CAP-02"]
 start = "src/clayzer/cases.py (build_change, change_labels)"
 after = ["change-cases"]
+notes = "Done 2026-11-04. In California USGS dates almost everything (all 893 USPVDB sites; all but 14 of 4,947 USWTDB turbines), so GRW's main use here is the cross-check. Run on the 43 USGS sites of the dev Cases: 22 GRW-dated, 20 only \"by 2017 Q4\", 1 unmatched, and 15 more than a year from USGS. By eye, each source is wrong at times: Pine Tree's panels are in NAIP 2016 though GRW says 2018 Q1 (GRW's early quarters miss sites), and Antelope Expansion 1B is bare land in NAIP 2020 though USGS says 2016. So a flagged site isn't built until a person chooses with `--dated-by`. The one California turbine only GRW dates (USWTDB 3088586, Victory Garden, 2018 Q2) shows no visible change between NAIP 2016 and 2022, so it wasn't kept. GRW-dated and checked by eye: North Rosamond Solar (USPVDB 406675, 2019 Q2), NAIP 2018 racking without panels to 2022 panels, solar array appeared. Per-class labels can't show one new turbine among old ones (it reads unchanged): pick sites whose class is absent before."
+see_it = "`uv run clayzer case uspvdb 406675 --change --dated-by grw`, and `uv run clayzer case uspvdb 400117 --change`, which is refused until `--dated-by` chooses."
 context = "Change Cases date a Chip Pair from USGS's install year (`p_year`) only. Global Renewables Watch v1.0 (MIT) estimates a construction quarter for 86,410 solar farms and 375,197 wind turbines worldwide (Q4 2017 to Q2 2024), and the land use before each, so it can date sites USGS has no year for and confirm the ones it has. A quarter is finer than a year, so a Pair's NAIP dates can bracket it more tightly. GRW is model-detected, so less exact than USGS inside the US: where both date a site and disagree by more than a year, flag the Case for a look by eye instead of picking one. Read the GeoPackages' columns first (docs/sources.toml has only the release listing); download at run time, never commit."
+changes = [
+  "src/clayzer/grw.py: reads GRW's GeoPackages with sqlite3 and their R-tree; matches USGS records to GRW detections; dates a Chip Pair, refusing when USGS and GRW disagree until a person chooses",
+  "src/clayzer/cases.py: build_change dates by grw.dating and records `dating` and GRW's release; change_labels dates USGS records with no year by GRW",
+  "src/clayzer/chips.py: find_naip takes day-level bounds for a construction quarter",
+  "src/clayzer/cli.py: `clayzer case ... --change --dated-by usgs|grw`, and a refused build says why",
+  "docs/sources.toml: GRW's columns, and that 2017 Q4 means already there",
+  "tests/test_grw.py: a small GeoPackage read back, dating, the cross-check, and change labels for a turbine USGS has no year for",
+]
 done_when = [
   "GRW's construction quarter read for the sites near a Chip, with the release version recorded on each Case as an Answer Key",
   "`clayzer case ... --change` brackets the quarter with two NAIP dates when USGS has no year, and says which source dated it",
@@ -332,10 +364,19 @@ step = "case"
 title = "Review the ontology's classes, look-alikes, and minimum sizes; add any class a Case or benchmark needs"
 area = "Data and Cases"
 tier = "Must"
-status = "todo"
+status = "done"
 closes = ["CAP-10"]
 start = "ontology/objects.toml"
-notes = "Raised 2026-11-04: construction_site, added as a candidate (claimable = false) at the end of ontology/objects.toml. 13 of the 19 stored Captions of fixed-dev-neg-1 call the scene a construction site or an excavation, and no other Case's ever do (LGND also called that Chip's false solar arrays a storage yard), and the extraction labels have no class for it. To decide: land use or built structure; whether NAIP Chips show it reliably; whether an Answer Key can score it (OSM landuse=construction, never readable by the Harness); and whether Clay's captions need it. Making it claimable changes the Claim vocabulary for every functional area (ADR-0007, ADR-0008)."
+notes = "Reviewed 2026-11-04 against the eye check of all 124 Cases, the OSM tags behind the labels it dropped, and dev63-base's 189 Captions. Water: the code mapped any waterway to water, and 17 of the 25 OSM water ways in our Cases are intermittent streams, ditches, or intermittent water (dry desert washes); now only natural=water and waterway=river|canal, never intermittent=yes. The committed Cases keep their old labels until water-relabel, which needs its own dev Baseline. Field: 26 of 38 field Claims are on Chips with no farmland (the prompt shows only the id); every class now has a definition, and showing it in the prompt belongs to lookalike-prompt. construction_site stays a candidate (6 of 189 Captions mention it; OSM landuse=construction goes stale fastest) and is a look-alike of solar_array; well_pad added as a candidate."
+see_it = "ontology/objects.toml (version 0.2), and uv run pytest tests/test_ontology.py"
+changes = [
+  "ontology/objects.toml: version 0.2, a definition per class, road and building rules matching the code, construction_site evidence, and the well_pad candidate",
+  "src/clayzer/answer_keys.py: osm_object maps only water there all year",
+  "src/clayzer/ontology.py: classes carry a definition",
+  "tests/test_ontology.py: every class has a definition, the road rules match the code, and dry washes and ditches aren't water",
+  "tests/test_provenance.py: reads the ontology version instead of hard-coding it",
+  "docs/caption-design.md: §3.5 describes version 0.2",
+]
 context = "ADR-0008: every class a Claim can name is defined once, in ontology/objects.toml (v0.1: 11 claimable classes under five roots, plus candidates). tests/test_ontology.py fails if the code's lists drift from it. Review it as a team: are the look-alikes and minimum visible sizes right, and does any Case or benchmark need a class that's missing?"
 done_when = [
   "Reviewed with the contracts on Day 1",
@@ -346,6 +387,28 @@ refs = [
   "docs/adr/0008-object-classes-live-in-one-ontology-file.md",
   "ontology/objects.toml",
   "tests/test_ontology.py",
+]
+
+[[task]]
+id = "water-relabel"
+step = "case"
+title = "Relabel water in the committed Cases: only water there all year"
+area = "Data and Cases"
+tier = "Should"
+status = "todo"
+closes = ["CAP-10"]
+start = "src/clayzer/answer_keys.py osm_object; fixtures/caption/cases/"
+after = ["ontology-review"]
+context = "ontology-review changed osm_object so intermittent streams, ditches, and intermittent water no longer count as water: in the desert they are dry washes, and their labels counted as misses against coverage though no Caption claims water there. The committed Cases still carry the old labels: 11 lose their water label (8 of them dev turbines in dry hills) and 2 shrink. Relabel the OSM labels of the dev and Texas Cases with the new rule, keep the hand corrections applied, and add water back by hand where an intermittent pond is wet in the image (Texas neg-10). The dev Baseline then needs a new Batch of its own (about an hour): lookalike-negatives kept its Cases apart and didn't re-baseline. Its one water label (fixed-dev-lookalike-neg-107) is a canal, so the look-alike set doesn't change."
+done_when = [
+  "OSM labels of the committed Cases rebuilt with the new water rule, hand corrections still applied",
+  "Texas neg-10's wet pond added back as a hand correction",
+  "A new dev Baseline on the relabelled Cases",
+]
+refs = [
+  "ontology/objects.toml (water)",
+  "fixtures/caption/cases/label-corrections.toml",
+  "docs/caption-plan.md §3",
 ]
 
 [[task]]
@@ -486,6 +549,30 @@ changes = [
   "src/clayzer/mcp_auth.py: stored_token_auth refreshes the saved sign-in before it expires and once on a 401, within a running Batch",
   "docs/adr/0009-the-verifier-gets-the-chip-footprint-the-captioner-doesnt.md: why the code, not the model, verifies",
   "tests/test_verify.py: the policy, the rewrite, the Workflow Score's tool plan, and a Batch with a fake LGND",
+]
+
+[[task]]
+id = "verifier-routes"
+step = "harness"
+title = "A verifier per object class: measure each on development Cases and route by what works"
+area = "Captioning"
+tier = "Should"
+status = "doing"
+closes = ["CAP-10", "CAP-18"]
+start = "uv run clayzer verifier calibrate  ·  ontology/verifiers.toml"
+after = ["verify-then-write", "dev-cases"]
+notes = "First calibration 2026-11-04 (98 probes, 53 LGND calls), routes NOT written: the fixtures on main still lack dev-cases' hand corrections, and most disagreements were the labels, not the verifier. The imagery check kept 100% of true Claims for wind, road and building and 67% for solar, but 0% for water (the probes were dry washes OSM maps as water: LGND said \"dry cracked earth, not water\") and 25% for parking lots. It independently flagged uspvdb-404545 (no panels in its image; dev-cases replaced it) and rooftop solar on neg-10 that USPVDB doesn't list. The classifier build timed out at the 60 s call limit (it finished on LGND's side), so builds now get 300 s. The classifier, applied afterwards to the same 34 probe images in one call, did far worse than the imagery check (solar 17% of true Claims kept vs 67%, wind 17% vs 100%, building 0% vs 100%; only parking lots better, 50% vs 25%): it gives each 160 m image one label, so a cell with an array and a road confirms only one. A one-Case --verify Batch (20261104T182638Z-verify-routes) ran clean on the routed verify.py: 3 Claims, 2 confirmed, bare ground in a solar cell moved. Next: once the corrected fixtures are on main, calibrate again and write the routes."
+context = "LGND found the right tool depends on the concept and keeps a record of which to use for which (lgnd.ai, Building a memory of what works in GeoAI). Clayzer's record is ontology/verifiers.toml: each class's Claims go to LGND's imagery check, an LGND classifier built from committed text examples, or no check, with the evidence the route was chosen on. Calibration writes Claims of its own at cells whose truth the dev Cases' Reference Labels give, false ones preferring each class's confusers, and scores each verifier by true Claims kept and false Claims removed; a verifier must beat keeping every Claim by 0.1 balanced. Where verifiers disagree with a label, the report lists it to look at by eye."
+done_when = [
+  "`clayzer verifier calibrate --write` on the corrected dev Cases, the routes committed with their evidence",
+  "A --verify Batch with the routes gated against the Baseline, with the result in the PR",
+  "Suspect labels the calibration lists are checked by eye on the Cases page",
+]
+refs = [
+  "ontology/verifiers.toml",
+  "src/clayzer/calibrate.py",
+  "src/clayzer/verify.py",
+  "docs/cli.md (Tools: a verifier per class)",
 ]
 
 [[task]]
@@ -665,7 +752,7 @@ status = "todo"
 closes = ["CAP-01"]
 start = "src/clayzer/harness.py (PROMPT); ontology/objects.toml"
 after = ["ontology-in-code"]
-context = "The ontology records each class's look-alikes (confusers) and minimum visible size at 0.6 m. Putting them in the prompt should cut confusions such as greenhouses called solar arrays, and Claims about things NAIP can't show. Test it as a prompt change through the gate."
+context = "The ontology records each class's definition, look-alikes (confusers), and minimum visible size at 0.6 m. Putting them in the prompt should cut confusions such as greenhouses called solar arrays, open desert called a field (26 of 38 field Claims in dev63-base are on Chips with no farmland), and Claims about things NAIP can't show. Test it as a prompt change through the gate."
 done_when = [
   "The prompt built from the ontology's look-alikes and sizes",
   "Run as a Batch and gated against the Baseline",
