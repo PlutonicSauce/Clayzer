@@ -502,9 +502,10 @@ images = [
 used_in = [
   { path = "ontology/objects.toml", symbol = "rsicd_scenes", what = "crosswalk from RSICD scene classes to Clayzer object classes" },
   { path = "tests/test_ontology.py", symbol = "RSICD_SCENES", what = "checks the crosswalk uses real RSICD class names" },
+  { path = "src/clayzer/rsicd.py", symbol = "rows", what = "the human captions as a Caption Set, for the importer (`clayzer rsicd`)" },
 ]
 notes = "Must: ~100 test images for fidelity and retrieval against human captions. Captions rarely state counts or positions: a reference, not a style."
-tasks = ["rsicd"]
+tasks = ["rsicd", "caption-importer"]
 
 # ── Sandbox ─────────────────────────────────────────────────────────────────────────────
 

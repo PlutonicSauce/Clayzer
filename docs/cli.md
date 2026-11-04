@@ -185,6 +185,18 @@ uv run clayzer import --from-batch <batch-id> --export set.jsonl   # our own Cap
 `--from-batch` turns a Batch's Captions into a Caption Set and imports it: the labels should
 match that Batch's Cases, since the footprints and dates are the same.
 
+RSICD's human captions convert to a Caption Set too. RSICD has no locations, dates, or published
+ground sample distance, so its rows are unlocated (`geometry`, `datetime`, and `gsd_m` null):
+its Cases can be judged and searched but not grounded, and the too-small check can't be made.
+
+```sh
+uv run clayzer rsicd --split test                  # 5,465 captions of 1,093 images → data/rsicd-test.jsonl
+uv run clayzer import data/rsicd-test.jsonl --name rsicd-test
+```
+
+The captions file is downloaded once into `~/.cache/clayzer/rsicd/`. RSICD states no license:
+never commit its captions or images, and cite Lu et al. 2017.
+
 ## Claims from free text
 
 Grounding scores structured Claims, but most caption sets are text only. `clayzer extract` has a
