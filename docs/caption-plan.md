@@ -634,8 +634,15 @@ invocation logging, creating dashboards, IAM roles, and CloudFormation stacks, a
 X-Ray's trace destination simulate as allowed (a simulation ignores organization-level SCPs, so
 those may still be refused). X-Ray's Transaction Search is off, so traces go to X-Ray only; it
 must be turned on (an account setting) before using X-Ray's direct OpenTelemetry endpoint or
-CloudWatch's generative-AI views. ADOT to X-Ray works without it. AgentCore is reachable (no
-runtimes yet).
+CloudWatch's generative-AI views. ADOT to X-Ray works without it. AgentCore Runtime and a JWT
+Gateway were deployed on 2026-11-04; a live Nova Pro caption and its S3 Trace were verified.
+The reviewed runtime now records an authenticated LGND readiness tool Step and a caption
+model Step in its hosted Trace; AgentCore Identity retains the LGND consent. An actual
+runtime-role HEAD request against a harmless Cases canary was denied. Standalone output
+lives under `runs/agentcore/`, outside scored Batches, and traces checkpoint completed Steps.
+Gateway's authorization-code flow requires JWT inbound auth and
+MCP 2025-11-25 or newer; an IAM gateway cannot host that target
+([deployment notes](deploy.md#agentcore-captioner-23)).
 
 ## 8. Risks
 

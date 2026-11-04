@@ -66,6 +66,19 @@ const base = process.env.CLAYZER_UI_URL || "http://127.0.0.1:8788";
       await page.request.get(base + "/api/batches")
     ).json();
     const bid = batches.find((b) => b.batch_id.includes("SYNTHETIC")).batch_id;
+    await page.route("**/api/batches", (route) =>
+      route.fulfill({
+        json: batches.map((b) => ({ ...b, self_graded: true })),
+      }),
+    );
+    await page.goto(base + "/#/batches");
+    await page.locator(".experiment-card .b-warn").first().waitFor();
+    assert.equal(
+      await page.locator(".experiment-card .b-warn").first().innerText(),
+      "self-graded",
+    );
+    await page.unroute("**/api/batches");
+
     await page.route(`**/api/batches/${bid}/listen`, (route) =>
       route.fulfill({
         json: {

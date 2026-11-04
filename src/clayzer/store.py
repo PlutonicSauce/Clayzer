@@ -46,12 +46,12 @@ class LocalStore:
 
 
 class S3Store:
-    def __init__(self, url: str):
+    def __init__(self, url: str, client=None):
         bucket, _, prefix = url.removeprefix("s3://").partition("/")
         self.bucket, self.prefix = bucket, prefix.strip("/")
         import boto3
 
-        self.s3 = boto3.client("s3")
+        self.s3 = client if client is not None else boto3.client("s3")
 
     def _key(self, key: str) -> str:
         return f"{self.prefix}/{key}" if self.prefix else key
@@ -71,7 +71,8 @@ class S3Store:
             raise
 
     def get(self, key: str) -> bytes:
-        return self.s3.get_object(Bucket=self.bucket, Key=self._key(key))["Body"].read()
+        with self.s3.get_object(Bucket=self.bucket, Key=self._key(key))["Body"] as body:
+            return body.read()
 
     def put(self, key: str, body: bytes, content_type: str | None = None) -> None:
         extra = {"ContentType": content_type} if content_type else {}

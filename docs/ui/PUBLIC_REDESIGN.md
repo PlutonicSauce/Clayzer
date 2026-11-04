@@ -82,25 +82,29 @@ Read-only remains the default. No held-out Texas tuning or model evaluation was 
 | `docs/ui/CINEMATIC_JOURNEY.md`                                                         | Experience audit, five-scene interaction/evidence design and acceptance criteria                                                                                                      |
 | `docs/ui/PUBLIC_REDESIGN.md`                                                           | This current handoff                                                                                                                                                                  |
 
-Final publication scope is 20 files: the original 19 UI files plus
-`tests/ui_upstream_compatibility.cjs`. The frontend is based on PR #82's reconciled commit
-`9cb21c2`, which includes team main `e57303d`. Its clean dependent PR must target
-`feat/output-score-report-ready` until #82 is merged, then be retargeted to main. Do not merge
-or deploy as part of this handoff: main merges can trigger an automatic AWS deployment.
+Final publication scope remains 20 files. This follow-up targets **main directly**, with
+`feat/public-redesign-main` refreshed through `1041c52` (AgentCore). PR #82 merged into main,
+but PR #94 merged into its feature branch; #94's frontend therefore did not reach production.
+This PR transfers that reviewed UI without duplicating scoring or teammate contributions.
+Merging main can trigger an automatic AWS deployment; no merge/deployment is part of this handoff.
 
 Upstream Ontology navigation/API, all five walkthrough steps, recorded Batch audio and the
 Pitch Deck route remain. Integration fixes use native list/button semantics with the current
 step announced, an explicit previous-step label, a saved-audio label, light banner headings, and readable unavailable
-experiment metadata. The Ontology and audio content remain the teammate's work. All 11 Pitch
+experiment metadata. The Ontology and audio content remain the teammate's work. The updated Mermaid view retains
+its relation overlay and gains keyboard activation and native class buttons for offline access.
+Self-grading warnings from AgentCore remain visible in public Results as well as technical reports. All 11 Pitch
 Deck files are byte-identical to current main; ongoing presentation edits must be refreshed
 before merge. No Case fixture, historical baseline, scorer, dependency, CI or infrastructure
 change belongs to the UI diff.
 
 ## Verification and actual artifacts
 
-Final integrated application suite: **573 passed**, **85.33% coverage**, 40 upstream Shapely
-warnings, zero failures/skips. Infrastructure trust-policy suite: **3 passed**. Total: **576**.
-Ruff lint/format over the CI scope (`src tests`, 109 files), Vulture, 16 JavaScript syntax checks,
+Final integrated full suite: **703 passed, 1 skipped**, **85.57% coverage**, 40 upstream
+Shapely warnings, zero failures. The optional AgentCore telemetry module is skipped without the
+OpenTelemetry dependency in this local environment. Current CI infrastructure scope: **18 passed**,
+including eight CDK tests also present in the full suite. Counts are not added as unique tests.
+Ruff lint/format over the CI scope (`src tests`, 129 files), Vulture, 16 JavaScript syntax checks,
 eight-slide deck smoke, duplication (0.30% lines against the unchanged 3% gate) and Git whitespace
 checks pass. The broader upstream scripts lint has an existing EXE001 executable-bit issue in
 `upload_to_s3.py`; it is outside CI's lint scope and was not changed in this frontend work.
@@ -109,10 +113,10 @@ All four browser suites pass: public smoke, five-scene journey, upstream compati
 **132 axe/overflow checks at 1440, 768, 390 and 320 pixels**. Zero reported WCAG-rule violations,
 horizontal page overflows or runtime errors in the final audit. After visual banner corrections,
 24 additional affected-route/viewport audits and the banner-style regression also pass. Initial integration findings
-(Ontology list semantics and overview status contrast) were corrected and the full audit rerun.
+(Ontology list semantics, overview status contrast and the new relation legend contrast) were corrected and the full audit rerun.
 The opaque script-free dataset iframe and exact standalone card artifact are audited separately;
 the security sandbox is preserved. Upstream compatibility tests keyboard use of every Ontology
-step and graph, saved-audio controls/transcript using explicitly mocked metadata, and the unchanged
+step and the new Mermaid graph, including a native text alternative when the CDN is unavailable, saved-audio controls/transcript using explicitly mocked metadata, and the unchanged
 Pitch Deck's forward/back navigation. Audio generation and real MP3 playback are not claimed by
 that test. Native speech lifecycle, cancellation and reduced motion are covered in browser tests.
 
@@ -123,7 +127,7 @@ measurements are unchanged; the UI reads recorded scoring provenance rather than
 
 Current validation logs, screenshots, accessibility trees/JSON, source hashes and complete UI
 patch/archive live outside the repository under
-`/Users/seshank/Desktop/Clayzer-public-redesign-review/reconciliation-e57303d/`.
+`/Users/seshank/Desktop/Clayzer-public-redesign-review/main-e856a6b/`.
 The original worktrees and earlier hash-verified backups remain intact. Prior cinematic captures,
 a silent browser tour and local timing observations are retained under `cinematic/`; those
 performance observations are not production benchmarks. No generated review outputs are in the PR.

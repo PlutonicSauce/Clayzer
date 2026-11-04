@@ -152,6 +152,7 @@ def create_app(
             "batch_id": batch_id, "label": cfg.label, "created": cfg.created,
             "cases": len(cfg.case_ids), "repeats": cfg.repeats,
             "caption_model": cfg.caption_model, "judge_model": cfg.judge_model,
+            "self_graded": provenance.self_graded(cfg.caption_model, cfg.judge_model),
             "prompt_sha": cfg.prompt_sha, "prompt_source": cfg.prompt_source,
             "complete": bool(s) and not s.get("stopped")
             and not s["batch"]["runs"]["sandbox_failures"],
@@ -303,6 +304,9 @@ def create_app(
                 "cases": len(base["config"].case_ids),
                 "repeats": base["config"].repeats,
                 "caption_model": base["config"].caption_model,
+                "self_graded": provenance.self_graded(
+                    base["config"].caption_model, base["config"].judge_model
+                ),
             }
         return {
             "latest": latest,
@@ -389,7 +393,11 @@ def create_app(
     @app.get("/api/batches/{batch_id}")
     def one(batch_id: str):
         cfg, summary = batches.load_summary(store, _safe(batch_id))
-        return {"config": asdict(cfg), "summary": summary}
+        return {
+            "config": asdict(cfg),
+            "summary": summary,
+            "self_graded": provenance.self_graded(cfg.caption_model, cfg.judge_model),
+        }
 
     @app.get("/api/batches/{batch_id}/provenance")
     def batch_provenance(batch_id: str):
