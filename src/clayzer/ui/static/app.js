@@ -554,13 +554,116 @@ async function casesPage() {
     <p>The development ${term("Case")} set in the store (${cases.length}). Each Chip's ${term("Reference Label", "Reference Labels")}
     are what grounding checks Claims against; the Harness never sees them (ADR-0006).</p>
     ${cases.length ? "" : '<p class="empty">No Cases yet: <code>uv run clayzer case uspvdb &lt;site-id&gt;</code></p>'}
+    ${cases.length ? '<p class="sub">Click a Chip to open it large, with its labels on the grid and zoom.</p>' : ""}
     <div class="case-grid">${cases.map((c) => `<div class="case-card">
-      <img src="/api/chips/${encodeURIComponent(c.chip.id)}.png" alt="Chip ${esc(c.chip.id)}" loading="lazy">
-      <div class="body"><b>${esc(c.id)}</b><br><small class="mono">${esc(c.chip.id)} · NAIP ${esc(c.chip.date)} · ${esc(c.chip.source)}</small>
+      <a href="#/cases/${encodeURIComponent(c.id)}"><img src="/api/chips/${encodeURIComponent(c.chip.id)}.png" alt="Chip ${esc(c.chip.id)}" loading="lazy"></a>
+      <div class="body"><b><a href="#/cases/${encodeURIComponent(c.id)}">${esc(c.id)}</a></b><br><small class="mono">${esc(c.chip.id)} · NAIP ${esc(c.chip.date)} · ${esc(c.chip.source)}</small>
       <ul>${c.labels.map((l) => `<li>${l.count !== null ? `${esc(l.count)} × ` : ""}${esc(l.object.replace(/_/g, " "))}
         at ${esc(l.position)} <small>(${esc(l.source)})</small></li>`).join("") || "<li>no labels</li>"}</ul>
       <small>Built in ${f2(c.prep_seconds)} s</small></div></div>`).join("")}</div>`;
 }
+
+// ── One Case, large: for checking its Reference Labels by eye ────────────────────────
+
+const VIEW = { zoom: 1, grid: true, labels: true };
+
+function caseFigure(c) {
+  const C = 512 / 3;
+  const per = {};
+  const pills = VIEW.labels ? c.labels.map((l) => {
+    const i = CELLS.indexOf(l.position);
+    if (i < 0) return "";
+    const n = (per[l.position] = (per[l.position] || 0) + 1) - 1;
+    const x = (i % 3) * C + 8, y = Math.floor(i / 3) * C + 10 + n * 26;
+    const text = `${l.count !== null ? `${l.count} × ` : ""}${l.object.replace(/_/g, " ")}`;
+    return `<g class="pill ${l.source === "osm" ? "near" : "good"}"><rect x="${x}" y="${y}" width="${C - 16}" height="22" rx="11"/>
+      <text x="${x + (C - 16) / 2}" y="${y + 15}" text-anchor="middle">${esc(text)}</text></g>`;
+  }).join("") : "";
+  const covered = VIEW.labels ? new Set(c.labels.flatMap((l) => l.cells || [])) : new Set();
+  const refs = [...covered].map((cell) => {
+    const i = CELLS.indexOf(cell);
+    return i < 0 ? "" : `<rect class="ref" x="${(i % 3) * C + 3}" y="${Math.floor(i / 3) * C + 3}" width="${C - 6}" height="${C - 6}" rx="4"/>`;
+  }).join("");
+  const grid = VIEW.grid ? [1, 2].map((k) => `<line x1="${k * C}" y1="0" x2="${k * C}" y2="512"/><line x1="0" y1="${k * C}" x2="512" y2="${k * C}"/>`).join("") : "";
+  return `<div class="chip-fig${VIEW.zoom > 1 ? " zoomed" : ""}" style="width:${VIEW.zoom * 100}%">
+    <img src="/api/chips/${encodeURIComponent(c.chip.id)}.png" alt="Aerial image ${esc(c.chip.id)}">
+    <svg viewBox="0 0 512 512" aria-hidden="true"><g class="grid">${grid}</g><g>${refs}</g>${pills}</svg></div>`;
+}
+
+async function casePage(id) {
+  const me = SEQ;
+  const cases = await api("/api/cases");
+  if (stale(me)) return;
+  const i = cases.findIndex((c) => c.id === id);
+  if (i < 0) {
+    $view.innerHTML = `<p><a href="#/cases">← Cases</a></p><p class="empty">No Case ${esc(id)} in the store.</p>`;
+    return;
+  }
+  const c = cases[i];
+  const prev = cases[(i - 1 + cases.length) % cases.length].id, next = cases[(i + 1) % cases.length].id;
+  const [w, s, e, n] = c.chip.bbox;
+  const lat = ((s + n) / 2).toFixed(5), lon = ((w + e) / 2).toFixed(5);
+  const draw = () => {
+    document.getElementById("case-fig").innerHTML = caseFigure(c);
+    document.querySelectorAll("[data-zoom]").forEach((b) => b.setAttribute("aria-pressed", String(+b.dataset.zoom === VIEW.zoom)));
+    document.getElementById("t-grid").checked = VIEW.grid;
+    document.getElementById("t-labels").checked = VIEW.labels;
+  };
+  $view.innerHTML = `<p><a href="#/cases">← Cases</a> · ${i + 1} of ${cases.length} ·
+      <a href="#/cases/${encodeURIComponent(prev)}">← previous</a> · <a href="#/cases/${encodeURIComponent(next)}">next →</a></p>
+    <h1>${esc(c.id)}</h1>
+    <div class="case-view">
+      <div>
+        <div class="case-tools">
+          <span>Zoom ${[1, 2, 4].map((z) => `<button type="button" class="btn secondary" data-zoom="${z}">${z}×</button>`).join("")}</span>
+          <label><input type="checkbox" id="t-grid"> grid</label>
+          <label><input type="checkbox" id="t-labels"> labels</label>
+          <small>Keys: ← → Case · + − zoom · g grid · l labels</small>
+        </div>
+        <div class="case-zoom" id="case-zoom"><div id="case-fig"></div></div>
+        <p class="legend-row"><span><i class="dot good"></i>USGS label</span> <span><i class="dot near"></i>OpenStreetMap label</span>
+          <span><i class="sq"></i>cells the label covers</span></p>
+      </div>
+      <div>
+        <h3>Reference Labels</h3>
+        <ul>${c.labels.map((l) => `<li>${l.count !== null ? `${esc(l.count)} × ` : ""}${esc(l.object.replace(/_/g, " "))}
+          at ${esc(l.position)}${(l.cells || []).length > 1 ? ` <small>(covers ${l.cells.map((x) => esc(x.replace(/_/g, " "))).join(", ")})</small>` : ""}
+          <small>· ${esc(l.source)}</small></li>`).join("") || "<li>no labels: nothing mapped here</li>"}</ul>
+        <h3>Chip</h3>
+        <p class="mono">${esc(c.chip.id)}<br>NAIP ${esc(c.chip.date)} · ${esc(c.chip.source)}<br>${lat}, ${lon}</p>
+        <h3>Check it elsewhere</h3>
+        <p>Current imagery and maps at the Chip's centre (they may be newer than ${esc(c.chip.date.slice(0, 4))}):<br>
+          <a href="https://www.google.com/maps/@${lat},${lon},400m/data=!3m1!1e3" target="_blank" rel="noopener">Google satellite</a> ·
+          <a href="https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=17/${lat}/${lon}" target="_blank" rel="noopener">OpenStreetMap</a></p>
+        <h3>What to look for</h3>
+        <ul class="sub"><li>Is each label really there, in the cell it names?</li>
+          <li>Solar and wind counts: are the panels built and the turbines still standing?</li>
+          <li>Water: is there water, or a dry wash or lake bed?</li>
+          <li>Negatives: any small or rooftop solar USGS doesn't list?</li>
+          <li>Anything obvious with no label (buildings, roads, fields)?</li></ul>
+      </div>
+    </div>`;
+  draw();
+  document.querySelectorAll("[data-zoom]").forEach((b) => b.addEventListener("click", () => { VIEW.zoom = +b.dataset.zoom; draw(); }));
+  document.getElementById("t-grid").addEventListener("change", (ev) => { VIEW.grid = ev.target.checked; draw(); });
+  document.getElementById("t-labels").addEventListener("change", (ev) => { VIEW.labels = ev.target.checked; draw(); });
+  CASE_KEYS = { prev, next, draw };
+}
+
+let CASE_KEYS = null;
+document.addEventListener("keydown", (ev) => {
+  if (!CASE_KEYS || !location.hash.startsWith("#/cases/") || ev.target.matches("input, textarea, select")) return;
+  const zooms = [1, 2, 4];
+  if (ev.key === "ArrowLeft") location.hash = `#/cases/${encodeURIComponent(CASE_KEYS.prev)}`;
+  else if (ev.key === "ArrowRight") location.hash = `#/cases/${encodeURIComponent(CASE_KEYS.next)}`;
+  else if (ev.key === "+" || ev.key === "=") VIEW.zoom = zooms[Math.min(zooms.indexOf(VIEW.zoom) + 1, 2)];
+  else if (ev.key === "-") VIEW.zoom = zooms[Math.max(zooms.indexOf(VIEW.zoom) - 1, 0)];
+  else if (ev.key === "g") VIEW.grid = !VIEW.grid;
+  else if (ev.key === "l") VIEW.labels = !VIEW.labels;
+  else return;
+  ev.preventDefault();
+  if (document.getElementById("case-fig")) CASE_KEYS.draw();
+});
 
 async function batchesPage() {
   const me = SEQ;
@@ -892,6 +995,7 @@ async function route() {
     if (page === "") await overview();
     else if (page === "how") await howPage(parts[1]);
     else if (page === "tasks") await tasksPage(parts[1]);
+    else if (page === "cases" && parts[1]) await casePage(parts[1]);
     else if (page === "cases") await casesPage();
     else if (page === "batches" && parts[1]) await batchPage(parts[1], parts[2]);
     else if (page === "batches") await batchesPage();

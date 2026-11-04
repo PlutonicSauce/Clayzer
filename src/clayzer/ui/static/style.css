@@ -389,3 +389,14 @@ abbr { text-decoration: underline dotted; cursor: help; }
 .prov-run > summary { cursor: pointer; font-weight: 600; }
 .prov-run table { margin-top: 10px; }
 @media (max-width: 1000px) { .prov { grid-template-columns: 1fr; } }
+
+/* One Case, large: the Chip with zoom, its labels on the grid, and what to check. */
+.case-view { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(260px, 1fr); gap: 28px; align-items: start; }
+.case-tools { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin-bottom: 8px; }
+.case-tools .btn { padding: 3px 10px; margin-left: 4px; }
+.case-tools .btn[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+.case-zoom { overflow: auto; max-height: min(78vh, 900px); border-radius: 10px; border: 1px solid var(--line); }
+.case-zoom .chip-fig { border-radius: 0; }
+.chip-fig.zoomed img { image-rendering: pixelated; }
+.case-card a img:hover { outline: 3px solid var(--decision); outline-offset: -3px; }
+@media (max-width: 900px) { .case-view { grid-template-columns: 1fr; } }

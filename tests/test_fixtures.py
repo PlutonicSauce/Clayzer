@@ -60,3 +60,14 @@ def test_push_fills_an_empty_store_and_a_batch_runs_on_it(tmp_path, monkeypatch)
     bid = batches.start(cases[:3], settings, store, 1, "", "dev", progress=lambda _: None)
     runs = batches.load(store, bid)["summary"]["batch"]["runs"]
     assert runs["planned"] == 3 and runs["sandbox_failures"] == 0
+
+
+def test_no_chip_is_partly_blank():
+    import numpy as np
+    from PIL import Image
+
+    from clayzer.chips import MAX_BLANK, blank_share
+
+    for case in CASES:
+        img = np.asarray(Image.open(ROOT / case["chips"][0]["uri"]).convert("RGB"))
+        assert blank_share(np.moveaxis(img, -1, 0)) <= MAX_BLANK, case["id"]

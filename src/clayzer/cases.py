@@ -59,10 +59,10 @@ def build_positive(
     else:
         raise ValueError(f"unknown Answer Key {answer_key!r}")
     lon, lat = rec["xlong"], rec["ylat"]
-    item = find_naip(lon, lat, after_year=rec.get("p_year"))
     prefix = f"{state.lower()}-{answer_key}-{source_id}"
     # Offset so the site lands anywhere in the 3×3 grid, not always in the centre cell.
     offset = offset_for(f"{answer_key}-{source_id}")
+    item = find_naip(lon, lat, after_year=rec.get("p_year"), offset_m=offset)
     chip = cut_chip(item, lon, lat, prefix, store, naip_source, offset)
     return _case(f"fixed-{region}-{answer_key}-{source_id}", region, chip, _labels(chip), started)
 
