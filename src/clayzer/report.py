@@ -61,6 +61,12 @@ def render(b: dict) -> str:
             f"| Cost (partial) | {_f(batch['seconds_per_caption'], 1)} s, "
             f"{_f(batch['tokens_per_caption'], 0)} tokens per Caption | Bedrock hides GPU time |"
         ),
+        (
+            f"| Verified Claims per dollar | {_f(batch.get('verified_claims_per_dollar'), 0)} | "
+            f"{_f(batch.get('verified_claims_per_caption'), 1)} per Caption at "
+            f"${_f(batch.get('usd_per_caption'), 5)} each; per GPU-second "
+            f"{_f(batch.get('verified_claims_per_gpu_second'))} |"
+        ),
         *(
             [
                 (

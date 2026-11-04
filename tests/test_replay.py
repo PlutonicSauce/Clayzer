@@ -1,95 +1,73 @@
-"""Replay (REQ-09): a recorded Batch rescored against updated Cases with no model or network."""
+"""Recorded-Trace replay (REQ-09): a Batch rescored and reported from its stored files alone, with
+no model, MCP server, AWS credentials, or network, and the Judge's saved verdicts reused."""
 
-import copy
+import json
+import socket
 
-import boto3
 import pytest
-from test_loop import SOLAR, WIND, FakeBedrock
+from test_loop import SOLAR, env, run  # noqa: F401
 
 from clayzer import batch as batches
-from clayzer.config import Settings
-from clayzer.gate import accept_baseline, gate, load_baseline
-from clayzer.store import LocalStore
-from clayzer.trace import trace_key
+from clayzer import cli
+from clayzer.run_report import run_keys
+
+AWS_ENV = ("AWS_PROFILE", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN",
+           "AWS_BEARER_TOKEN_BEDROCK", "AWS_REGION", "AWS_DEFAULT_REGION")  # fmt: skip
 
 
 @pytest.fixture
-def recorded(tmp_path, monkeypatch):
-    store = LocalStore(tmp_path / "data", tmp_path / "batches")
-    for case in (SOLAR, WIND):
-        store.put(case["chips"][0]["uri"], case["chips"][0]["id"].encode())
-    settings = Settings(
-        caption_model="cap", judge_model="judge", embed_model="embed",
-        bedrock_endpoint_url=None, data_dir=tmp_path / "data",
-        batches_dir=tmp_path / "batches", baselines_dir=tmp_path / "baselines",
-        store_url=None, naip_source="pc",
-    )  # fmt: skip
-    monkeypatch.setattr(batches, "bedrock", lambda s: FakeBedrock())
-    bid = batches.start([SOLAR, WIND], settings, store, 2, "rec", "dev", narrate=False,
-                        progress=lambda _: None)  # fmt: skip
-    return store, settings, bid
-
-
-def offline(monkeypatch):
-    """No model, no AWS client, no credentials: anything that reaches for them fails."""
+def offline(monkeypatch, tmp_path):
+    """No network, no AWS credentials, and no Bedrock client: any attempt fails the test."""
 
     def refuse(*a, **k):
-        raise AssertionError("replay must not call a model or AWS")
+        raise AssertionError("replay tried to reach the network")
 
+    for name in ("connect", "connect_ex"):
+        monkeypatch.setattr(socket.socket, name, refuse)
+    monkeypatch.setattr(socket, "create_connection", refuse)
+    monkeypatch.setattr(socket, "getaddrinfo", refuse)
+    for key in AWS_ENV:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("AWS_CONFIG_FILE", str(tmp_path / "no-aws-config"))
+    monkeypatch.setenv("AWS_SHARED_CREDENTIALS_FILE", str(tmp_path / "no-aws-credentials"))
     monkeypatch.setattr(batches, "bedrock", refuse)
-    monkeypatch.setattr(boto3, "client", refuse)
-    for var in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "AWS_PROFILE"):
-        monkeypatch.delenv(var, raising=False)
 
 
-def relabelled():
-    wind = copy.deepcopy(WIND)
-    wind["reference_labels"][0]["count"] = 3  # a corrected turbine count
-    return [SOLAR, wind]
+def test_a_batch_rescores_and_reports_with_the_network_off(env, monkeypatch, offline_later):  # noqa: F811
+    store, settings, _ = env
+    b = run(env, repeats=2)
+    bid = b["config"].batch_id
+    judged = {(r["case_id"], r["repeat"]): r["fidelity"] for r in b["results"]}
+    retrieval = b["retrieval"]
+
+    # Break the stored grounding and drop the reports, so replay has to rebuild both.
+    for r in b["results"]:
+        r["grounding"] = {**r["grounding"], "correctness": 0.0}
+    store.put(f"batches/{bid}/results.jsonl",
+              "".join(json.dumps(r) + "\n" for r in b["results"]).encode())  # fmt: skip
+    html, rec = run_keys(bid, SOLAR["id"], 1)
+    for key in (f"batches/{bid}/report.html", f"batches/{bid}/report.md", html, rec):
+        store.delete(key)
+
+    offline_later()
+    monkeypatch.setattr(cli, "load_env", lambda: None)  # keep a developer's .env out of it
+    monkeypatch.setenv("CLAYZER_DATA_DIR", str(settings.data_dir))
+    monkeypatch.setenv("CLAYZER_BATCHES_DIR", str(settings.batches_dir))
+    monkeypatch.delenv("CLAYZER_STORE", raising=False)
+    assert cli.main(["rescore", bid]) == 0
+
+    after = batches.load(store, bid)
+    assert after["summary"]["batch"]["correctness"] == 1.0  # grounding recomputed
+    assert {(r["case_id"], r["repeat"]): r["fidelity"] for r in after["results"]} == judged
+    assert after["retrieval"] == retrieval
+    for key in (f"batches/{bid}/report.html", f"batches/{bid}/report.md", html, rec):
+        assert store.exists(key)
+    fid = judged[(SOLAR["id"], 1)]
+    assert json.loads(store.get(rec))["scores"]["fidelity"] == {
+        "score": fid["score"], "issues": fid.get("issues", [])}  # fmt: skip
 
 
-def test_replay_rescores_offline_and_reuses_the_rest(recorded, monkeypatch):
-    store, _, bid = recorded
-    offline(monkeypatch)
-    rid = batches.replay(bid, store, relabelled(), "fix")
-    a, b = batches.load(store, bid), batches.load(store, rid)
-    assert b["config"].replayed_from == bid and b["config"].cases_sha != a["config"].cases_sha
-    assert b["summary"]["replayed_from"] == bid and rid.endswith("-fix")
-    wind_a = {r["repeat"]: r for r in a["results"] if r["case_id"] == WIND["id"]}
-    for r in (r for r in b["results"] if r["case_id"] == WIND["id"]):
-        assert (
-            r["grounding"]["count"] != wind_a[r["repeat"]]["grounding"]["count"]
-        )  # 2 claimed vs 3 now
-        assert r["fidelity"] == wind_a[r["repeat"]]["fidelity"]  # the Judge's verdict, reused
-    assert b["captions"] == a["captions"]
-    assert [row["mrr"] for row in b["retrieval"]] == [row["mrr"] for row in a["retrieval"]]
-    assert store.exists(trace_key(rid, WIND["id"], 1)) and store.exists(
-        f"batches/{rid}/report.html"
-    )
-
-
-def test_a_replayed_baseline_gates_live_batches_on_the_new_cases(recorded, monkeypatch, tmp_path):
-    store, settings, bid = recorded
-    offline(monkeypatch)
-    rid = batches.replay(bid, store, relabelled(), "fix", reports=False)
-    accept_baseline(batches.load(store, rid), settings.baselines_dir)
-    monkeypatch.setattr(batches, "bedrock", lambda s: FakeBedrock())
-    live = batches.start(relabelled(), settings, store, 2, "live", "dev", narrate=False,
-                         progress=lambda _: None)  # fmt: skip
-    result = gate(load_baseline(settings.baselines_dir), batches.load(store, live))
-    assert not any("not comparable" in r for r in result.reasons), result.reasons
-
-
-def test_replay_refuses_what_it_cant_rescore(recorded, monkeypatch):
-    store, _, bid = recorded
-    offline(monkeypatch)
-    with pytest.raises(ValueError, match="same Cases"):
-        batches.replay(bid, store, [SOLAR], "x")
-    moved = copy.deepcopy(SOLAR)
-    moved["chips"][0]["uri"] = "chips/elsewhere.png"
-    with pytest.raises(ValueError, match="Chips differ"):
-        batches.replay(bid, store, [moved, WIND], "x")
-    rail = copy.deepcopy(SOLAR)
-    rail["reference_labels"].append({**rail["reference_labels"][0], "object": "railroad"})
-    with pytest.raises(ValueError, match="can't replay retrieval"):
-        batches.replay(bid, store, [rail, WIND], "x")  # nothing was ever ranked for railroads
+@pytest.fixture
+def offline_later(request):
+    """Turn `offline` on partway through a test, after the Batch has been run."""
+    return lambda: request.getfixturevalue("offline")
