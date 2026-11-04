@@ -218,6 +218,10 @@ def main(argv: list[str] | None = None) -> int:
                     help="search LGND for each gap and print `clayzer case` commands")  # fmt: skip
     sp.add_argument("--max-calls", type=int, default=100,
                     help="stop before starting if it would take more LGND calls")  # fmt: skip
+    co = sub.add_parser("corroborate",
+                        help="check the Cases' USGS labels against OSM's power mapping")  # fmt: skip
+    co.add_argument("cases", nargs="+", type=Path, help="Case files (.jsonl)")
+    co.add_argument("--json", type=Path, help="also write every Case's result here")
 
     a = p.parse_args(argv)
     if a.cmd in ("login", "tools"):
@@ -511,6 +515,35 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  proposals a person changed: {r['edit_rate']:.0%}")
         print(f"  {r['failed']} failed; saved in {store.url(prefix)}/agreement.json")
         return 0
+
+    if a.cmd == "corroborate":
+        from clayzer import corroborate
+
+        cases = [c for f in a.cases for c in parse_jsonl(f.read_bytes())]
+        done = {}
+        if a.json and a.json.exists():  # resume an interrupted run
+            done = {r["case"]: r for r in json.loads(a.json.read_text())["cases"]}
+
+        def save(rows):
+            if a.json:
+                a.json.write_text(json.dumps(
+                    {"summary": corroborate.summary(rows), "cases": rows}, indent=2) + "\n")  # fmt: skip
+
+        print(f"{len(cases)} Cases, {len(done)} done before: one Overpass query per "
+              f"{corroborate.BATCH} Chips", flush=True)  # fmt: skip
+        rows = corroborate.corroborate(cases, done=done, save=save,
+                                       progress=lambda m: print(m, flush=True))  # fmt: skip
+        s = corroborate.summary(rows)
+        print(f"solar agrees on {s['solar_agree']} of {s['solar_cases']} Cases with solar; "
+              f"wind on {s['wind_agree']} of {s['wind_cases']} with turbines")  # fmt: skip
+        print("to check by eye: " + (", ".join(s["to_check"]) or "none"))
+        print("OSM candidate classes, Cases with each: "
+              + (", ".join(f"{k} {v}" for k, v in s["candidate_cases"].items()) or "none"))  # fmt: skip
+        if s["failed"]:
+            print(f"{len(s['failed'])} failed; run the same command again to retry them")
+        if a.json:
+            print(f"written to {a.json}")
+        return 1 if s["failed"] else 0
 
     if a.cmd in ("verifier", "spread"):
         return _lgnd_command(a, store, load_cases(store, key))

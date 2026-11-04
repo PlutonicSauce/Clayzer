@@ -77,7 +77,12 @@ from the USGS APIs (`https://energy.usgs.gov/api/uspvdb/v1/projects`,
 
 Where a Chip clearly contradicts its labels (houses OSM never mapped, a dry wash mapped as
 water), record the fix in `fixtures/caption/cases/label-corrections.toml`. Every build applies
-it, so the fix survives a rebuild; hand-added labels have `source = "manual"` and no count.
+it, so the fix survives a rebuild; hand-added labels have `source = "manual"` and no count unless
+the correction gives one.
+
+`uv run clayzer corroborate <cases.jsonl> ... --json out.json` checks the Cases' USGS solar and
+wind labels against OSM's own power mapping and lists each disagreement to check by eye; it also
+counts OSM features of the ontology's candidate classes in each Chip. Reruns resume from `--json`.
 
 **Setting spread.** A gate can only see what its Cases show. `clayzer spread` labels each
 Case's surroundings (one cell of its Chip without its subject) with an LGND settings classifier

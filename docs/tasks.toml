@@ -438,32 +438,36 @@ refs = [
 [[task]]
 id = "dataset-corroboration"
 step = "case"
-title = "Corroborate and enrich Case Reference Labels with SkyScript and MegaEarth"
+title = "Corroborate the USGS labels with OSM's power mapping, and list OSM's candidate classes"
 area = "Data and Cases"
 tier = "Could"
-status = "todo"
+status = "done"
 closes = []
-start = "fixtures/caption/cases/caption-dev.jsonl; then the SkyScript repo and the MegaEarth dataset card"
+start = "uv run clayzer corroborate fixtures/caption/cases/*.jsonl fixtures/caption-lookalike/cases/*.jsonl"
 after = ["dev-cases"]
-context = "Our Reference Labels come from USGS and OSM, and nothing outside them checks those labels today. Two public datasets could. SkyScript (wangzhecheng/skyscript) pairs remote-sensing images, including a NAIP subset, with captions templated from OSM tags. MegaEarth (Mead0w1ark/megaearth-osm-sentinel2 on Hugging Face) pairs Sentinel-2 windows with OSM labels over 485 classes, split by geography. For each Case, find any image that overlaps its Chip and compare their labels with ours. Both label from OSM, so agreeing on an OSM class mostly shows the OSM snapshots match. The useful checks are USGS-labelled solar and wind (an outside source agreeing), and disagreement in either direction, which marks a Case to look at by eye. The second aim is enrichment: their labels can add objects our Answer Keys miss in a Chip, and their samples can suggest new Case locations for classes we have few of. An added label has to map to an ontology class (a missing class goes through ontology-review first), records which dataset it came from, and is checked by eye before it becomes a Reference Label. Sentinel-2 is 10 m against NAIP's 0.6 m, so only large objects compare. Neither dataset's captions are gold (caption-plan.md §3). Check each license first; download at run time, never commit."
+notes = "Done 2026-11-04 over all 134 fixed Cases (dev, Texas, look-alikes). Reshaped first: SkyScript and MegaEarth both label from OSM, our own Answer Key for everything but solar and wind, so they can't corroborate it; MegaEarth covers only 7 of our Cases at 2.56 km (its two solar windows agree with USPVDB), and SkyScript's overlap would cost 2.8 GB to find (both recorded in docs/sources.toml as unused). The independent check is OSM's own power mapping. Solar agrees on 45 of 58 Cases with solar; the 13 USGS-only Cases all show panels, so OSM just doesn't map those plants. No negative or look-alike has OSM solar or wind, so nothing suggests USGS missed a site. Wind agrees on 25 of 26: OSM and the Chip show an 18th turbine in uswtdb-3073564's south-east cell, now a hand correction with its count; OSM also has exactly one turbine on uswtdb-3036765 and uswtdb-3044325, settling dev-cases' open question. OSM maps none of the candidate classes in our Chips except 3 substations, so it can't key them either. The dev label change goes into the next dev Baseline (water-relabel)."
+see_it = "uv run clayzer corroborate fixtures/caption/cases/caption-dev.jsonl --json corroboration.json"
+changes = [
+  "src/clayzer/corroborate.py: OSM's power mapping and candidate classes per Chip, compared with the USGS labels; one Overpass query per 20 Chips, resumable",
+  "src/clayzer/cli.py: the corroborate command",
+  "src/clayzer/cases.py: a hand correction can give the corrected count",
+  "fixtures/caption/cases/label-corrections.toml: uswtdb-3073564's 18th turbine",
+  "fixtures/caption/cases/caption-dev.jsonl: the correction applied",
+  "docs/sources.toml: MegaEarth and SkyScript, checked and not used; corroborate under OSM",
+  "tests/test_corroborate.py: plants around the Chip, multipolygons, turbine counts, candidates, each disagreement, batching, and resuming",
+]
+context = "Our Reference Labels come from USGS (solar and wind) and OSM (everything else), and nothing outside them checked the labels. OSM's own power tags (power=plant and power=generator with a solar or wind source, the ontology's osm_reference, which the Answer Keys never use) are an independent record of the same sites. For each Case, compare them with the USGS labels, and send each disagreement to an eye check: USGS listed RE Gaskell West 5 and Samson Solar III years before their panels show in NAIP. The same query lists OSM's features of the ontology's candidate classes (substation, storage tank, well pad, construction site) as evidence for making one claimable, never as Reference Labels. OSM is read only to prepare Cases (ADR-0006)."
 done_when = [
-  "Each dataset's license and coverage checked and added to docs/sources.toml",
-  "A script that, for each development Case, finds overlapping SkyScript or MegaEarth samples and lists where their labels agree or disagree with our Reference Labels",
-  "Disagreements reviewed by eye; any wrong Reference Label fixed or the Case replaced",
-  "Labels they add that our Answer Keys miss mapped to ontology classes, checked by eye, and added to the Cases with their source recorded",
-  "Candidate Case locations from their samples listed for classes with few Cases",
-  "Nothing from either dataset in git",
+  "A command that compares every Case's USGS labels with OSM's power mapping and lists OSM's candidate classes",
+  "Every disagreement checked by eye; any wrong Reference Label fixed or the Case replaced",
+  "SkyScript and MegaEarth checked and recorded in docs/sources.toml",
 ]
 refs = [
-  "docs/caption-plan.md §3 (What scores what; SkyScript not gold)",
-  "docs/caption-design.md §1 (Auxiliary datasets row)",
-  "docs/tech-hackathon.md (datasets table)",
-  "docs/sources.toml",
+  "ontology/objects.toml (osm_reference)",
   "src/clayzer/answer_keys.py",
-  "ontology/objects.toml",
+  "fixtures/caption/cases/label-corrections.toml",
+  "docs/sources.toml (megaearth, skyscript)",
 ]
-
-# ── Captioning ──────────────────────────────────────────────────────────────────────────
 
 [[task]]
 id = "skeleton"
