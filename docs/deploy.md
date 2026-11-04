@@ -158,9 +158,14 @@ caption Harness, Trace format, fault attribution and MCP client. Change Case Chi
 round-trip through the Batch Runtime contract with both image hashes and ordered image keys.
 Fixed Cases retain contract v1 compatibility; Chip Pairs use v2 and require the integrated
 container Runtime, so an older Runtime refuses them instead of silently misreading an image.
-Integration validation: 508 application and infrastructure tests passed, two skipped, with
-84.29% coverage. Ruff, formatting, dead-code and deck smoke checks passed. These local checks
-cover both contracts; the hosted validation below exercises the standalone Gateway deployment.
+Contract mismatches stop the Batch with a completed stopped Trace and reports. With verification
+enabled, the Runtime records its ontology and verifier-file hashes and the Batch checks them
+before scoring; older images without those hashes must be redeployed. Classifier initialization
+runs once per cached verifier, and setup failures remain visible in Trace metadata.
+Optional ontology guidance reaches the local and remote captioners identically.
+
+Local integration checks cover both contracts; the hosted validation below exercises the
+standalone Gateway deployment. Ruff, formatting, dead-code and deck smoke checks passed.
 
 **Validation (2026-11-04):** the reviewed runtime completed both an LGND tool call and a Nova
 Pro caption inside AgentCore in `us-west-2`. The S3 Trace contains a successful

@@ -433,6 +433,27 @@ def test_a_batch_refuses_a_bad_harness_setting_before_writing_anything(env):
     assert not (store.batches_dir.exists() and list(store.batches_dir.iterdir()))
 
 
+def test_ontology_guidance_reaches_both_harnesses_identically(env, monkeypatch):
+    guidance = 'General guidance with literal braces: {"class": "solar_array"}'
+    monkeypatch.setattr(batches, "_ontology_context", lambda cfg, chip: guidance)
+    prompts = []
+    configs = []
+    for mode in ("local", "agentcore"):
+        result = run_batch(
+            env, cases=(SOLAR,), repeats=1, harness=mode, runtime=ARN, ontology_context=True
+        )
+        cfg = result["config"]
+        configs.append(cfg)
+        _, steps = loads(env[0].get(trace_key(cfg.batch_id, SOLAR["id"], 1)))
+        prompts.append(next(s.input["prompt"] for s in steps if s.kind == "llm"))
+    assert prompts[0] == prompts[1]
+    assert guidance in prompts[1]
+    from dataclasses import replace
+
+    changed = setting_changes(configs[0], replace(configs[0], ontology_context=False))
+    assert "ontology_context" in {s["setting"] for s in changed}
+
+
 def test_the_gate_and_compare_see_the_harness_settings(env):
     local = run_batch(env, label="local", repeats=1)
     on_agentcore = run_batch(env, label="ac", repeats=1, harness="agentcore", runtime=ARN)
@@ -451,6 +472,7 @@ def test_verification_runs_inside_the_runtime_through_real_mcp(env, monkeypatch)
         result = run_batch(env, repeats=1, harness="agentcore", runtime=ARN, verify="lgnd")
     finally:
         loop.cache.reset()
+    assert not result["summary"]["stopped"], result["summary"]["stopped"]
     rows = {r["case_id"]: r for r in result["results"]}
     assert rows[SOLAR["id"]]["verification"]["confirmed"] == 1
     assert rows[WIND["id"]]["verification"]["moved"] == 1
@@ -460,3 +482,106 @@ def test_verification_runs_inside_the_runtime_through_real_mcp(env, monkeypatch)
         and captions[WIND["id"]]["text"] == "Nothing confirmed."
     )
     assert result["config"].tool_versions and "lgnd" in result["config"].tool_servers
+
+
+def test_old_runtime_refusing_pairs_finishes_trace_and_batch_reports(env, monkeypatch):
+    case = {**SOLAR, "kind": "change", "chips": [SOLAR["chips"][0], SOLAR["chips"][0]]}
+
+    def old_runtime(**kw):
+        assert json.loads(kw["payload"])["contract"] == 2
+        return {
+            "response": io.BytesIO(
+                RunResponse.failure(
+                    contract.CONTRACT,
+                    "ContractError",
+                    "this Runtime speaks v1; redeploy for Chip Pairs",
+                ).to_json()
+            )
+        }
+
+    monkeypatch.setattr(env[2], "invoke_agent_runtime", old_runtime)
+    result = run_batch(env, cases=(case,), repeats=1, harness="agentcore", runtime=ARN)
+    assert "contract mismatch" in result["summary"]["stopped"]
+    bid = result["config"].batch_id
+    run, _ = loads(env[0].get(trace_key(bid, case["id"], 1)))
+    assert run.status == "stopped"
+    assert env[0].exists(f"batches/{bid}/report.html")
+
+
+def test_tool_versions_add_later_servers_without_replacing_first_version(env):
+    store, settings, _ = env
+    bid = batches.create([SOLAR], settings, store, 1, "versions", "dev")
+    cfg = batches.load_config(store, bid)
+    notes = []
+    cfg = batches._record_tool_versions(store, cfg, {"roda": "1"}, notes.append)
+    cfg = batches._record_tool_versions(store, cfg, {"roda": "1", "lgnd": "2"}, notes.append)
+    assert cfg.tool_versions == {"roda": "1", "lgnd": "2"} and not notes
+    cfg = batches._record_tool_versions(store, cfg, {"roda": "3"}, notes.append)
+    assert cfg.tool_versions["roda"] == "1" and len(notes) == 1
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("footprint", [["bbox"]]),
+        ("tools", [[]]),
+        ("model", {}),
+        ("prompt", 1),
+        ("image_b64", "not base64!"),
+    ],
+)
+def test_malformed_requests_do_not_reset_live_tool_connections(field, value):
+    from unittest.mock import Mock
+
+    cache = Mock()
+    data = json.loads(build_request().to_json())
+    response = runtime.answer(json.dumps({**data, field: value}), FakeBedrock(), cache)
+    assert response.error["kind"] == contract.CONTRACT
+    cache.reset.assert_not_called()
+
+
+def test_classifier_setup_is_cached_and_errors_are_reported(monkeypatch):
+    from types import SimpleNamespace
+    from unittest.mock import Mock
+
+    routes = SimpleNamespace(uses_classifier=lambda: True, classifier="c", examples={})
+    monkeypatch.setattr(runtime.verifiers, "load", lambda: routes)
+    ensure = Mock(return_value="classifier unavailable")
+    monkeypatch.setattr(runtime.lgnd, "ensure_classifier", ensure)
+    cache = ToolboxCache(FakeBox)
+    request = build_request(verify="lgnd")
+    for _ in range(2):
+        response = runtime.run_request(request, FakeBedrock(), cache)
+        assert response.metadata["classifier_setup_error"] == "classifier unavailable"
+    ensure.assert_called_once()
+
+
+def test_verification_data_mismatch_stops_before_scoring():
+    from types import SimpleNamespace
+
+    cfg = SimpleNamespace(
+        caption_model="cap",
+        max_turns=8,
+        tools=[],
+        verify="lgnd",
+        ontology_sha="wrong",
+        verifiers_sha="wrong",
+    )
+    loop = Loopback(cache=ToolboxCache(FakeBox))
+    with pytest.raises(ContractError, match="redeploy matching"):
+        RemoteHarness(ARN, client=loop).caption(cfg, CHIP, b"c-solar", "p", tracer(), None)
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        b"\xff",
+        json.dumps({**json.loads(build_request().to_json()), "tools": ["osm"]}).encode(),
+    ],
+)
+def test_bad_encoding_or_forbidden_server_keeps_tool_connections(body):
+    from unittest.mock import Mock
+
+    cache = Mock()
+    assert runtime.answer(body, FakeBedrock(), cache).error["kind"] == contract.CONTRACT
+    cache.reset.assert_not_called()

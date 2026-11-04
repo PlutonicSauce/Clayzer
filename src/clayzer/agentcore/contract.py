@@ -79,6 +79,7 @@ class RunRequest:
 
     def check(self) -> None:
         """Refuse a request that breaks a rule. Run on both sides of the wire."""
+        self._check_types()
         if self.contract not in (CONTRACT_VERSION, PAIR_CONTRACT_VERSION):
             raise ContractError(
                 f"contract version {self.contract}, but this side speaks {CONTRACT_VERSION}"
@@ -105,10 +106,29 @@ class RunRequest:
         if self.footprint is not None and not {"bbox", "date"} >= set(self.footprint):
             raise ContractError("the footprint holds only a bbox and a date")
 
+    def _check_types(self) -> None:
+        if type(self.contract) is not int:
+            raise ContractError("contract must be an integer")
+        if any(not isinstance(value, str) for value in (self.chip_id, self.prompt, self.model)):
+            raise ContractError("chip_id, prompt, and model must be strings")
+        if not isinstance(self.tools, list) or any(not isinstance(t, str) for t in self.tools):
+            raise ContractError("tools must be a list of server names")
+        if self.verify is not None and not isinstance(self.verify, str):
+            raise ContractError("verify must be a server name")
+        if self.footprint is not None and not isinstance(self.footprint, dict):
+            raise ContractError("footprint must be an object")
+        for value in (self.image_b64, self.image_sha256):
+            values = value if isinstance(value, list) else [value]
+            if any(not isinstance(v, str) for v in values):
+                raise ContractError("images and hashes must be strings")
+
     def png(self) -> bytes | list[bytes]:
         encoded = self.image_b64 if isinstance(self.image_b64, list) else [self.image_b64]
         hashes = self.image_sha256 if isinstance(self.image_sha256, list) else [self.image_sha256]
-        images = [base64.b64decode(image, validate=True) for image in encoded]
+        try:
+            images = [base64.b64decode(image, validate=True) for image in encoded]
+        except ValueError:
+            raise ContractError("the image must be valid base64") from None
         if any(
             hashlib.sha256(image).hexdigest() != sha
             for image, sha in zip(images, hashes, strict=True)
@@ -123,7 +143,7 @@ class RunRequest:
     def from_json(cls, raw: bytes | str) -> RunRequest:
         try:
             data = json.loads(raw)
-        except json.JSONDecodeError as e:
+        except (ValueError, UnicodeError) as e:
             raise ContractError(f"the request is not JSON: {e}") from None
         if not isinstance(data, dict):
             raise ContractError("the request must be a JSON object")
@@ -158,7 +178,12 @@ class RunResponse:
 
     @classmethod
     def from_json(cls, raw: bytes | str) -> RunResponse:
-        data: dict[str, Any] = json.loads(raw)
+        try:
+            data: dict[str, Any] = json.loads(raw)
+        except (ValueError, UnicodeError):
+            raise ContractError("the Runtime response is not JSON") from None
+        if not isinstance(data, dict):
+            raise ContractError("the Runtime response must be an object")
         if data.get("contract") not in (CONTRACT_VERSION, PAIR_CONTRACT_VERSION):
             raise ContractError(
                 f"the Runtime answered contract {data.get('contract')}, expected {CONTRACT_VERSION}"

@@ -23,12 +23,24 @@
 #   land_cover        matching classes in NLCD (US) and ESA WorldCover, as each legend names them;
 #                     checked 2026-11-04 against the MRLC NLCD legend and the WorldCover v2.0 user
 #                     manual. `note` says where a legend's classes only partly match the class
+#   caption_exemplars Layer C (ADR-0010): 1-2 short, class-LEVEL caption phrases in house style,
+#                     fed to the captioner as few-shot examples. CIRCULARITY RULE: these are
+#                     generic ("rows of dark solar panels…"), never a label for a scored Chip,
+#                     and are written by hand or from a source we do NOT score against. They
+#                     teach phrasing and help retrieval; they never state what is in THIS image.
+#
+# The data-driven Layer B (embedding prototypes per class, learned look-alikes, and co-occurrence
+# statistics) is a generated sidecar, not this file: ontology/prototypes/<version>.json, built by
+# `clayzer ontology build-prototypes` from a disjoint dev region (prototypes.py, ADR-0010). This
+# file stays the small, hand-curated, diff-able symbolic layer.
 #
 # Version 0.1 (2026-11-03): matches the classes in harness.OBJECTS, grounding.KEYED,
 # answer_keys.osm_object, and retrieval.QUERIES as they were on that date.
-# Version 0.2 (2026-11-04, ontology-review): a definition per class; water is only water there
+# Version 0.2 (2026-11-04): ontology-review — a definition per class; water is only water there
 # all year (OSM mapped dry desert washes as intermittent streams); the road and building rules
-# list everything the code maps; construction_site stays a candidate; well_pad added as one.
+# list everything the code maps; construction_site stays a candidate; well_pad added as one;
+# land_cover `note` where a legend only partly matches. Plus Layer C caption_exemplars for the
+# keyed classes (ADR-0010).
 
 version = "0.2"
 
@@ -85,6 +97,7 @@ min_visible_m = 10
 attributes = { size = ["small", "medium", "large"] }
 queries = ["find solar farms"]
 rsicd_scenes = []
+caption_exemplars = ["Rows of dark blue-grey photovoltaic panels fill the centre of the tile.", "A large ground-mounted solar array in regular rectangular blocks, set in open land."]
 
 [[class]]
 id = "wind_turbine"
@@ -99,6 +112,7 @@ confusers = ["transmission_tower"]
 min_visible_m = 5
 queries = ["find wind turbines"]
 rsicd_scenes = []
+caption_exemplars = ["Several white wind turbines, each casting a long thin shadow, stand spaced across open ground.", "Wind turbines set in a loose line through farmland."]
 
 [[class]]
 id = "substation"
@@ -143,6 +157,7 @@ min_visible_m = 3
 attributes = { surface = ["paved", "unpaved"] }
 queries = []
 rsicd_scenes = ["viaduct", "bridge"]
+caption_exemplars = ["A paved road runs across the tile from edge to edge.", "A straight road separates two fields."]
 
 [[class]]
 id = "railroad"
@@ -157,6 +172,7 @@ confusers = ["road"]
 min_visible_m = 3
 queries = ["find railroads"]
 rsicd_scenes = ["railwaystation"]
+caption_exemplars = ["A single rail line crosses the tile in a long gentle curve.", "Parallel train tracks run beside open ground."]
 
 [[class]]
 id = "parking_lot"
@@ -171,6 +187,7 @@ confusers = ["solar_array", "bare_ground"]
 min_visible_m = 10
 queries = ["find parking lots"]
 rsicd_scenes = ["parking"]
+caption_exemplars = ["A paved parking lot with marked rows of spaces, some holding cars.", "An open paved lot beside a building, lined with parking bays."]
 
 [[class]]
 id = "runway"
@@ -199,6 +216,7 @@ confusers = ["greenhouse", "substation"]
 min_visible_m = 4
 queries = ["find buildings"]
 rsicd_scenes = ["denseresidential", "mediumresidential", "sparseresidential", "commercial", "industrial", "school", "church", "center"]
+caption_exemplars = ["A cluster of rectangular building roofs with a road alongside.", "A large industrial building with a flat rectangular roof."]
 
 [[class]]
 id = "greenhouse"
@@ -213,6 +231,7 @@ confusers = ["solar_array", "building"]
 min_visible_m = 5
 queries = ["find greenhouses"]
 rsicd_scenes = []
+caption_exemplars = ["Long pale greenhouse roofs in parallel rows, brighter and more reflective than solar panels.", "A block of glasshouses with light, translucent roofs."]
 
 [[class]]
 id = "storage_tank"
@@ -242,6 +261,7 @@ min_visible_m = 5
 queries = ["find water"]
 rsicd_scenes = ["pond", "river", "beach", "port"]
 land_cover = { nlcd = ["11 Open Water"], worldcover = ["Permanent water bodies"] }
+caption_exemplars = ["A dark, smooth body of water occupies part of the tile.", "A pond with an irregular shoreline set among open land."]
 
 # ── land cover ──────────────────────────────────────────────────────────────────────────
 
@@ -259,6 +279,7 @@ min_visible_m = 20
 queries = ["find farmland"]
 rsicd_scenes = ["farmland", "meadow"]
 land_cover = { nlcd = ["81 Pasture/Hay", "82 Cultivated Crops"], worldcover = ["Cropland"], note = "WorldCover's Cropland is annual crops only: it maps orchards as Tree cover, vineyards as Shrubland, and pastures as Grassland, so WorldCover misses part of this class. NLCD's Cultivated Crops includes orchards and vineyards." }
+caption_exemplars = ["Cultivated farm fields in large rectangular parcels of differing colours.", "An agricultural field with visible plough lines."]
 
 [[class]]
 id = "vegetation"

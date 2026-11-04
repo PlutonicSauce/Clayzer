@@ -12,7 +12,7 @@ are defined in [GLOSSARY.md](../GLOSSARY.md).
   of `tech-hackathon.docx` and `vision-hackathon.docx`. They are **newer** than
   `Clay-Foundry-Technical-Hackathon.md` and `Clay-Foundry-Vision-Hackathon.md` and add most of
   the caption-track detail.
-- Section 2 gives every requirement an ID: CAP-01 to CAP-19 (caption), AWS-01 to AWS-13 (AWS),
+- Section 2 gives every requirement an ID: CAP-01 to CAP-19 (caption), AWS-01 to AWS-14 (AWS),
   and REQ-01 to REQ-19 (the evaluation loop as a whole).
 - Facts marked *(from memory)* in sections 6–8 come from general knowledge of the field, not from
   the source documents, and should be re-checked before they go into a demo or the spec.
@@ -105,6 +105,7 @@ teammate has their own hackathon AWS account in us-west-2.
 | AWS-11 | The agentic captioner can run as a managed agent that holds the LGND sign-in and reaches MCP tools | Amazon Bedrock AgentCore (Runtime, Gateway, Identity, Observability) | REQ-02 (LGND), agentic captioning | judging criteria; *Technical* §Confirmed Data Sources (LGND Geo MCP) |
 | AWS-12 | No disallowed services: no HyperPod or large Trainium, no cross-account deployment, no warehouse (Traces stay files in S3) | — | REQ-17 | *Technical* §Service Disallow List |
 | AWS-13 | Access is least-privilege and short-lived: no credentials in the repo, a role per service, public access blocked on every bucket | AWS IAM | REQ-13, REQ-15 | judging criteria (technical execution); public repo |
+| AWS-14 | A Batch's result is read aloud as a short spoken summary, for teammates and judges who'd rather hear it than read a report; it's made once and replayed, so the hosted app never calls a model | Amazon Polly (generative or neural voice), with the script from Bedrock Nova Pro | REQ-09, REQ-12 | judging criteria |
 
 Facts about newer services (AgentCore's components, SageMaker GPU instance
 types and default quotas) are from general knowledge and must be checked in an account before
@@ -264,6 +265,7 @@ flowchart LR
 | ECS Fargate, ALB, CloudFront (AWS-08) | Hosts the read-only UI and API container | A live HTTPS URL for the judges with no domain or certificate to manage. App Runner was the first choice but the participant role can't use it (checked 2026-11-03). One ARM64 task in a public subnet, no NAT gateway; the load balancer only accepts CloudFront |
 | Step Functions (AWS-09) | Runs the caption pipeline with parallel fan-out | The pipeline is visible as a workflow, and retries and failures are per Chip |
 | AgentCore (AWS-11) | Hosts the agentic captioner and holds the LGND OAuth sign-in | LGND's MCP server is remote and needs OAuth, which a laptop MCP client handles poorly |
+| Polly (AWS-14) | Reads each Batch's result aloud: code computes the facts, Nova Pro writes the script, Polly makes the MP3 (`listen.py`) | Saved next to the Batch and replayed, so the read-only web app needs no Polly or Bedrock access; only whoever runs a Batch or `clayzer listen` needs `polly:SynthesizeSpeech` (the Step Functions role too, once AWS-09 runs the pipeline) |
 
 Order of value against effort: AWS-04 and AWS-05 first (each closes a rubric gap), then AWS-07
 and AWS-08 (a reproducible stack and a live URL), then AWS-09, AWS-10, and AWS-11.
@@ -322,6 +324,20 @@ legend and the WorldCover v2.0 user manual, and `tests/test_ontology.py` keeps t
 those legends. They only partly match: WorldCover counts pasture as grassland and orchards as
 tree cover, and NLCD calls most Mojave desert Shrub/Scrub, so a land-cover score would disagree
 with Captions that call it bare ground (each class's `note`).
+
+**Data-driven extension (the team's differentiator; [ADR-0010](adr/0010-the-ontology-is-data-driven-and-feeds-the-captioner.md),
+[docs/ontology-data-driven.md](ontology-data-driven.md)).** The ontology now also flows *into*
+captioning, as class-level guidance in three layers: **A** look-alikes and minimum sizes (in the
+file), **C** caption exemplars (new `caption_exemplars` field, version 0.2), and **B** embedding
+prototypes — the centroid of a few confirmed example Chips' Clay/LGND embeddings per class, built
+from a disjoint development region and stored as a generated sidecar
+(`ontology/prototypes/<version>.json`). At caption time the Chip's own already-published
+embedding is matched against the centroids and the nearest classes become a one-line prompt hint,
+disambiguating look-alikes with no second vision call. It is a Batch option (`ontology_context`,
+default off), so its effect is measured by the loop (Batches, Compare, the gate). Two constraints
+are built into the code: **circularity** (class-level only, disjoint region, built from Clay/LGND
+which is not a scored Answer Key; `guard_scoring_region`) and **cost** (no model call per caption;
+`LAYER_B_CLASSES` restricts B to classes discriminable at Sentinel-2's 10 m).
 
 ### 3.6 Evaluating caption data from any source
 
@@ -514,6 +530,14 @@ Each idea is mapped to the rubric criterion it serves.
 **Recommended combination:** 1 + 2 + 7, plus 5 if a GPU instance is available. It attacks
 grounding and label-preparation cost directly, and every step is measured by the same
 evaluation loop.
+
+**Ontology-grounded captioning** (Grounding, Retrieval, Fidelity; on branch
+`feat/ontology-data-driven`). Feed the captioner class-level ontology knowledge — look-alikes,
+house-style exemplars, and an embedding-nearest-class hint from Clay/LGND prototypes — to cut the
+look-alike confusions (greenhouse vs solar array) and generic text that overhead VLMs produce.
+It reuses Clay's own embeddings, adds no model call, and is measured by the loop like idea 7. See
+[ADR-0010](adr/0010-the-ontology-is-data-driven-and-feeds-the-captioner.md) and
+[docs/ontology-data-driven.md](ontology-data-driven.md).
 
 ### Stretch goals: cost and quality at scale
 

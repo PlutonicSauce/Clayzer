@@ -171,13 +171,18 @@ def caption(
     max_turns: int = MAX_TURNS,
     verifier=None,
     footprint: dict | None = None,
+    ontology_context: str | None = None,
 ) -> tuple[dict, dict]:
     """Caption one Chip, and with a `verifier` (a Toolbox with LGND Geo) and the Chip's
     `footprint`, verify its Claims and rewrite it from the confirmed ones (verify.py).
 
+    `ontology_context` is class-level guidance from the Object Ontology (look-alikes, minimum
+    sizes, caption exemplars, and an embedding-nearest-class hint): general knowledge, never the
+    Case's Answer Key, so ADR-0006 still holds. See ontology.py and prototypes.py (ADR-0010).
+
     The rest is `_draft`'s: see there."""
     cap, step = _draft(client, model, chip_id, png, prompt_template, tracer, image_key,
-                       toolbox, max_turns)  # fmt: skip
+                       toolbox, max_turns, ontology_context)  # fmt: skip
     if verifier is None or footprint is None:
         return cap, step
     from clayzer.verify import verify
@@ -232,18 +237,22 @@ def _draft(
     image_key: str | None = None,
     toolbox=None,
     max_turns: int = MAX_TURNS,
+    ontology_context: str | None = None,
 ) -> tuple[dict, dict]:
     """Caption one Chip. Returns the Caption (minus `case_id`) and a summary of the call.
 
-    `prompt_template` may use {grid}, {objects}, and {relations}. With a `tracer`, the call is
-    recorded as a Step in the Run's Trace: the full prompt and response, the image by key and
-    hash, timing, tokens, and retries. With a `toolbox` that has tools, the model may call them
-    first (see the module docstring).
+    `prompt_template` may use {grid}, {objects}, and {relations}. `ontology_context`, when given,
+    is appended as class-level guidance (ADR-0010). With a `tracer`, the call is recorded as a
+    Step in the Run's Trace: the full prompt and response, the image by key and hash, timing,
+    tokens, and retries. With a `toolbox` that has tools, the model may call them first (see the
+    module docstring).
     """
 
     prompt = prompt_template.format(
         grid=", ".join(GRID), objects=", ".join(OBJECTS), relations=", ".join(RELATIONS)
     )
+    if ontology_context:
+        prompt = f"{prompt}\n{ontology_context}"
     if toolbox is not None and toolbox.specs:
         ref = _image_refs(png, image_key, chip_id)
         return _with_tools(client, model, chip_id, png, prompt, tracer, ref, toolbox, max_turns)

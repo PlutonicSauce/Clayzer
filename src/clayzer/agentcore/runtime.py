@@ -16,6 +16,7 @@ with this Runtime's own IAM role.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import threading
@@ -24,9 +25,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from botocore.exceptions import BotoCoreError, ClientError
 
-from clayzer import harness
+from clayzer import harness, lgnd, ontology, verifiers
 from clayzer.agentcore import contract, telemetry
 from clayzer.agentcore.contract import ContractError, RunRequest, RunResponse
+from clayzer.allowlist import ForbiddenServer
 from clayzer.mcp_auth import NotSignedIn
 from clayzer.trace import RunInfo, Tracer, watch_retries
 
@@ -43,6 +45,7 @@ class ToolboxCache:
             factory = Toolbox.named
         self.factory = factory
         self._boxes: dict[tuple, object] = {}
+        self._classifier_errors: dict[tuple, str | None] = {}
         self._lock = threading.Lock()
 
     def get(self, tools: list[str], verify: str | None):
@@ -66,11 +69,27 @@ class ToolboxCache:
         """Drop every connection, so the next request makes fresh ones."""
         with self._lock:
             boxes, self._boxes = list(self._boxes.values()), {}
+            self._classifier_errors.clear()
         for box in boxes:
             try:
                 box.__exit__(None, None, None)
             except Exception as e:  # noqa: BLE001 - closing a dead connection may fail
                 print(f"note: closing a tool connection failed: {type(e).__name__}", flush=True)
+
+    def prepare_verifier(self, tools, verify, verifier) -> str | None:
+        """Initialize classifier routes once per cached verifier, as a local Batch does."""
+        if verifier is None:
+            return None
+        routes = verifiers.load()
+        if not routes.uses_classifier():
+            return None
+        key = (*dict.fromkeys([*tools, verify]), verify)
+        with self._lock:
+            if key not in self._classifier_errors:
+                self._classifier_errors[key] = lgnd.ensure_classifier(
+                    verifier.call, routes.classifier, routes.examples
+                )
+            return self._classifier_errors[key]
 
 
 def build() -> str:
@@ -108,6 +127,14 @@ def run_request(request: RunRequest, client, cache: ToolboxCache) -> RunResponse
     ):  # fmt: skip
         try:
             model_tools, verifier, versions = cache.get(request.tools, request.verify)
+            if request.verify:
+                tracer.run.metadata["verification_files"] = {
+                    "ontology_sha": hashlib.sha256(ontology.DEFAULT.read_bytes()).hexdigest(),
+                    "verifiers_sha": hashlib.sha256(verifiers.DEFAULT.read_bytes()).hexdigest(),
+                }
+                error = cache.prepare_verifier(request.tools, request.verify, verifier)
+                if error:
+                    tracer.run.metadata["classifier_setup_error"] = error
             cap, step = harness.caption(
                 client, request.model, request.chip_id, png, request.prompt, tracer,
                 request.image_key, model_tools, request.max_turns, verifier, request.footprint,
@@ -165,7 +192,7 @@ def answer(body: bytes, client, cache: ToolboxCache) -> RunResponse:
         response = run_request(request, client, cache)
         response.contract = request.contract
         return response
-    except ContractError as e:
+    except (ContractError, ForbiddenServer) as e:
         return RunResponse.failure(contract.CONTRACT, "ContractError", str(e), build=build())
     except Exception as e:  # noqa: BLE001 - report it; one bad Run must not kill the server
         cache.reset()  # a broken connection would fail every later Run

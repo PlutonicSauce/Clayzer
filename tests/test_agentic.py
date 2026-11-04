@@ -67,6 +67,18 @@ def tracer():
     return Tracer(run, [])
 
 
+def test_ontology_context_is_appended_to_the_caption_prompt():
+    # Single-call path (no toolbox): the ontology guidance lands in the prompt text block.
+    bedrock = Scripted(turn(use("submit_caption", CAPTION, "t1")))
+    harness.caption(bedrock, "m", "chip", b"png", ontology_context="GUIDANCE-MARKER")
+    text = bedrock.requests[0]["messages"][0]["content"][1]["text"]
+    assert "GUIDANCE-MARKER" in text
+    # Absent by default: no behaviour change for Batches that don't opt in.
+    plain = Scripted(turn(use("submit_caption", CAPTION, "t1")))
+    harness.caption(plain, "m", "chip", b"png")
+    assert "GUIDANCE-MARKER" not in plain.requests[0]["messages"][0]["content"][1]["text"]
+
+
 def test_the_model_calls_a_tool_then_submits():
     bedrock = Scripted(
         turn(use("lookup", {"place": "Mojave"})), turn(use("submit_caption", CAPTION, "t2"))

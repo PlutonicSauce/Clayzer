@@ -18,6 +18,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
+from http.client import HTTPException
 
 from botocore.exceptions import ClientError
 
@@ -96,22 +97,26 @@ class RemoteHarness:
     def _invoke_https(self, request: RunRequest, retry: bool = True) -> RunResponse:
         """Invoke the JWT-protected endpoint with a bearer token. On a 401/403 (an expired
         token), mint a fresh one and retry once; any other HTTP error is an environment fault."""
-        token = self._inbound.token()
-        http = urllib.request.Request(
-            _invocation_url(self.runtime_arn), data=request.to_json(), method="POST",
-            headers={"Content-Type": "application/json", "Accept": "application/json",
-                     "Authorization": f"Bearer {token}", SESSION_HEADER: self.session_id},
-        )  # fmt: skip
         try:
+            token = self._inbound.token(force=not retry)
+            http = urllib.request.Request(
+                _invocation_url(self.runtime_arn), data=request.to_json(), method="POST",
+                headers={"Content-Type": "application/json", "Accept": "application/json",
+                         "Authorization": f"Bearer {token}", SESSION_HEADER: self.session_id},
+            )  # fmt: skip
             with self._opener.open(http, timeout=READ_TIMEOUT) as reply:
                 return RunResponse.from_json(reply.read())
         except urllib.error.HTTPError as e:
             if e.code in (401, 403) and retry:
-                self._inbound.token(force=True)
                 return self._invoke_https(request, retry=False)
-            body = e.read().decode()[:300]
+            body = e.read().decode(errors="replace")[:300]
             raise ClientError(
                 {"Error": {"Code": f"AgentCoreInbound{e.code}", "Message": body}},
+                "InvokeAgentRuntime",
+            ) from e
+        except (OSError, HTTPException) as e:
+            raise ClientError(
+                {"Error": {"Code": "AgentCoreInboundConnection", "Message": type(e).__name__}},
                 "InvokeAgentRuntime",
             ) from e
 
@@ -127,6 +132,16 @@ class RemoteHarness:
         self._merge(tracer, response)
         error = response.error
         if error is None:
+            if request.verify:
+                actual = response.metadata.get("verification_files", {})
+                for key in ("ontology_sha", "verifiers_sha"):
+                    expected = getattr(cfg, key, None)
+                    # BatchConfig uses the first 12 hex digits; retain the full runtime hash
+                    # in the Trace while comparing the same representation.
+                    if expected is not None and actual.get(key, "")[:12] != expected:
+                        raise ContractError(
+                            f"Runtime {key} differs from the Batch; redeploy matching verification data"
+                        )
             return response.caption, response.step
         kind, code, message = error["kind"], error["code"], error["message"]
         if kind == contract.HARNESS_FAULT:

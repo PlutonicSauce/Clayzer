@@ -382,7 +382,18 @@ def render_html(b: dict, store) -> str:
         ("Cost (partial)", f"{_f(batch['seconds_per_caption'], 1)} s",
          f"{_f(batch['tokens_per_caption'], 0)} tokens per Caption; no GPU time on Bedrock",
          " platform"),
+        ("Verified Claims per dollar", _f(batch.get("verified_claims_per_dollar"), 0),
+         (f"{_f(batch.get('verified_claims_per_caption'), 1)} verified Claims per Caption at "
+          f"${_f(batch.get('usd_per_caption'), 5)}; per GPU-second "
+          f"{_f(batch.get('verified_claims_per_gpu_second'))}"), " platform"),
     ]  # fmt: skip
+    if batch.get("lookalikes"):
+        from clayzer.report import lookalike_line
+
+        fooled = sum(k["fooled"] for k in batch["lookalikes"].values())
+        tried = sum(k["runs"] for k in batch["lookalikes"].values())
+        cards.append(("Fooled by look-alikes", f"{fooled} of {tried} Runs",
+                     lookalike_line(batch["lookalikes"]), ""))  # fmt: skip
     html = [
         "<!doctype html><html lang='en'><head><meta charset='utf-8'>",
         f"<title>Caption Batch {escape(cfg.batch_id)}</title>",

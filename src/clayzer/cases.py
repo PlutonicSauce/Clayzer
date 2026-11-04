@@ -51,6 +51,26 @@ def apply_corrections(case_id: str, labels: list[dict], corrections: list[dict])
     return out
 
 
+def relabel_water(case: dict, chip: Chip, elements: list[dict], corrections: list[dict]) -> dict:
+    """The Case with its water label rebuilt from OSM `elements` under the current rule (only
+    water there all year, since ontology-review), every other label left as it is, and its hand
+    corrections applied again. Rebuilding only water keeps OSM edits made since the Case was
+    built out of it. A Change Case's water is the later Chip's, with change unknown."""
+    water = [lb for lb in ak.osm_labels(chip, elements) if lb["object"] == "water"]
+    if case.get("kind") == "change":
+        water = [{**lb, "change": "unknown"} for lb in water]
+    labels, placed = [], False
+    for lb in case["reference_labels"]:
+        if lb["object"] != "water":
+            labels.append(lb)
+        elif not placed:  # where the old water label was, so the order stays
+            labels += water
+            placed = True
+    if not placed:
+        labels += water
+    return {**case, "reference_labels": apply_corrections(case["id"], labels, corrections)}
+
+
 def _labels(chip: Chip) -> list[dict]:
     # Wider than the Chip: a large array centred outside it can still cover part of it.
     solar, turbines = ak.usgs_near(chip.bbox, ak.SOLAR_SEARCH_DEG, turbine_buffer_deg=0.0)

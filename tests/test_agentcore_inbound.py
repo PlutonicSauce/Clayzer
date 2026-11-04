@@ -1,6 +1,7 @@
 """Inbound OAuth on the Runtime endpoint (the JWT authorizer): minting the Cognito token, and
 RemoteHarness invoking over HTTPS with it instead of the SigV4 boto3 call. No network or AWS."""
 
+import http.client
 import io
 import json
 import urllib.error
@@ -184,3 +185,28 @@ def test_a_persistent_403_becomes_an_environment_fault():
         h.caption(cfg(), CHIP, b"c-solar", "p", tracer(), None)
     # A ClientError is what the Batch already treats as a Sandbox Failure (excluded, retried).
     assert "AgentCoreInbound403" in e.value.response["Error"]["Code"]
+
+
+@pytest.mark.parametrize("failure", [
+    urllib.error.URLError("unreachable"), TimeoutError(), http.client.IncompleteRead(b"partial"),
+])  # fmt: skip
+def test_https_connection_failures_are_environment_faults(failure):
+    from botocore.exceptions import ClientError
+
+    def answer(request, timeout=None):
+        raise failure
+
+    opener = FakeOpener(token_response("token"), on_invoke=answer)
+    h = RemoteHarness(ARN, inbound=AUTH, opener=opener)
+    with pytest.raises(ClientError, match="AgentCoreInboundConnection"):
+        h.caption(cfg(), CHIP, b"c-solar", "p", tracer(), None)
+
+
+@pytest.mark.parametrize("body", [b"not JSON", b"[]", b"null"])
+def test_invalid_runtime_bodies_are_contract_errors(body):
+    from clayzer.agentcore.contract import ContractError
+
+    opener = FakeOpener(token_response("token"), on_invoke=lambda *a, **kw: io.BytesIO(body))
+    h = RemoteHarness(ARN, inbound=AUTH, opener=opener)
+    with pytest.raises(ContractError):
+        h.caption(cfg(), CHIP, b"c-solar", "p", tracer(), None)
