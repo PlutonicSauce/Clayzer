@@ -30,17 +30,52 @@ const WRONG = [
   ["OpenStreetMap", "a dry wash mapped as water"],
 ];
 
+// The Claims drawn on the grid the way the web app's Overview draws them: a pill in the cell each
+// Claim names, coloured by its verdict, over the cells where the Answer Key puts turbines.
+const C = 512 / 3;
+const PILLS = [
+  ["18 turbines", "centre", "near"],
+  ["road, unpaved", "centre", "good"],
+  ["bare ground", "centre", "none"],
+];
+const TURBINE_CELLS = ["north_west", "north", "north_east", "west", "east", "south_west", "south",
+  "south_east"];
+
+function cellXY(cell) {
+  const i = CELLS.indexOf(cell);
+  return [(i % 3) * C, Math.floor(i / 3) * C];
+}
+
 function Chip() {
+  const per = {};
   return html`<figure class="ex-chip">
     <div class="ex-frame">
       <img src=${CHIP} alt="Aerial photo of desert hills crossed by dirt roads, with wind turbines
-        spread across most of the image" />
-      <div class="ex-grid" aria-hidden="true">
-        ${CELLS.map((c) => html`<span class=${c === "south_east" ? "hit" : ""}></span>`)}
-      </div>
+        spread across every part of the image except the centre" />
+      <svg viewBox="0 0 512 512" aria-hidden="true">
+        <g class="grid">${[1, 2].map((k) => html`<line x1=${k * C} y1="0" x2=${k * C} y2="512" />
+          <line x1="0" y1=${k * C} x2="512" y2=${k * C} />`)}</g>
+        ${TURBINE_CELLS.map((cell) => {
+          const [x, y] = cellXY(cell);
+          return html`<rect class=${cell === "south_east" ? "ref only-osm" : "ref"} x=${x + 4}
+            y=${y + 4} width=${C - 8} height=${C - 8} rx="6" />`;
+        })}
+        ${PILLS.map(([label, cell, tone]) => {
+          const [x0, y0] = cellXY(cell);
+          const n = (per[cell] = (per[cell] || 0) + 1) - 1;
+          const x = x0 + 5, y = y0 + 14 + n * 50;
+          return html`<g class=${`pill ${tone}`}><rect x=${x} y=${y} width=${C - 10} height="42"
+            rx="21" /><text x=${x + (C - 10) / 2} y=${y + 28} text-anchor="middle">${label}</text></g>`;
+        })}
+      </svg>
     </div>
-    <figcaption>NAIP aerial photo, 0.6 m per pixel, Tehachapi, California. The highlighted cell
-      holds the turbine USGS doesn't list.</figcaption>
+    <figcaption class="ex-legend">
+      <span><i class="dot good"></i>right, right place</span>
+      <span><i class="dot near"></i>right, wrong cell</span>
+      <span><i class="dot none"></i>no record to check</span>
+      <span><i class="sq"></i>turbines, per the answer key</span>
+      <span><i class="sq only-osm"></i>the one only OpenStreetMap had</span>
+    </figcaption>
   </figure>`;
 }
 
