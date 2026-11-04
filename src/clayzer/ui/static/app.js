@@ -93,7 +93,7 @@ const FLOW = [
   },
   {
     key: "report", phase: "report", title: "Report", sub: "summary and both scores, per Run", area: "Platform",
-    what: "One evaluation report per Run that puts its Trace summary, Workflow Score, and Output Score together; Batch reports roll the Runs up. If the live Harness misbehaves, recorded Traces and Captions are replayed through scoring, so a report, and the demo, never depend on a live run.",
+    what: "One evaluation report per Run, in HTML for people and JSON for machines, that puts its Trace summary, scores with their reasons, Steps, and Caption together; Batch reports roll the Runs up and link to each one. The Workflow Score joins it once it exists. If the live Harness misbehaves, recorded Traces and Captions are replayed through scoring, so a report, and the demo, never depend on a live run.",
     why: "The report is what a practitioner or partner reads. The replay fallback is a brief Must: it keeps the demo safe.",
     code: ["src/clayzer/report_html.py", "uv run clayzer rescore <batch-id> (replays stored Captions through scoring)", "uv run clayzer ui"],
   },
@@ -198,7 +198,7 @@ function chipFigure(sc) {
     <svg viewBox="0 0 512 512" aria-hidden="true"><g class="grid">${grid}</g><g>${refs}</g>${pills}</svg></div>`;
 }
 
-function showcaseCard(list, i) {
+function showcaseCard(list, i, batchId = "") {
   if (!list.length) {
     return `<div class="showcase empty">Run a Batch and accept it as the Baseline to see a featured Caption here.</div>`;
   }
@@ -215,7 +215,8 @@ function showcaseCard(list, i) {
     <p class="legend-row"><span><i class="dot good"></i>right, right place</span>
       <span><i class="dot near"></i>right, wrong cell</span> <span><i class="dot bad"></i>not there</span>
       <span><i class="sq"></i>where the map says things are</span></p>
-    <p class="sub">${esc(sc.chip.id)} · NAIP ${esc(sc.chip.date)}</p></div>`;
+    <p class="sub">${esc(sc.chip.id)} · NAIP ${esc(sc.chip.date)} ·
+      <a href="#/runs/${esc(batchId)}/${esc(sc.case_id)}/${esc(sc.run_id.split("#")[1])}">open this Run</a></p></div>`;
 }
 
 const VERDICT = {
@@ -297,7 +298,7 @@ async function overview() {
         <p class="sub">${B ? `Scored on Clay's five criteria, from the accepted ${term("Baseline")}: ${plural(B.cases, "Case")} × ${plural(B.repeats, "Repeat")}, captioned by ${esc(B.caption_model.replace(/^us\./, ""))}. Weights aren't set yet, so each criterion stands on its own.` : "No Baseline accepted yet."}</p>
         ${B ? scorecard(B) : ""}
       </div>
-      <div id="showcase">${showcaseCard(o.showcase, 0)}</div>
+      <div id="showcase">${showcaseCard(o.showcase, 0, B ? B.batch_id : "")}</div>
     </section>
 
     <div class="home-row">
@@ -324,7 +325,7 @@ async function overview() {
     const next = document.getElementById("sc-next");
     if (next) next.addEventListener("click", () => {
       shown += 1;
-      document.getElementById("showcase").innerHTML = showcaseCard(o.showcase, shown);
+      document.getElementById("showcase").innerHTML = showcaseCard(o.showcase, shown, B ? B.batch_id : "");
       wire();
     });
   };
@@ -635,7 +636,21 @@ async function batchPage(id) {
     ${gateHtml}
     <h2>Report</h2>
     <p class="sub">The same self-contained report the CLI writes; <a href="/api/batches/${encodeURIComponent(id)}/report.html" target="_blank">open it on its own</a>.</p>
-    <iframe class="report" sandbox="allow-scripts" src="/api/batches/${encodeURIComponent(id)}/report.html" title="Batch report"></iframe>`;
+    <iframe class="report" sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox" src="/api/batches/${encodeURIComponent(id)}/report.html" title="Batch report"></iframe>`;
+}
+
+async function runPage(batchId, caseId, repeat) {
+  const me = SEQ;
+  const name = `${caseId}--r${repeat}`;
+  const src = `/api/batches/${encodeURIComponent(batchId)}/runs/${encodeURIComponent(name)}`;
+  const r = await api(`${src}.json`);
+  if (stale(me)) return;
+  $view.innerHTML = `<p><a href="#/batches/${esc(batchId)}">← Batch ${esc(batchId)}</a></p>
+    <h1>Run ${esc(r.run_id)}</h1>
+    <p class="sub">${esc((r.summary || {}).verdict || r.status)} ·
+      <a href="${src}.html" target="_blank" rel="noopener">open on its own</a> ·
+      <a href="${src}.json" target="_blank" rel="noopener">as JSON</a></p>
+    <iframe class="report" sandbox="allow-scripts" src="${src}.html" title="Run report"></iframe>`;
 }
 
 async function comparePage(a, b) {
@@ -780,6 +795,7 @@ async function route() {
     else if (page === "batches" && parts[1]) await batchPage(parts[1]);
     else if (page === "batches") await batchesPage();
     else if (page === "compare") await comparePage(parts[1], parts[2]);
+    else if (page === "runs") await runPage(parts[1], parts[2], parts[3] || "1");
     else if (page === "sources") await sourcesPage();
     else if (page === "concepts") await conceptsPage();
     else $view.innerHTML = '<p class="empty">No such page.</p>';

@@ -133,6 +133,12 @@ never call a model, and one that names a fault the Trace doesn't have is rejecte
 `--no-narrate` skips it; `clayzer summarize <batch-id>` rebuilds the facts offline, and
 `--narrate` writes any missing narratives.
 
+Every Run also gets its own **report**, `batches/<batch-id>/runs/<case-id>--r<repeat>.html` (and
+`.json` for machines): the verdict, both scores with their reasons, the Chip with its Claims, the
+Caption, the summary, and every Step with its prompt and response. It's built from stored files
+only, so it rebuilds offline. In the web app it's at `#/runs/<batch-id>/<case-id>/<repeat>`, and
+each Repeat in a Batch report links to it.
+
 ```sh
 uv run clayzer trace <batch-id> <case-id> --repeat 1          # one Run, Step by Step
 uv run clayzer trace <batch-id> <case-id> --repeat 1 --json   # the raw Trace

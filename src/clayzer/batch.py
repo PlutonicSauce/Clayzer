@@ -22,6 +22,7 @@ Store layout, under batches/<batch-id>/:
     retrieval.jsonl  retrieval over each Repeat's Captions
     summary.json     per-Case means and Spreads, and Batch-level scores
     report.md, report.html
+    runs/            one report per Run: <case-id>--r<repeat>.html and .json (run_report.py)
 """
 
 import hashlib
@@ -493,6 +494,9 @@ def write_reports(store, batch_id: str) -> None:
     store.put(_key(batch_id, "report.md"), render(b).encode(), "text/markdown")
     html = render_html(b, store).encode()
     store.put(_key(batch_id, "report.html"), html, "text/html; charset=utf-8")
+    from clayzer.run_report import write_run_reports
+
+    write_run_reports(store, b)
 
 
 def list_batches(store) -> list[str]:

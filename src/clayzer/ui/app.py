@@ -5,6 +5,7 @@ store the settings point at (local folders or the account's S3 bucket). It's rea
 started with --allow-launch, which lets the browser start Batches; it listens on localhost.
 """
 
+import json
 import re
 import threading
 import tomllib
@@ -336,6 +337,20 @@ def create_app(settings: Settings, region: str = "dev", allow_launch: bool = Fal
         if not store.exists(key):
             raise HTTPException(404, "no report yet")
         return HTMLResponse(store.get(key).decode())
+
+    @app.get("/api/batches/{batch_id}/runs/{name}.html", response_class=HTMLResponse)
+    def run_html(batch_id: str, name: str):
+        key = f"batches/{_safe(batch_id)}/runs/{_safe(name)}.html"
+        if not store.exists(key):
+            raise HTTPException(404, "no report for this Run yet")
+        return HTMLResponse(store.get(key).decode())
+
+    @app.get("/api/batches/{batch_id}/runs/{name}.json")
+    def run_json(batch_id: str, name: str):
+        key = f"batches/{_safe(batch_id)}/runs/{_safe(name)}.json"
+        if not store.exists(key):
+            raise HTTPException(404, "no report for this Run yet")
+        return json.loads(store.get(key))
 
     @app.get("/api/compare")
     def compare_two(a: str, b: str):

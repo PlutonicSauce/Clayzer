@@ -194,3 +194,12 @@ def test_overview_has_a_showcase_and_an_experiment_log(client):
     assert sc["text"] and sc["claims"] and sc["chip"]["uri"].startswith("chips/")
     assert sc["right"] <= sc["gradable"]
     assert o["experiments"][0] == {**o["experiments"][0], "batch_id": bid, "verdict": "baseline"}
+
+
+def test_run_report_endpoints(client):
+    c, bid = client
+    name = f"{SOLAR['id']}--r1"
+    assert "Run fixed-dev-solar#1" in c.get(f"/api/batches/{bid}/runs/{name}.html").text
+    assert c.get(f"/api/batches/{bid}/runs/{name}.json").json()["status"] == "ok"
+    assert c.get(f"/api/batches/{bid}/runs/nope--r9.json").status_code == 404
+    assert c.get(f"/api/batches/{bid}/runs/x..y.html").status_code == 400

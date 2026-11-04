@@ -237,7 +237,8 @@ def _ms(d: dict | None) -> str:
 
 
 def _markdown(text: str) -> str:
-    """The small Markdown a narrative uses (### headings, - bullets, **bold**), as escaped HTML."""
+    """The small Markdown a narrative uses (### headings, - bullets, **bold**, `code`), as
+    escaped HTML."""
     import re
 
     html, items = [], []
@@ -249,6 +250,7 @@ def _markdown(text: str) -> str:
 
     for line in text.splitlines():
         line = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", escape(line.strip()))
+        line = re.sub(r"`([^`]+)`", r"<code>\1</code>", line)
         if not line:
             flush()
         elif line.startswith("### "):
@@ -342,7 +344,9 @@ def _repeat_row(
         out.append("</ul>")
     out.append(
         f"<p class='sub'>Caption in {_f(r.get('seconds_to_caption'), 1)} s, "
-        f"{r.get('caption_tokens')} tokens</p></details>"
+        f"{r.get('caption_tokens')} tokens · "
+        f"<a href='runs/{escape(r['case_id'])}--r{r['repeat']}.html' target='_blank' rel='noopener'>"
+        "Open this Run's full report: Steps, prompts, responses</a></p></details>"
     )
     return "".join(out)
 
