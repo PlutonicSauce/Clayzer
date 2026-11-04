@@ -23,23 +23,54 @@ function Title() {
   </div>`;
 }
 
-function Problem() {
-  return html`<div class="two-col">
-    <div>
-      <${Kicker}>The problem<//>
-      <h2>Clay's imagery is described by captions nobody has checked</h2>
-      <p class="big">Clay is making satellite and aerial imagery searchable in words, using
-        written descriptions — and no one has the time to check whether those descriptions are true.</p>
-      <p class="big">A caption that miscounts turbines or invents a road sends every search that
-        relies on it to the wrong place, at continental scale.</p>
-    </div>
-    <div class="hook">
-      <p class="hook-label">Seen in a real Run</p>
-      <blockquote>"An aerial image of a wind farm … turbines in the north-west, north, and
-        north-east …"</blockquote>
-      <p class="hook-truth">The USGS turbine database says <b>16 turbines, to the south</b>.
-        Wrong count, wrong place. A plausible caption, and wrong — the kind that quietly sends
-        a search to the wrong place.</p>
+// The problem, then how Clayzer earns trust: three techniques build in one press at a time
+// (`steps` in SLIDES), and the last press turns the untrusted caption into a trusted one.
+const TRUST = [
+  { icon: "layers", title: "Enrich the inputs",
+    text: "Public records (USGS, OpenStreetMap), a shared vocabulary of look-alikes, and an imagery check on every fact before it's written." },
+  { icon: "split", title: "Tune on one region, test on another",
+    text: "Built on 74 Mojave images, scored once on 61 Texas images it never saw, plus look-alikes that fool models." },
+  { icon: "loop", title: "A self-improvement loop",
+    text: "Every change runs 3× per image and is kept only if it beats the baseline, so we learn which techniques work." },
+];
+
+function TrustIcon({ name }) {
+  const s = { fill: "none", stroke: "currentColor", "stroke-width": 3, "stroke-linecap": "round", "stroke-linejoin": "round" };
+  return html`<svg class="trust-icon" viewBox="0 0 48 48" aria-hidden="true">
+    ${name === "layers" && html`<g ...${s}><path d="M24 8 42 17 24 26 6 17Z" /><path d="M6 24l18 9 18-9" /><path d="M6 31l18 9 18-9" /></g>`}
+    ${name === "split" && html`<g ...${s}><rect x="5" y="12" width="15" height="24" rx="3" /><rect x="28" y="12" width="15" height="24" rx="3" /><path d="M20 24h8" stroke-dasharray="2 4" /></g>`}
+    ${name === "loop" && html`<g ...${s}><path d="M38 20a15 15 0 0 0-27-4" /><path d="M10 9v7h7" /><path d="M10 28a15 15 0 0 0 27 4" /><path d="M38 39v-7h-7" /></g>`}
+  </svg>`;
+}
+
+function Problem({ step = 0 }) {
+  const trusted = step > TRUST.length;
+  return html`<div class="problem">
+    <${Kicker}>The problem<//>
+    <h2>Clay's imagery is described by captions nobody has checked</h2>
+    <div class="problem-grid">
+      <div class=${`hook ${trusted ? "trusted" : ""}`}>
+        <p class="hook-label">${trusted ? "The goal" : "Seen in a real Run"}</p>
+        ${trusted
+          ? html`<blockquote>"An aerial image of a wind farm … 16 turbines, mostly in the
+              south …"</blockquote>`
+          : html`<blockquote>"An aerial image of a wind farm … turbines in the north-west, north,
+              and north-east …"</blockquote>`}
+        ${trusted
+          ? html`<p class="hook-truth"><b>Every fact checked</b> against the records before it's
+              kept, so a search that relies on it lands in the right place.</p>`
+          : html`<p class="hook-truth">The USGS turbine database says <b>16 turbines, to the
+              south</b>. Plausible, and wrong — and every search that relies on it goes to the
+              wrong place.</p>`}
+        <span class="hook-stamp">${trusted ? "✓ Trusted" : "✗ Unchecked"}</span>
+      </div>
+      <div class="trust">
+        <p class=${`trust-head build ${step >= 1 ? "in" : ""}`}>How we make captions trustworthy</p>
+        ${TRUST.map((t, k) => html`<div class=${`trust-item build ${step >= k + 1 ? "in" : ""}`}>
+          <${TrustIcon} name=${t.icon} />
+          <div><b>${t.title}</b><p>${t.text}</p></div>
+        </div>`)}
+      </div>
     </div>
   </div>`;
 }
@@ -138,16 +169,16 @@ export const SLIDES = [
   { title: "Clayzer", seconds: 10, theme: "dark", component: Title,
     spoken: "Clayzer. Give us your caption set, and we tell you how much of it you can trust.",
     notes: ["One line, then move on.", "4:00 total. T starts the timer, A reads a slide aloud."] },
-  { title: "The problem", seconds: 20, component: Problem,
-    spoken: "Clay is making satellite imagery searchable in words, using written descriptions that nobody has checked. In a real run, a caption put a wind farm's turbines to the north. The official database says sixteen turbines, to the south. Plausible, and wrong.",
-    notes: ["Read the wrong caption, then the answer key: 16 turbines, south.", "Keep it short: the next slide shows a full example."] },
+  { title: "The problem", seconds: 35, component: Problem, steps: 4,
+    spoken: "Clay is making satellite imagery searchable in words, using captions nobody has checked. In a real run, a caption put a wind farm's turbines to the north. The database says sixteen, to the south. So how do we make captions you can trust? First, we enrich the inputs: public records, look-alikes, and an imagery check on every fact. Second, we tune on one region and test on another it never saw. Third, a self-improvement loop that keeps only the changes that beat the baseline. The result: captions you can trust.",
+    notes: ["Open on the wrong caption: 16 turbines, south.", "Press → for each point as you say it: 1 enrich the inputs, 2 tune here / test there, 3 the loop. The 4th press turns the card green: trusted.", "Say 'tune', not 'train': we don't train a model, we tune the captioner's prompt and checks."] },
   { title: "What a caption looks like", seconds: 40, component: CaptionExample,
     spoken: "Here is one real caption. The model saw only this photo and said eighteen wind turbines, mostly in the centre. The dots are what public records say is there. The count is right, but they are all around the centre, not in it. We never hand-label: code builds the answer key from public records and cross-checks two sources. Here they disagree by two metres on one turbine, so that is all a person looks at.",
     notes: ["Dots are the records, drawn on the real turbines. The amber box is the caption's claim: Claims name a cell, not an object.", "USGS and OpenStreetMap place the top-edge turbine 2 m apart: one says inside the photo, one outside.", "Scale: labels are automatic (about a minute per image); the code cross-checks sources and flags disagreements for a person. Don't say we checked every image by eye: that was a one-time audit of the test set.", "Say both: count right, position wrong."] },
-  { title: "How it works", seconds: 40, component: Architecture,
+  { title: "How it works", seconds: 35, component: Architecture,
     spoken: "Here is the whole journey. One aerial image comes in on the left. A model on AWS writes a caption. Before each statement is kept, we check it against the imagery. We score it against open map data the model never saw. A gate decides whether it is good enough. What comes out is a verdict you can trust, and the same path works for one image or a million.",
     notes: ["One image in on the left, a verdict out on the right.", "Point at each numbered stop. End on: same path scales to millions."] },
-  { title: "Our approach · what's new", seconds: 35, component: Approach,
+  { title: "Our approach · what's new", seconds: 25, component: Approach,
     spoken: "Three things set this apart. Verify-then-write: each claim is checked against imagery as the caption is written. Hidden answer keys: the captioner never sees the ground truth, so a good score is earned. And an ontology learned from captions and fed back into the model, so it confuses a greenhouse for a solar array less often. It scores captions and teaches the next ones.",
     notes: ["Verify-then-write, hidden keys, the ontology that feeds the model.", "The loop: the ontology scores AND teaches, proven by the gate."] },
   { title: "Live demo", seconds: 35, component: Demo,

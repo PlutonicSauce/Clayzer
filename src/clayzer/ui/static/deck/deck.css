@@ -191,3 +191,27 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .slide-video { width: 100%; max-height: 640px; aspect-ratio: 16 / 9; border-radius: 14px;
   border: 1px solid var(--line); background: var(--paper); object-fit: contain; }
 .video-slide .source { align-self: flex-start; margin-top: 14px; }
+
+/* The problem slide: an untrusted caption on the left, the three ways we earn trust building in
+   on the right (one per press), and the caption turning trusted on the last press. */
+.problem h2 { margin-bottom: 30px; }
+.problem-grid { display: grid; grid-template-columns: 560px 1fr; gap: 56px; align-items: start; }
+.problem .hook { position: relative; align-self: stretch; transition: background-color .5s ease; }
+.problem .hook.trusted { background: var(--evaluation); }
+.problem .hook.trusted blockquote { border-left-color: var(--ok); }
+.hook-stamp { position: absolute; right: 26px; bottom: 22px; padding: 6px 16px; border-radius: 999px;
+  font-size: 18px; font-weight: 800; letter-spacing: .04em; color: #fffdfb; background: var(--decision); }
+.hook.trusted .hook-stamp { background: var(--ok); }
+.trust-head { margin: 0 0 18px; font-size: 22px; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--decision); }
+.trust-item { display: grid; grid-template-columns: 64px 1fr; gap: 20px; align-items: start;
+  padding: 18px 22px; margin-bottom: 16px; border-radius: 14px; background: var(--data);
+  border: 1px solid var(--data-line); }
+.trust-item b { display: block; font-size: 27px; margin: 2px 0 6px; }
+.trust-item p { margin: 0; font-size: 21px; line-height: 1.4; color: #4a4240; }
+.trust-icon { width: 56px; height: 56px; color: var(--decision); }
+.build { opacity: 0; transform: translateY(18px); transition: opacity .45s ease, transform .45s ease; }
+.build.in { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  .build, .problem .hook { transition: none; }
+}
