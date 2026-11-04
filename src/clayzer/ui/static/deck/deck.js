@@ -3,14 +3,33 @@
 //
 //   → / Space / PageDown   next          ← / PageUp   previous
 //   Home / End             first / last  N            presenter notes and timer
-//   T                      start or reset the timer
+//   T                      start or reset the timer    A   read this slide aloud (stop with A)
 //
-// Slides, their time budgets, and their notes live in slides.js.
+// Accessibility: each slide carries a plain-language `spoken` script in slides.js. Pressing A (or
+// the speaker button) reads it with the browser's own speech synthesis — no network, no install —
+// so a non-technical listener, or someone who finds dense slides hard to read, can hear the point.
+// Motion is dropped for anyone who asks for reduced motion (CSS).
+//
+// Slides, their time budgets, their notes, and their spoken scripts live in slides.js.
 
 import { render } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { html } from "./html.js";
 import { SLIDES } from "./slides.js";
+
+const canSpeak = typeof speechSynthesis !== "undefined";
+
+function speak(text) {
+  if (!canSpeak) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.rate = 1.0;
+  speechSynthesis.speak(u);
+}
+
+function stopSpeaking() {
+  if (canSpeak) speechSynthesis.cancel();
+}
 
 const W = 1600, H = 900;
 const TOTAL = SLIDES.reduce((sum, s) => sum + s.seconds, 0);
@@ -68,11 +87,20 @@ function Deck() {
   const [elapsed, running, toggleTimer] = useTimer();
   const scale = useScale();
 
-  const go = (n) => setI(Math.min(Math.max(n, 0), SLIDES.length - 1));
+  const go = (n) => {
+    stopSpeaking(); // moving on cancels any narration from the slide we're leaving
+    setI(Math.min(Math.max(n, 0), SLIDES.length - 1));
+  };
+
+  const readAloud = () => {
+    const s = SLIDES[i];
+    speak(s.spoken || s.notes.join(". "));
+  };
 
   useEffect(() => {
     history.replaceState(null, "", `#${i + 1}`);
     document.title = `Clayzer · ${SLIDES[i].title}`;
+    return stopSpeaking; // never let speech outlive the slide
   }, [i]);
 
   useEffect(() => {
@@ -86,7 +114,10 @@ function Deck() {
       else if (k === "End") go(SLIDES.length - 1);
       else if (k === "n" || k === "N") setNotes((v) => !v);
       else if (k === "t" || k === "T") toggleTimer();
-      else return;
+      else if (k === "a" || k === "A") {
+        if (canSpeak && speechSynthesis.speaking) stopSpeaking();
+        else readAloud();
+      } else return;
       e.preventDefault();
     };
     addEventListener("hashchange", onHash);
@@ -107,6 +138,10 @@ function Deck() {
         </section>
         <div class="progress" style=${{ width: `${((i + 1) / SLIDES.length) * 100}%` }}></div>
         <div class="pageno">${i + 1} / ${SLIDES.length}</div>
+        ${canSpeak && html`<button class="speak" title="Read this slide aloud (A)"
+          aria-label="Read this slide aloud"
+          onClick=${(e) => { e.stopPropagation(); speechSynthesis.speaking ? stopSpeaking() : readAloud(); }}>
+          &#9658; Listen</button>`}
       </div>
     </div>
     ${notes && html`<${Notes} i=${i} elapsed=${elapsed} running=${running} />`}`;

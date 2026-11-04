@@ -23,6 +23,22 @@ body { color: var(--ink); font-family: system-ui, -apple-system, "Segoe UI", san
 .pageno { position: absolute; right: 32px; bottom: 22px; font-size: 18px; color: var(--muted);
   font-variant-numeric: tabular-nums; }
 
+/* Read-aloud button (also the A key): browser speech synthesis, for a non-technical listener or
+   anyone who finds a dense slide hard to read. */
+.speak { position: absolute; left: 32px; bottom: 18px; font: inherit; font-size: 16px;
+  padding: 6px 14px; border-radius: 999px; border: 2px solid var(--decision); cursor: pointer;
+  background: var(--paper); color: var(--decision); font-weight: 600; }
+.speak:hover { background: var(--decision); color: var(--paper); }
+.speak:focus-visible { outline: 3px solid var(--decision); outline-offset: 2px; }
+.slide.dark ~ .speak { background: rgba(14, 13, 12, .5); color: var(--paper);
+  border-color: var(--captions-line); }
+
+/* Respect a reduced-motion preference: no sliding progress bar or scale transitions. */
+@media (prefers-reduced-motion: reduce) {
+  .progress { transition: none; }
+  * { scroll-behavior: auto; }
+}
+
 .kicker { margin: 0 0 14px; font-size: 20px; font-weight: 600; letter-spacing: .12em;
   text-transform: uppercase; color: var(--decision); }
 h1 { margin: 0; font-size: 150px; line-height: 1; letter-spacing: -.03em; }
