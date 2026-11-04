@@ -1,0 +1,21 @@
+# Credentials. Never commit.
+.env
+
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+dist/
+
+# Records the package index used on the machine that generated it; regenerate against public PyPI before sharing.
+uv.lock
+
+# Built Chips, Cases and Run outputs; commit curated ones under fixtures/ instead.
+data/
+runs/
+batches/
+
+# CDK output, and lookups that record the account ID.
+infra/cdk.out/
+infra/cdk.context.json

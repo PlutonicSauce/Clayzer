@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Clayzer · pitch</title>
+  <link rel="icon" href="/static/favicon.ico" sizes="any">
+  <link rel="icon" href="/static/favicon-32.png" type="image/png" sizes="32x32">
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+  <link rel="stylesheet" href="/static/deck/deck.css">
+  <!-- Preact + htm: React's component and hooks model with no build step. Vendored, so the deck
+       works with no network beyond this server. -->
+  <script type="importmap">
+    { "imports": {
+        "preact": "/static/deck/vendor/preact.js",
+        "preact/hooks": "/static/deck/vendor/preact-hooks.js",
+        "htm": "/static/deck/vendor/htm.js"
+    } }
+  </script>
+  <script type="module" src="/static/deck/deck.js"></script>
+</head>
+<body>
+  <div id="deck"></div>
+  <noscript>The pitch deck needs JavaScript.</noscript>
+</body>
+</html>

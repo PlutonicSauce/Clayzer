@@ -1,0 +1,31 @@
+/* The docs pages (/docs/<path>): a sidebar of every doc, and the doc itself at a readable width. */
+.home-link { color: var(--ink); text-decoration: none; }
+.docs-layout { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 36px;
+  max-width: 1280px; padding: 18px 28px 60px; }
+.docs-nav { position: sticky; top: 14px; align-self: start; max-height: calc(100vh - 28px);
+  overflow: auto; font-size: 13.5px; }
+.docs-nav h3 { margin-top: 4px; }
+.docs-nav ul { list-style: none; margin: 0; padding: 0; }
+.docs-nav li a { display: block; padding: 5px 8px; border-radius: 6px; color: var(--ink);
+  text-decoration: none; line-height: 1.35; }
+.docs-nav li a:hover { background: #f3ebe7; }
+.docs-nav li a[aria-current="page"] { background: var(--platform); color: #2d5a66; font-weight: 600; }
+.doc { max-width: 78ch; font-size: 15.5px; line-height: 1.65; }
+.doc h1 { font-size: 28px; margin: 4px 0 12px; }
+.doc h2 { font-size: 21px; margin: 32px 0 8px; padding-top: 6px; border-top: 1px solid var(--line); }
+.doc h3 { font-size: 16.5px; margin: 24px 0 6px; text-transform: none; letter-spacing: 0; color: var(--ink); }
+.doc h1, .doc h2, .doc h3, .doc h4 { scroll-margin-top: 14px; }
+.doc :target { background: #fbf4e6; border-radius: 4px; }
+.doc table { display: block; overflow-x: auto; font-size: 13.5px; margin: 10px 0; }
+.doc th, .doc td { border: 1px solid var(--line); }
+.doc pre { background: #faf6f3; border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px;
+  overflow-x: auto; font-size: 12.5px; line-height: 1.45; }
+.doc pre.mermaid { background: #fff; text-align: center; }
+.doc code { background: #f6f1ee; border-radius: 4px; padding: 1px 4px; }
+.doc pre code { background: none; padding: 0; }
+.doc blockquote { margin: 10px 0; padding: 6px 14px; border-left: 3px solid var(--captions-line);
+  background: #fdf8f6; }
+@media (max-width: 900px) {
+  .docs-layout { grid-template-columns: 1fr; }
+  .docs-nav { position: static; max-height: none; }
+}

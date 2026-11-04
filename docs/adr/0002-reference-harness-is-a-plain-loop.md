@@ -1,0 +1,3 @@
+# The Reference Harness is a plain loop, not an agent framework
+
+The Reference Harness calls the model directly through Bedrock's Converse API and, once verify-then-write lands, routes tool calls to MCP servers itself, rather than being built on a framework such as AWS Strands or LangGraph. The evaluation, not the Harness, is the deliverable, and owning the loop guarantees every model turn and tool call becomes a Step with nothing hidden inside a framework. Framework-based Harnesses (including an AgentCore-hosted captioner, AWS-11) are expected as additional Harnesses under test, plugged in alongside it, not as replacements.

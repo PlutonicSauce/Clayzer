@@ -1,0 +1,20 @@
+{
+  "batch_id": "20261104T061323Z-base-v2",
+  "label": "base-v2",
+  "created": "2026-11-04T06:13:23+00:00",
+  "region": "dev",
+  "repeats": 3,
+  "case_ids": [
+    "fixed-dev-neg-1",
+    "fixed-dev-uspvdb-400117",
+    "fixed-dev-uspvdb-402150",
+    "fixed-dev-uswtdb-3025453"
+  ],
+  "cases_sha": "c07bc78cba59",
+  "caption_model": "us.amazon.nova-pro-v1:0",
+  "judge_model": "us.anthropic.claude-opus-5-5",
+  "embed_model": "amazon.titan-embed-text-v2:0",
+  "prompt_sha": "d1ffc8393867",
+  "prompt_source": "built-in",
+  "scorer_version": "grounding-3"
+}

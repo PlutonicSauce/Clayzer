@@ -1,0 +1,256 @@
+# Object ontology for Captions: the one place object classes are defined.
+#
+# Every object a Claim can name is a class here. Code reads its lists from this file, and
+# tests/test_ontology.py fails if the code's own lists drift from it (ADR-0008).
+#
+# Fields per class:
+#   id, name          the Claim value and a readable name
+#   parent            the class it is a kind of ("" for a root); gives partial credit in grounding
+#   claimable         true if a Caption's Claims may use it today; false = candidate for later
+#   keyed_by          Answer Keys that can verify it (empty = Claims about it are unscored)
+#   osm               OSM tag rules the code maps to this class (tested against answer_keys.osm_object)
+#   osm_reference     OSM tags for the class that the code does NOT use (e.g. power features come
+#                     from USGS); documentation for Answer Keys outside the US
+#   synonyms          other words people use; for retrieval queries and prompt wording
+#   confusers         classes it is easily mistaken for in aerial imagery; for prompts and negatives
+#   min_visible_m     rough smallest size identifiable in NAIP at 0.6 m (heuristic, not measured)
+#   attributes        attribute names and allowed values Claims may carry
+#   queries           retrieval queries whose right answers are Chips containing this class
+#   rsicd_scenes      RSICD scene classes whose images imply this class is present (scene-level:
+#                     usable for retrieval and fidelity, never as grounding)
+#   land_cover        matching classes in NLCD (US) and ESA WorldCover; from general knowledge,
+#                     check against the published legends before relying on them
+#
+# Version 0.1 (2026-11-03): matches the classes in harness.OBJECTS, grounding.KEYED,
+# answer_keys.osm_object, and retrieval.QUERIES as they were on that date.
+
+version = "0.1"
+
+# ── roots ───────────────────────────────────────────────────────────────────────────────
+
+[[class]]
+id = "energy_infrastructure"
+name = "Energy infrastructure"
+parent = ""
+claimable = false
+
+[[class]]
+id = "transportation"
+name = "Transportation"
+parent = ""
+claimable = false
+
+[[class]]
+id = "built_structure"
+name = "Built structure"
+parent = ""
+claimable = false
+
+[[class]]
+id = "hydrography"
+name = "Water features"
+parent = ""
+claimable = false
+
+[[class]]
+id = "land_cover"
+name = "Land cover"
+parent = ""
+claimable = false
+
+# ── energy ──────────────────────────────────────────────────────────────────────────────
+
+[[class]]
+id = "solar_array"
+name = "Solar array"
+parent = "energy_infrastructure"
+claimable = true
+keyed_by = ["uspvdb", "grw"]
+osm_reference = [{ power = "plant", "plant:source" = "solar" }, { power = "generator", "generator:source" = "solar" }]
+synonyms = ["solar farm", "solar park", "PV plant", "photovoltaic array", "solar panels"]
+confusers = ["greenhouse", "parking_lot", "water"]
+min_visible_m = 10
+attributes = { size = ["small", "medium", "large"] }
+queries = ["find solar farms"]
+rsicd_scenes = []
+
+[[class]]
+id = "wind_turbine"
+name = "Wind turbine"
+parent = "energy_infrastructure"
+claimable = true
+keyed_by = ["uswtdb", "grw"]
+osm_reference = [{ power = "generator", "generator:source" = "wind" }]
+synonyms = ["wind farm", "wind generator", "turbine"]
+confusers = ["transmission_tower"]
+min_visible_m = 5
+queries = ["find wind turbines"]
+rsicd_scenes = []
+
+[[class]]
+id = "substation"
+name = "Electrical substation"
+parent = "energy_infrastructure"
+claimable = false
+osm_reference = [{ power = "substation" }]
+synonyms = ["switchyard"]
+confusers = ["building", "parking_lot"]
+min_visible_m = 20
+
+[[class]]
+id = "transmission_tower"
+name = "Transmission tower"
+parent = "energy_infrastructure"
+claimable = false
+osm_reference = [{ power = "tower" }]
+synonyms = ["pylon", "power line tower"]
+confusers = ["wind_turbine"]
+min_visible_m = 5
+
+# ── transportation ──────────────────────────────────────────────────────────────────────
+
+[[class]]
+id = "road"
+name = "Road"
+parent = "transportation"
+claimable = true
+keyed_by = ["osm"]
+osm = [{ highway = "primary" }, { highway = "residential" }, { highway = "service" }, { highway = "track" }]
+synonyms = ["street", "highway", "track", "dirt road"]
+confusers = ["railroad"]
+min_visible_m = 3
+attributes = { surface = ["paved", "unpaved"] }
+queries = []
+rsicd_scenes = ["viaduct", "bridge"]
+
+[[class]]
+id = "railroad"
+name = "Railroad"
+parent = "transportation"
+claimable = true
+keyed_by = ["osm"]
+osm = [{ railway = "rail" }]
+synonyms = ["railway", "rail line", "train tracks"]
+confusers = ["road"]
+min_visible_m = 3
+queries = ["find railroads"]
+rsicd_scenes = ["railwaystation"]
+
+[[class]]
+id = "parking_lot"
+name = "Parking lot"
+parent = "transportation"
+claimable = true
+keyed_by = ["osm"]
+osm = [{ amenity = "parking" }]
+synonyms = ["car park", "parking area"]
+confusers = ["solar_array", "bare_ground"]
+min_visible_m = 10
+queries = ["find parking lots"]
+rsicd_scenes = ["parking"]
+
+[[class]]
+id = "runway"
+name = "Runway"
+parent = "transportation"
+claimable = false
+osm_reference = [{ aeroway = "runway" }]
+synonyms = ["airstrip"]
+confusers = ["road"]
+min_visible_m = 20
+rsicd_scenes = ["airport"]
+
+# ── built structures ────────────────────────────────────────────────────────────────────
+
+[[class]]
+id = "building"
+name = "Building"
+parent = "built_structure"
+claimable = true
+keyed_by = ["osm"]
+osm = [{ building = "yes" }, { building = "house" }, { building = "industrial" }]
+synonyms = ["house", "warehouse", "structure", "barn"]
+confusers = ["greenhouse", "substation"]
+min_visible_m = 4
+queries = ["find buildings"]
+rsicd_scenes = ["denseresidential", "mediumresidential", "sparseresidential", "commercial", "industrial", "school", "church", "center"]
+
+[[class]]
+id = "greenhouse"
+name = "Greenhouse"
+parent = "building"
+claimable = true
+keyed_by = ["osm"]
+osm = [{ building = "greenhouse" }, { landuse = "greenhouse_horticulture" }]
+synonyms = ["glasshouse", "hothouse", "polytunnel"]
+confusers = ["solar_array", "building"]
+min_visible_m = 5
+queries = ["find greenhouses"]
+rsicd_scenes = []
+
+[[class]]
+id = "storage_tank"
+name = "Storage tank"
+parent = "built_structure"
+claimable = false
+osm_reference = [{ man_made = "storage_tank" }]
+synonyms = ["oil tank", "silo"]
+confusers = ["building"]
+min_visible_m = 5
+rsicd_scenes = ["storagetanks"]
+
+# ── water ───────────────────────────────────────────────────────────────────────────────
+
+[[class]]
+id = "water"
+name = "Water"
+parent = "hydrography"
+claimable = true
+keyed_by = ["osm"]
+osm = [{ natural = "water" }, { waterway = "river" }, { waterway = "canal" }]
+synonyms = ["pond", "lake", "reservoir", "river", "canal"]
+confusers = ["solar_array"]
+min_visible_m = 5
+queries = ["find water"]
+rsicd_scenes = ["pond", "river", "beach", "port"]
+land_cover = { nlcd = ["11 Open Water"], worldcover = ["Permanent water bodies"] }
+
+# ── land cover ──────────────────────────────────────────────────────────────────────────
+
+[[class]]
+id = "field"
+name = "Farm field"
+parent = "land_cover"
+claimable = true
+keyed_by = ["osm"]
+osm = [{ landuse = "farmland" }, { landuse = "meadow" }, { landuse = "orchard" }, { landuse = "vineyard" }]
+synonyms = ["farmland", "cropland", "agricultural field", "pasture"]
+confusers = ["vegetation", "bare_ground"]
+min_visible_m = 20
+queries = ["find farmland"]
+rsicd_scenes = ["farmland", "meadow"]
+land_cover = { nlcd = ["81 Pasture/Hay", "82 Cultivated Crops"], worldcover = ["Cropland"] }
+
+[[class]]
+id = "vegetation"
+name = "Vegetation"
+parent = "land_cover"
+claimable = true
+keyed_by = []
+synonyms = ["trees", "shrubs", "scrub", "woodland"]
+confusers = ["field"]
+min_visible_m = 5
+rsicd_scenes = ["forest", "park"]
+land_cover = { nlcd = ["41 Deciduous Forest", "42 Evergreen Forest", "43 Mixed Forest", "52 Shrub/Scrub", "71 Grassland/Herbaceous"], worldcover = ["Tree cover", "Shrubland", "Grassland"] }
+
+[[class]]
+id = "bare_ground"
+name = "Bare ground"
+parent = "land_cover"
+claimable = true
+keyed_by = []
+synonyms = ["bare soil", "desert", "dirt", "sand"]
+confusers = ["parking_lot", "field"]
+min_visible_m = 20
+rsicd_scenes = ["bareland", "desert"]
+land_cover = { nlcd = ["31 Barren Land"], worldcover = ["Bare / sparse vegetation"] }
