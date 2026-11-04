@@ -27,19 +27,19 @@ function Problem() {
   return html`<div class="two-col">
     <div>
       <${Kicker}>The problem<//>
-      <h2>Clay v2 learns from captions nobody has checked</h2>
-      <p class="big">Clay v2 is text-native. It is trained on written descriptions of satellite
-        and aerial images — and no one has the time to check whether those descriptions are true.</p>
-      <p class="big">A caption that miscounts turbines or invents a road teaches the model the
-        wrong thing, at continental scale.</p>
+      <h2>Clay's imagery is described by captions nobody has checked</h2>
+      <p class="big">Clay is making satellite and aerial imagery searchable in words, using
+        written descriptions — and no one has the time to check whether those descriptions are true.</p>
+      <p class="big">A caption that miscounts turbines or invents a road sends every search that
+        relies on it to the wrong place, at continental scale.</p>
     </div>
     <div class="hook">
       <p class="hook-label">Seen in a real Run</p>
       <blockquote>"An aerial image of a wind farm … turbines in the north-west, north, and
         north-east …"</blockquote>
       <p class="hook-truth">The USGS turbine database says <b>16 turbines, to the south</b>.
-        Wrong count, wrong place. A plausible caption, and wrong — the kind that quietly poisons
-        training.</p>
+        Wrong count, wrong place. A plausible caption, and wrong — the kind that quietly sends
+        a search to the wrong place.</p>
     </div>
   </div>`;
 }
@@ -111,7 +111,7 @@ function Downstream() {
 function Next() {
   return html`<div class="title-slide closing">
     <${Kicker}>What it means for Clay<//>
-    <h2>Trust your captions before you train on them</h2>
+    <h2>Trust your captions before anyone searches them</h2>
     <p class="lede">Hand Clayzer a caption set, get a verdict: how much to trust, where it fails,
       what it costs to fix.</p>
     <p class="team">The ask: Clay's real caption set and its rubric weights, so the verdict is
@@ -128,7 +128,7 @@ export const SLIDES = [
     spoken: "Clayzer. Give us your caption set, and we tell you how much of it you can trust.",
     notes: ["One line, then move on.", "4:00 total. T starts the timer, A reads a slide aloud."] },
   { title: "The problem", seconds: 20, component: Problem,
-    spoken: "Clay's new model learns from written descriptions of satellite images that nobody has checked. In a real run, a caption put a wind farm's turbines to the north. The official database says sixteen turbines, to the south. Plausible, and wrong.",
+    spoken: "Clay is making satellite imagery searchable in words, using written descriptions that nobody has checked. In a real run, a caption put a wind farm's turbines to the north. The official database says sixteen turbines, to the south. Plausible, and wrong.",
     notes: ["Read the wrong caption, then the answer key: 16 turbines, south.", "Keep it short: the next slide shows a full example."] },
   { title: "What a caption looks like", seconds: 40, component: CaptionExample,
     spoken: "Here is one real caption. The model saw only this photo and said eighteen wind turbines, mostly in the centre. The dots are what public records say is there. The count is right, but they are all around the centre, not in it. We never hand-label: code builds the answer key from public records and cross-checks two sources. Here they disagree by two metres on one turbine, so that is all a person looks at.",
