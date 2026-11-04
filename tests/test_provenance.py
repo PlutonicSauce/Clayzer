@@ -9,7 +9,7 @@ from test_loop import SOLAR, WIND, env, run  # noqa: F401
 from test_ui import client  # noqa: F401
 
 from clayzer import batch as batches
-from clayzer import judge, provenance
+from clayzer import judge, ontology, provenance
 from clayzer.gate import gate, load_baseline, setting_changes
 
 
@@ -26,7 +26,7 @@ def test_a_batch_records_its_rubric_chips_ontology_and_commit(env):  # noqa: F81
         for c in (SOLAR, WIND)
     }
     assert cfg.chips_sha == provenance.sha(store.get(f"batches/{bid}/chips.json"))
-    assert cfg.ontology_version == "0.1" and len(cfg.ontology_sha) == 12
+    assert cfg.ontology_version == ontology.load().version and len(cfg.ontology_sha) == 12
     assert cfg.code_commit is None or len(cfg.code_commit) == 40
     assert cfg.summary_model
 
