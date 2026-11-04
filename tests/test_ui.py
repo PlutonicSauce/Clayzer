@@ -182,3 +182,15 @@ def test_the_favicon_is_served_and_linked(client):
         assert c.get(path).status_code == 200, path
     assert 'rel="icon"' in c.get("/").text
     assert c.get("/favicon.ico").status_code == 200  # browsers ask the root too
+
+
+def test_overview_has_a_showcase_and_an_experiment_log(client):
+    c, bid = client
+    o = c.get("/api/overview").json()
+    assert o["baseline"]["seconds_per_caption"] is not None
+    cases = {s["case_id"] for s in o["showcase"]}
+    assert cases == {SOLAR["id"], WIND["id"]}  # the best Run of each Case
+    sc = o["showcase"][0]
+    assert sc["text"] and sc["claims"] and sc["chip"]["uri"].startswith("chips/")
+    assert sc["right"] <= sc["gradable"]
+    assert o["experiments"][0] == {**o["experiments"][0], "batch_id": bid, "verdict": "baseline"}

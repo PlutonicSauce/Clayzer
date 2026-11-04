@@ -350,6 +350,9 @@ def summarize(cfg: BatchConfig, cases: list[dict], results: list[dict], retr: li
 
     scored = [r for r in results if r["status"] != SANDBOX_FAILURE]
     mrr = [row["mrr"] for row in retr if row["mrr"] is not None]
+    # The rubric's measure: how often the right Caption is the top result for a query.
+    top1 = [row["recall@1"] for row in retr if row.get("recall@1") is not None]
+    prep = [c.get("prep_seconds") for c in cases if c.get("prep_seconds") is not None]
     return {
         "batch_id": cfg.batch_id,
         "cases": per_case,
@@ -358,8 +361,10 @@ def summarize(cfg: BatchConfig, cases: list[dict], results: list[dict], retr: li
             "coverage": _mean(c["coverage"]["mean"] for c in per_case.values()),
             "fidelity": _mean(c["fidelity"]["mean"] for c in per_case.values()),
             "retrieval_mrr": {"mean": _mean(mrr), "spread": _spread(mrr)},
+            "retrieval_recall_at_1": {"mean": _mean(top1), "spread": _spread(top1)},
             "unscored_share": _mean(c["unscored_share"] for c in per_case.values()),
             "label_prep_seconds": sum(c.get("prep_seconds") or 0 for c in cases),
+            "label_prep_seconds_per_case": _mean(prep),
             # Cost is partial on Bedrock: time to output and tokens, no GPU time (CAP-12).
             "seconds_per_caption": _mean(r.get("seconds_to_caption") for r in scored),
             "tokens_per_caption": _mean(r.get("caption_tokens") for r in scored),
