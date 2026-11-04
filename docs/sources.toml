@@ -375,6 +375,7 @@ used_in = [
   { path = "src/clayzer/answer_keys.py", symbol = "def osm_labels", what = "turn ways into per-object Reference Labels: count, position, cells, road surface" },
   { path = "ontology/objects.toml", symbol = "osm = ", what = "which OSM tags map to which object class" },
   { path = "src/clayzer/grounding.py", symbol = "OSM", what = "most Claims are scored against OSM labels" },
+  { path = "src/clayzer/corroborate.py", symbol = "def osm_in_chip", what = "OSM's own power mapping, an independent check on the USGS solar and wind labels" },
 ]
 notes = "Covers everything that isn't solar or wind, so most Claims get scored. Forbidden to the Harness (ADR-0006). Stays out of Batch summaries and Baselines, which carry no Claim rows."
 tasks = ["dev-cases", "fixtures", "grounding-fix"]
@@ -513,6 +514,46 @@ used_in = [
 ]
 notes = "Must: ~100 test images for fidelity and retrieval against human captions. Captions rarely state counts or positions: a reference, not a style."
 tasks = ["rsicd", "caption-importer"]
+
+[[source]]
+id = "megaearth"
+name = "MegaEarth (OSM x Sentinel-2)"
+group = "Auxiliary caption datasets"
+url = "https://huggingface.co/datasets/Mead0w1ark/megaearth-osm-sentinel2"
+license = "ODbL 1.0 for labels and tables (from OSM); Copernicus Sentinel data terms for the image arrays"
+status = "unused"
+data = "44,355 Sentinel-2 L2A windows (2.56 km at 10 m, November 2024 to December 2025) with exact OSM polygon coverages for 485 classes (188 admitted), grouped into 91 families; train, validation, and test split by one-degree cells."
+format = "188 tar.zst archives of windows (22 GB) and 11 Parquet tables; tables/select/windows.parquet gives every window's centre, cell, split, and target class."
+access = "Hugging Face, no sign-in. Read the 4 MB windows table at run time; never commit."
+sample_from = "tables/select/windows.parquet, read 2026-11-04"
+sample = '''
+{"candidate_id": "3031--104320--786560", "lon": -172.445, "lat": -82.707, "split": "test",
+ "class_id": "natural=glacier|glacier:type=shelf", "coverage": 1.0, "window_id": "w0000000"}'''
+images = [
+  { src = "https://huggingface.co/datasets/Mead0w1ark/megaearth-osm-sentinel2/resolve/main/assets/example-grid.png", caption = "Example windows from three OSM classes, from the dataset card" },
+]
+used_in = []
+notes = "Checked for dataset-corroboration (2026-11-04) and not used: its labels come from OSM, our Answer Key for everything but solar and wind, so agreement shows two copies of OSM match. Only 7 of our 134 fixed Cases fall inside a window (the median Case is 10.8 km from the nearest), its windows are coarser than a 3x3 Chip grid, and its imagery is 2024-25. Its two solar windows (on dev-uspvdb-406675 and test-uspvdb-402304) agree with USPVDB."
+tasks = ["dataset-corroboration"]
+
+[[source]]
+id = "skyscript"
+name = "SkyScript"
+group = "Auxiliary caption datasets"
+url = "https://github.com/wangzhecheng/skyscript"
+license = "MIT (code); images from Google Earth Engine collections, NAIP for the US (public domain); tags from OSM (ODbL)"
+status = "unused"
+data = "5.2 million image-text pairs over 29K OSM semantic tags, with captions assembled from the tags by rule (and a ChatGPT-polished version)."
+format = "JPEG images in six zip archives (about 10 GB each), a pickled meta file per image with its lon/lat box, and CSVs of captions."
+access = "Public S3 (opendatasharing, us-west-2). Finding which images overlap our Chips needs the six meta archives, about 2.8 GB."
+sample_from = "the repository README (not downloaded)"
+sample = '''
+a198234555_CH_19.jpg: OSM object 198234555, image source CH (SWISSIMAGE 10 cm), 2019
+meta: {"box": (west, south, east, north), ...}'''
+images = []
+used_in = []
+notes = "Checked for dataset-corroboration (2026-11-04) and not used: its tags are OSM's and its captions are templated from them (caption-plan.md §3: never gold), so it can't corroborate our OSM labels, and its overlap with our Chips would cost 2.8 GB to find. Still a Could for retrieval at scale."
+tasks = ["dataset-corroboration"]
 
 # ── Sandbox ─────────────────────────────────────────────────────────────────────────────
 
