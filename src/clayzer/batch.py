@@ -443,6 +443,29 @@ def _retrieval(client, cfg: BatchConfig, cases: list[dict], captions: list[dict]
 COMPONENTS = ("precision", "recall", "count", "position", "attributes", "relations")
 
 
+def _lookalikes(cases: list[dict], results: list[dict]) -> dict | None:
+    """Per look-alike kind (fixtures/caption-lookalike): in how many Runs a Caption claimed the
+    thing the Case imitates, which grounding already marks a false positive. None without any."""
+    by_id = {c["id"]: c for c in cases if c.get("lookalike")}
+    if not by_id:
+        return None
+    kinds: dict[str, dict] = {}
+    for r in results:
+        case = by_id.get(r["case_id"])
+        if case is None or r["status"] == SANDBOX_FAILURE:
+            continue
+        of = case["lookalike"]["of"]
+        rows = (r.get("grounding") or {}).get("rows", [])
+        fooled = any(x["verdict"] == "false positive" and x["claim"]["object"] == of for x in rows)
+        k = kinds.setdefault(
+            case["lookalike"]["kind"], {"of": of, "cases": set(), "runs": 0, "fooled": 0}
+        )
+        k["cases"].add(case["id"])
+        k["runs"] += 1
+        k["fooled"] += fooled
+    return {name: {**k, "cases": len(k["cases"])} for name, k in sorted(kinds.items())}
+
+
 def summarize(cfg: BatchConfig, cases: list[dict], results: list[dict], retr: list[dict]) -> dict:
     by_case: dict[str, list[dict]] = {c["id"]: [] for c in cases}
     for r in results:
@@ -496,6 +519,8 @@ def summarize(cfg: BatchConfig, cases: list[dict], results: list[dict], retr: li
                 "harness_faults": sum(r["status"] == HARNESS_FAULT for r in results),
                 "sandbox_failures": sum(r["status"] == SANDBOX_FAILURE for r in results),
             },
+            # Look-alike negatives a Caption mistook for what they imitate; not a gated metric.
+            "lookalikes": _lookalikes(cases, results),
             # Failed Steps by who's to blame (ADR-0003), over every Run including failed ones.
             "step_faults": {
                 k: sum((r.get("faults") or {}).get(k, 0) for r in results)
