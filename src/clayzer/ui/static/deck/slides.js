@@ -9,6 +9,7 @@
 import { html } from "./html.js";
 import { StoryArchitecture } from "./diagram.js";
 import { CaptionExample } from "./caption-example.js";
+import { ValueFlow } from "./value-flow.js";
 
 const Kicker = ({ children }) => html`<p class="kicker">${children}</p>`;
 
@@ -98,42 +99,53 @@ function Demo() {
   </div>`;
 }
 
+// Downstream value: how checked captions reach Clay v2 and what it can do with them.
+function Downstream() {
+  return html`<div class="arch-slide">
+    <${Kicker}>Downstream value<//>
+    <h2>How our captions make Clay v2 better</h2>
+    <${ValueFlow} />
+  </div>`;
+}
+
 function Next() {
   return html`<div class="title-slide closing">
     <${Kicker}>What it means for Clay<//>
     <h2>Trust your captions before you train on them</h2>
     <p class="lede">Hand Clayzer a caption set, get a verdict: how much to trust, where it fails,
-      what it costs to fix. It's serverless, with cheap checks on every caption and the costly
-      judge on a sample, so it grows toward the 15.2 billion embeddings Clay has published.</p>
+      what it costs to fix.</p>
     <p class="team">The ask: Clay's real caption set and its rubric weights, so the verdict is
       Clay's, not our stand-in's.</p>
     <p class="access-note">Any slide reads itself aloud — press <b>A</b> or the Listen button.</p>
   </div>`;
 }
 
-// Seven slides, exactly 4:00: problem, one real caption and its answer key, the architecture as
-// a story, the novel ideas, the site, and the close. Results and scale ride on the demo's live
-// Overview and the closing slide.
+// Eight slides, exactly 4:00: problem, one real caption and its answer key, the architecture as
+// a story, the novel ideas, the site, the downstream value for Clay v2, and the close. Results
+// ride on the demo's live Overview; scale rides on the downstream slide.
 export const SLIDES = [
   { title: "Clayzer", seconds: 10, theme: "dark", component: Title,
     spoken: "Clayzer. Give us your caption set, and we tell you how much of it you can trust.",
     notes: ["One line, then move on.", "4:00 total. T starts the timer, A reads a slide aloud."] },
-  { title: "The problem", seconds: 25, component: Problem,
+  { title: "The problem", seconds: 20, component: Problem,
     spoken: "Clay's new model learns from written descriptions of satellite images that nobody has checked. In a real run, a caption put a wind farm's turbines to the north. The official database says sixteen turbines, to the south. Plausible, and wrong.",
     notes: ["Read the wrong caption, then the answer key: 16 turbines, south.", "Keep it short: the next slide shows a full example."] },
   { title: "What a caption looks like", seconds: 40, component: CaptionExample,
-    spoken: "Here is one real caption. The model saw only this photo and wrote that there are eighteen wind turbines, then listed its facts. We grade those facts against public records. But the records disagree. The government turbine database counts seventeen in the photo; OpenStreetMap counts eighteen, because it places one turbine two metres further in, right at the top edge. So no single source is the truth, and we never hand-label: the code builds every answer key from public records and cross-checks the sources, and a person only looks where they disagree, like here. This caption got the count right and the position wrong: it put every turbine in the centre, and the dots show they are all around it.",
+    spoken: "Here is one real caption. The model saw only this photo and said eighteen wind turbines, mostly in the centre. The dots are what public records say is there. The count is right, but they are all around the centre, not in it. We never hand-label: code builds the answer key from public records and cross-checks two sources. Here they disagree by two metres on one turbine, so that is all a person looks at.",
     notes: ["Dots are the records, drawn on the real turbines. The amber box is the caption's claim: Claims name a cell, not an object.", "USGS and OpenStreetMap place the top-edge turbine 2 m apart: one says inside the photo, one outside.", "Scale: labels are automatic (about a minute per image); the code cross-checks sources and flags disagreements for a person. Don't say we checked every image by eye: that was a one-time audit of the test set.", "Say both: count right, position wrong."] },
-  { title: "How it works", seconds: 45, component: Architecture,
+  { title: "How it works", seconds: 40, component: Architecture,
     spoken: "Here is the whole journey. One aerial image comes in on the left. A model on AWS writes a caption. Before each statement is kept, we check it against the imagery. We score it against open map data the model never saw. A gate decides whether it is good enough. What comes out is a verdict you can trust, and the same path works for one image or a million.",
     notes: ["One image in on the left, a verdict out on the right.", "Point at each numbered stop. End on: same path scales to millions."] },
-  { title: "Our approach · what's new", seconds: 40, component: Approach,
+  { title: "Our approach · what's new", seconds: 35, component: Approach,
     spoken: "Three things set this apart. Verify-then-write: each claim is checked against imagery as the caption is written. Hidden answer keys: the captioner never sees the ground truth, so a good score is earned. And an ontology learned from captions and fed back into the model, so it confuses a greenhouse for a solar array less often. It scores captions and teaches the next ones.",
     notes: ["Verify-then-write, hidden keys, the ontology that feeds the model.", "The loop: the ontology scores AND teaches, proven by the gate."] },
-  { title: "Live demo", seconds: 50, component: Demo,
+  { title: "Live demo", seconds: 45, component: Demo,
     spoken: "Now the site. The overview shows the current baseline. A caption, with each claim marked supported or not, right on the image. The report, five criteria side by side, which can read itself aloud. And compare to baseline: the gate says better, worse, or inconclusive.",
     notes: ["Overview → a Caption on its grid → report and Listen → Compare.", "Keep the recorded Batch open as the offline fallback."] },
-  { title: "What it means for Clay", seconds: 30, theme: "dark", component: Next,
-    spoken: "Hand Clayzer a caption set and get a verdict: how much to trust, where it fails, what it costs to fix. It is serverless, so it grows to Clay's scale. Our ask is Clay's real caption set and its rubric weights. And any slide here reads itself aloud.",
+  { title: "Downstream value", seconds: 30, component: Downstream,
+    spoken: "Why this matters for Clay. Clay v2 learns from satellite images paired with captions. Imagery and public records go into Clayzer. We write each caption from the image alone, then check every fact against the records. Only pairs that pass go on to Clay v2, so it learns from captions that are true. That is what lets it search the Earth in words, like find solar farms, at the scale of fifteen billion embeddings.",
+    notes: ["Left to right: public data, Clayzer (our part, the dashed box), Clay v2.", "The line to land: a caption that miscounts never becomes a lesson Clay v2 learns.", "The dashed loop back is planned, not built: say 'next'."] },
+  { title: "What it means for Clay", seconds: 20, theme: "dark", component: Next,
+    spoken: "Hand Clayzer a caption set and get a verdict: how much to trust, where it fails, what it costs to fix. Our ask is Clay's real caption set and its rubric weights. And any slide here reads itself aloud.",
     notes: ["Close on the ask: Clay's real caption set and its rubric weights.", "Mention Listen (A) as the accessibility point."] },
 ];
