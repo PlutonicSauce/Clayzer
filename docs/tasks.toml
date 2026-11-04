@@ -94,10 +94,11 @@ step = "case"
 title = "Find look-alike negatives (greenhouses, parking lots) with LGND Geo's NAIP search"
 area = "Data and Cases"
 tier = "Must"
-status = "todo"
+status = "done"
 closes = ["CAP-18"]
 start = "LGND Geo search_place_find; then uv run clayzer case neg <lon> <lat>"
 after = ["dev-cases"]
+notes = "Done 2026-11-04: 10 look-alike negatives in fixtures/caption-lookalike (4 greenhouses, 4 parking lots, 2 reflective roofs), found with LGND Geo's search_place_find over NAIP in eastern Kern County (the queries are in its README), each checked by eye for panels USPVDB misses (one dropped; one kept after LGND's imagery check). First Batch (Nova Pro, 1 Repeat): 4 of 10 Captions claimed a solar array: 3 of 4 greenhouses, 1 of 2 roofs (storage units), 0 of 4 parking lots. Kept apart from the development set until dev-cases is finished, so its mix and Baseline don't move; folding them in is then one push."
 context = "Negatives that look like positives test whether the captioner can tell a greenhouse or a parking lot from a solar array. LGND Geo's `search_place_find` takes a text description (\"greenhouse\", \"solar farm\") or an example, inside a bounding box, over NAIP. Keep results USGS doesn't list; `clayzer case neg` refuses a point with a USGS record within about 300 m. The ontology lists each class's look-alikes (`confusers`)."
 done_when = [
   "At least 8 look-alike negatives (greenhouses, parking lots, reflective roofs)",
@@ -108,6 +109,12 @@ refs = [
   "docs/caption-plan.md §3 (LGND Geo row, two-step selection)",
   "ontology/objects.toml",
   "src/clayzer/cases.py (build_negative)",
+]
+see_it = "`uv run clayzer push --from fixtures/caption-lookalike`, then `uv run clayzer --region dev-lookalike batch --repeats 3 --label lookalike`: the Batch's page shows which look-alikes a Caption called solar."
+changes = [
+  "fixtures/caption-lookalike/cases/caption-dev-lookalike.jsonl: the 10 Cases, each with what it imitates and the LGND search that found it",
+  "fixtures/caption-lookalike/README.md: how they were found and checked, and how to load them",
+  "tests/test_lookalike_fixtures.py: enough of them, each with its Chip, none labelled solar or wind, no Chip name shared with the development set, nothing private",
 ]
 
 [[task]]
