@@ -122,6 +122,17 @@ def create_app(
         with ThreadPoolExecutor(max_workers=8) as pool:
             return dict(zip(ids, pool.map(summary_of, ids), strict=True))
 
+    def written(ids: list[str]) -> list[str]:
+        """The Batches with a configuration. A batch or replay in flight writes batch.json after
+        its Traces, so until then its folder is in the store with nothing to read."""
+        from concurrent.futures import ThreadPoolExecutor
+
+        def has_config(batch_id: str) -> bool:
+            return batch_id in finished or store.exists(f"batches/{batch_id}/batch.json")
+
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            return [b for b, ok in zip(ids, pool.map(has_config, ids), strict=True) if ok]
+
     def summary_row(batch_id: str, loaded: tuple | None = None) -> dict:
         cfg, s = loaded or summary_of(batch_id)
         row = {
@@ -206,7 +217,7 @@ def create_app(
     def experiments(base, limit: int = 6) -> list[dict]:
         """Recent Batches, each judged against the Baseline."""
         rows = []
-        ids = list(reversed(batches.list_batches(store)))[: limit + 4]
+        ids = list(reversed(written(batches.list_batches(store))))[: limit + 4]
         loaded = summaries(ids)
         for batch_id in ids:
             if len(rows) >= limit:
@@ -249,7 +260,7 @@ def create_app(
 
     @app.get("/api/overview")
     def overview():
-        ids = batches.list_batches(store)
+        ids = written(batches.list_batches(store))
         latest = summary_row(ids[-1]) if ids else None
         base = baseline_or_none()
         cases = load_cases(store, cases_key(region))
@@ -324,7 +335,7 @@ def create_app(
 
     @app.get("/api/batches")
     def list_all():
-        ids = list(reversed(batches.list_batches(store)))
+        ids = list(reversed(written(batches.list_batches(store))))
         loaded = summaries(ids)
         return [summary_row(b, loaded[b]) for b in ids]
 

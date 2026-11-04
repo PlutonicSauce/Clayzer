@@ -74,6 +74,18 @@ def test_gate_api_reports_a_missing_batch(client):
     assert c.get("/api/gate/does-not-exist").status_code == 404
 
 
+def test_a_batch_still_being_written_is_left_out(client, tmp_path):
+    c, bid = client
+    # A replay copies its Traces before it writes batch.json; that Batch sorts last.
+    LocalStore(tmp_path / "data", tmp_path / "batches").put(
+        "batches/29991231T000000Z-inflight/traces/x.jsonl", b"{}\n"
+    )
+    o = c.get("/api/overview").json()
+    assert o["latest"]["batch_id"] == bid
+    assert o["batches"] == 1
+    assert [b["batch_id"] for b in c.get("/api/batches").json()] == [bid]
+
+
 def test_cases_and_chips(client):
     c, _ = client
     cases = c.get("/api/cases").json()
