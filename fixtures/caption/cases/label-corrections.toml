@@ -1,0 +1,110 @@
+# Hand corrections to Reference Labels, applied whenever a Case is built (src/clayzer/cases.py).
+#
+# The Answer Keys are USGS and OSM, and OSM is incomplete: houses nobody mapped, dry washes
+# mapped as water. Where a Chip clearly contradicts its labels, a person records the fix here
+# so it survives a rebuild. Decided 2026-11-04 (caption-plan.md §10).
+#
+#   case    the Case id
+#   object  an ontology class
+#   action  "add": the object is in the image but not in the labels. Its cells are merged into
+#           any existing label for the object, whose count becomes unknown (None).
+#           "drop": the label names something the image doesn't show.
+#   cells   for "add": every cell the object covers; the first is where most of it is
+#   reason  what the image shows, for the next person checking
+
+[[correction]]
+case = "fixed-dev-neg-1"
+object = "water"
+action = "drop"
+reason = "A dry retention basin; no water in the image."
+
+[[correction]]
+case = "fixed-dev-neg-2"
+object = "building"
+action = "add"
+cells = ["south", "north_west"]
+reason = "A homestead in the south and sheds in the north-west; OSM has no buildings."
+
+[[correction]]
+case = "fixed-dev-neg-2"
+object = "field"
+action = "drop"
+reason = "Desert scrub, not a farm field."
+
+[[correction]]
+case = "fixed-dev-neg-4"
+object = "field"
+action = "drop"
+reason = "Desert scrub with dry washes, not a farm field."
+
+[[correction]]
+case = "fixed-dev-neg-4"
+object = "water"
+action = "drop"
+reason = "Dry washes; no water in the image."
+
+[[correction]]
+case = "fixed-dev-neg-5"
+object = "building"
+action = "add"
+cells = ["south"]
+reason = "One large white-roofed building; OSM has none."
+
+[[correction]]
+case = "fixed-dev-neg-7"
+object = "building"
+action = "add"
+cells = ["centre", "north_west", "north", "north_east", "west", "east", "south_west", "south_east"]
+reason = "A residential street, about 30 houses; OSM has no buildings."
+
+[[correction]]
+case = "fixed-dev-neg-7"
+object = "water"
+action = "drop"
+reason = "No water in the image."
+
+[[correction]]
+case = "fixed-dev-neg-8"
+object = "building"
+action = "add"
+cells = ["centre", "north_west", "north_east", "west", "east", "south_west", "south_east"]
+reason = "Houses either side of the highway; OSM has no buildings."
+
+[[correction]]
+case = "fixed-dev-neg-9"
+object = "building"
+action = "add"
+cells = ["centre", "north_west", "north", "north_east", "west", "east", "south"]
+reason = "Houses along a cul-de-sac; OSM has no buildings."
+
+[[correction]]
+case = "fixed-dev-neg-12"
+object = "building"
+action = "add"
+cells = ["south", "south_east"]
+reason = "A yard with two buildings in the south; OSM has only the two in the north-east."
+
+[[correction]]
+case = "fixed-dev-neg-13"
+object = "water"
+action = "drop"
+reason = "No water in the image."
+
+[[correction]]
+case = "fixed-dev-neg-14"
+object = "parking_lot"
+action = "add"
+cells = ["centre", "west", "east", "south_west", "south"]
+reason = "Parking around the large building and the shops; OSM has none."
+
+[[correction]]
+case = "fixed-dev-neg-15"
+object = "water"
+action = "drop"
+reason = "An airport apron; no water in the image."
+
+[[correction]]
+case = "fixed-dev-uspvdb-401557"
+object = "water"
+action = "drop"
+reason = "Panels and bare ground; no water in the image."

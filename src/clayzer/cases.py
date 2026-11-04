@@ -3,6 +3,8 @@
 Positives start from an Answer Key record and cut the Chip around it, in a NAIP image taken
 after the site was built, with the Chip's centre offset so the site can land in any grid cell.
 Negatives must show no USGS record inside the Chip plus a buffer.
+Hand corrections from label-corrections.toml are applied to every Case built, so a fix for an
+OSM gap survives a rebuild.
 `prep_seconds` records label preparation time (CAP-13).
 
 A Chip's `uri` is its store key (`chips/<id>.png`), so a Case file works against any
@@ -11,12 +13,42 @@ teammate's store.
 
 import json
 import time
+import tomllib
 
 from clayzer import answer_keys as ak
 from clayzer.chips import Chip, cut_chip, find_naip, offset_for
+from clayzer.config import REPO
+from clayzer.grid import GRID
 
 # About 300 m at these latitudes: negatives need USGS-free surroundings, not just a clear Chip.
 NEGATIVE_BUFFER_DEG = 0.003
+CORRECTIONS = REPO / "fixtures" / "caption" / "cases" / "label-corrections.toml"
+
+
+def load_corrections(path=CORRECTIONS) -> list[dict]:
+    return tomllib.loads(path.read_text())["correction"] if path.exists() else []
+
+
+def apply_corrections(case_id: str, labels: list[dict], corrections: list[dict]) -> list[dict]:
+    """The labels with this Case's hand corrections applied: drops removed, adds merged in."""
+    out = [dict(lb) for lb in labels]
+    for c in (c for c in corrections if c["case"] == case_id):
+        if c["action"] == "drop":
+            out = [lb for lb in out if lb["object"] != c["object"]]
+            continue
+        if c["action"] != "add" or not c.get("cells") or set(c["cells"]) - set(GRID):
+            raise ValueError(f"bad label correction for {case_id}: {c}")
+        lb = next((lb for lb in out if lb["object"] == c["object"]), None)
+        if lb is None:
+            out.append({"object": c["object"], "count": None, "position": c["cells"][0],
+                        "cells": [g for g in GRID if g in c["cells"]], "attributes": {},
+                        "source": "manual", "source_ids": []})  # fmt: skip
+        else:  # applying twice changes nothing
+            lb["cells"] = [g for g in GRID if g in set(lb["cells"]) | set(c["cells"])]
+            lb["count"] = None
+            if not lb["source"].endswith("manual"):
+                lb["source"] += "+manual"
+    return out
 
 
 def _labels(chip: Chip) -> list[dict]:
@@ -52,7 +84,7 @@ def _case(case_id: str, region: str, chip: Chip, labels: list[dict], started: fl
                 "source": chip.source,
             }
         ],
-        "reference_labels": labels,
+        "reference_labels": apply_corrections(case_id, labels, load_corrections()),
         # Which release of each Answer Key the labels came from, where it's versioned.
         "answer_keys": {"uspvdb": ak.uspvdb_outlines()[0]}
         if any(lb["source"] == "uspvdb" for lb in labels)
@@ -81,7 +113,12 @@ def build_positive(
     offset = offset_for(f"{answer_key}-{source_id}")
     item = find_naip(lon, lat, after_year=rec.get("p_year"), offset_m=offset)
     chip = cut_chip(item, lon, lat, prefix, store, naip_source, offset)
-    return _case(f"fixed-{region}-{answer_key}-{source_id}", region, chip, _labels(chip), started)
+    try:
+        labels = _labels(chip)
+    except Exception:
+        _discard(store, chip)
+        raise
+    return _case(f"fixed-{region}-{answer_key}-{source_id}", region, chip, labels, started)
 
 
 def build_negative(
@@ -90,17 +127,25 @@ def build_negative(
     started = time.monotonic()
     item = find_naip(lon, lat)
     chip = cut_chip(item, lon, lat, f"{state.lower()}-neg-{n}", store, naip_source)
-    solar, turbines = ak.usgs_near(chip.bbox, NEGATIVE_BUFFER_DEG)
-    found = [f"uspvdb {s['case_id']}" for s in solar]
-    found += [f"uswtdb {t['case_id']}" for t in turbines]
-    # A large array's centroid can be far away while its panels reach the Chip.
-    found += [f for f in _solar_nearby(chip) if f not in found]
-    if found:
-        for suffix in (".png", ".json"):
-            store.delete(f"chips/{chip.id}{suffix}")
-        raise ValueError(f"not a negative: USGS records nearby ({', '.join(found[:5])})")
-    labels = ak.osm_labels(chip, ak.overpass(chip.bbox))
+    try:
+        solar, turbines = ak.usgs_near(chip.bbox, NEGATIVE_BUFFER_DEG)
+        found = [f"uspvdb {s['case_id']}" for s in solar]
+        found += [f"uswtdb {t['case_id']}" for t in turbines]
+        # A large array's centroid can be far away while its panels reach the Chip.
+        found += [f for f in _solar_nearby(chip) if f not in found]
+        if found:
+            raise ValueError(f"not a negative: USGS records nearby ({', '.join(found[:5])})")
+        labels = ak.osm_labels(chip, ak.overpass(chip.bbox))
+    except Exception:
+        _discard(store, chip)
+        raise
     return _case(f"fixed-{region}-neg-{n}", region, chip, labels, started)
+
+
+def _discard(store, chip: Chip) -> None:
+    """Delete a Chip whose Case can't be built (refused, or an API failed), so none is orphaned."""
+    for suffix in (".png", ".json"):
+        store.delete(f"chips/{chip.id}{suffix}")
 
 
 def cases_key(region: str) -> str:
