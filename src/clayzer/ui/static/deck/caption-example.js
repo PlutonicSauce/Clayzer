@@ -1,12 +1,16 @@
 // One real Caption next to the Answer Key it was graded against, and the public records behind
 // that key disagreeing. Case fixed-dev-uswtdb-3073564, Repeat 1 of Baseline
-// 20261104T211847Z-dev74-base; the correction is in fixtures/caption/cases/label-corrections.toml.
+// 20261104T211847Z-dev74-base.
+//
+// Turbine positions are Chip pixels (512 x 512, from Chip.pixel), fetched 2026-11-04 from the USGS
+// USWTDB API and OpenStreetMap's power=generator nodes. The two agree on 17 turbines to within a
+// few pixels. They disagree on one at the top edge: USGS puts it at y = -1, just outside the Chip,
+// and OSM at y = 2, just inside, about 2 m apart.
 
 import { html } from "./html.js";
 
 const CHIP = "/api/chips/ca-uswtdb-3073564-20220702.png";
-const CELLS = ["north_west", "north", "north_east", "west", "centre", "east",
-  "south_west", "south", "south_east"];
+const C = 512 / 3;
 
 const CAPTION = `The image shows a desert landscape with a network of roads and wind turbines. The
   roads are unpaved and form a grid-like pattern across the image. There are 18 wind turbines
@@ -19,35 +23,26 @@ const CLAIMS = [
 ];
 
 const SOURCES = [
-  ["USGS wind turbine database", "17 turbines", "missed one", "bad"],
-  ["OpenStreetMap", "roads, and an 18th turbine in the south-east corner", "", "ok"],
-  ["Checked by eye", "18 turbines: the photo shows the south-east one", "answer key", "ok"],
+  ["USGS wind turbine database", "17 turbines in the photo", "one just outside", "bad"],
+  ["OpenStreetMap", "18: it puts the top-edge turbine 2 m further in", "", "ok"],
+  ["Checked by eye", "18: the top-edge turbine is in the photo", "answer key", "ok"],
 ];
 
 const WRONG = [
-  ["USGS", "missed this turbine"],
+  ["USGS and OpenStreetMap", "place this turbine 2 m apart"],
   ["OpenStreetMap", "no houses on a street of about 30"],
   ["OpenStreetMap", "a dry wash mapped as water"],
 ];
 
-// The Claims drawn on the grid the way the web app's Overview draws them: a pill in the cell each
-// Claim names, coloured by its verdict, over the cells where the Answer Key puts turbines.
-const C = 512 / 3;
-const PILLS = [
-  ["18 turbines", "centre", "near"],
-  ["road, unpaved", "centre", "good"],
-  ["bare ground", "centre", "none"],
-];
-const TURBINE_CELLS = ["north_west", "north", "north_east", "west", "east", "south_west", "south",
-  "south_east"];
+// The 17 turbines both records place inside the Chip (USGS positions), and the one they disagree on.
+const AGREED = [[98, 282], [237, 92], [354, 315], [2, 39], [277, 414], [471, 159], [167, 187],
+  [431, 207], [312, 363], [393, 264], [132, 233], [281, 46], [238, 465], [57, 326], [203, 143],
+  [509, 116], [25, 377]];
+const DISPUTED = [316, 2];
 
-function cellXY(cell) {
-  const i = CELLS.indexOf(cell);
-  return [(i % 3) * C, Math.floor(i / 3) * C];
-}
-
+// What the records identify is drawn on the objects; the Caption's Claim is drawn on the cell it
+// names, because Claims are cells, not boxes (ADR-0007).
 function Chip() {
-  const per = {};
   return html`<figure class="ex-chip">
     <div class="ex-frame">
       <img src=${CHIP} alt="Aerial photo of desert hills crossed by dirt roads, with wind turbines
@@ -55,26 +50,18 @@ function Chip() {
       <svg viewBox="0 0 512 512" aria-hidden="true">
         <g class="grid">${[1, 2].map((k) => html`<line x1=${k * C} y1="0" x2=${k * C} y2="512" />
           <line x1="0" y1=${k * C} x2="512" y2=${k * C} />`)}</g>
-        ${TURBINE_CELLS.map((cell) => {
-          const [x, y] = cellXY(cell);
-          return html`<rect class=${cell === "south_east" ? "ref only-osm" : "ref"} x=${x + 4}
-            y=${y + 4} width=${C - 8} height=${C - 8} rx="6" />`;
-        })}
-        ${PILLS.map(([label, cell, tone]) => {
-          const [x0, y0] = cellXY(cell);
-          const n = (per[cell] = (per[cell] || 0) + 1) - 1;
-          const x = x0 + 5, y = y0 + 14 + n * 50;
-          return html`<g class=${`pill ${tone}`}><rect x=${x} y=${y} width=${C - 10} height="42"
-            rx="21" /><text x=${x + (C - 10) / 2} y=${y + 28} text-anchor="middle">${label}</text></g>`;
-        })}
+        <rect class="claim" x=${C + 4} y=${C + 4} width=${C - 8} height=${C - 8} rx="6" />
+        <g class="pill near"><rect x=${C + 10} y=${2 * C - 50} width=${C - 20} height="40" rx="20" />
+          <text x=${1.5 * C} y=${2 * C - 23} text-anchor="middle">caption: all 18</text></g>
+        ${AGREED.map(([x, y]) => html`<circle class="turbine" cx=${x} cy=${y} r="8" />`)}
+        <circle class="disputed-ring" cx=${DISPUTED[0]} cy=${DISPUTED[1]} r="22" />
+        <circle class="turbine disputed" cx=${DISPUTED[0]} cy=${DISPUTED[1] + 4} r="9" />
       </svg>
     </div>
     <figcaption class="ex-legend">
-      <span><i class="dot good"></i>right, right place</span>
-      <span><i class="dot near"></i>right, wrong cell</span>
-      <span><i class="dot none"></i>no record to check</span>
-      <span><i class="sq"></i>turbines, per the answer key</span>
-      <span><i class="sq only-osm"></i>the one only OpenStreetMap had</span>
+      <span><i class="dot rec"></i>a turbine both records agree on</span>
+      <span><i class="dot disputed"></i>the one they place 2 m apart</span>
+      <span><i class="sq claim"></i>where the caption put all 18</span>
     </figcaption>
   </figure>`;
 }
@@ -103,11 +90,11 @@ export function CaptionExample() {
         </ul>
         <h3>The verdict</h3>
         <p class="ex-verdict"><b class="ok">Count right:</b> 18 of 18. With USGS alone it would
-          have earned half credit.<br /><b class="bad">Position wrong:</b> no turbine stands in the
-          centre cell.</p>
+          have earned half credit.<br /><b class="bad">Position wrong:</b> it puts them all in the
+          centre; the records put them all around it.</p>
       </div>
     </div>
-    <p class="ex-wrong"><b>Public records are wrong too.</b>
+    <p class="ex-wrong"><b>Public records disagree, and are wrong too.</b>
       ${WRONG.map(([src, what]) => html`<span><i>${src}</i> ${what}</span>`)}
       <span>Every image checked by eye; the fixes live in one file.</span>
     </p>
