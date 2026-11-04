@@ -58,6 +58,31 @@ jobs:
       - name: Duplication (Python and JS)
         run: npx --yes jscpd@5.4.2 src --min-tokens 50 --threshold 3 --ignore "**/vendor/**" --reporters consoleFull
 
+  agentcore-package:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          python-version: "3.12"
+      - name: Tests against the runtime dependency lock
+        run: |
+          uv sync --extra ui --extra tools
+          uv pip install --require-hashes -r infra/agentcore-requirements.lock
+          uv run --no-sync pytest tests/test_agentcore.py tests/test_agentcore_callback.py tests/test_agentic.py -q
+      - name: Build and import the deployed ARM64 package
+        run: |
+          uv run python infra/package_agentcore.py /tmp/agentcore.zip
+          uv run python -m zipfile -e /tmp/agentcore.zip /tmp/agentcore-package
+          cd /tmp/agentcore-package
+          python -c "import clayzer.agentcore, entrypoint; assert clayzer.agentcore.create_app()"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: agentcore-runtime
+          path: |
+            /tmp/agentcore.zip
+            /tmp/agentcore.manifest.json
+
   infra:
     runs-on: ubuntu-latest
     steps:
@@ -80,7 +105,7 @@ jobs:
   # Set up once: deploy infra/github_oidc.py, then give the environment the AWS_DEPLOY_ROLE_ARN
   # secret and the AWS_REGION and CLAYZER_STORE variables (docs/deploy.md, "What's left").
   deploy:
-    needs: [lint, test, frontend, infra]
+    needs: [lint, test, frontend, infra, agentcore-package]
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     # The task image is ARM64, so build it on an ARM runner instead of under emulation.
     runs-on: ubuntu-24.04-arm

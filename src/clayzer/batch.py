@@ -618,4 +618,7 @@ def write_reports(store, batch_id: str) -> None:
 
 
 def list_batches(store) -> list[str]:
-    return sorted(store.list_dirs("batches/"))
+    # Interrupted creation and older standalone AgentCore Runs are not scored Batches.
+    return sorted(
+        name for name in store.list_dirs("batches/") if store.exists(_key(name, "batch.json"))
+    )

@@ -93,6 +93,7 @@ class ToolResult:
     text: str
     is_error: bool
     error_code: str | None = None
+    authorization_urls: list[str] = field(default_factory=list)
 
 
 class ToolView:
@@ -104,10 +105,14 @@ class ToolView:
     def server_for(self, name: str) -> str | None:
         return next((s.server for s in self.specs if s.name == name), None)
 
-    def call(self, name: str, arguments: dict, timeout: float | None = None) -> ToolResult:
+    def call(
+        self, name: str, arguments: dict, timeout: float | None = None, *, meta=None
+    ) -> ToolResult:
         if self.server_for(name) is None:
             return ToolResult(f"unknown tool {name!r}", True, "UnknownTool")
-        return self.box.call(name, arguments, timeout)
+        return self.box.call(
+            name, arguments, timeout, **({"meta": meta} if meta is not None else {})
+        )
 
 
 class Toolbox:
@@ -117,12 +122,23 @@ class Toolbox:
     """
 
     def __init__(
-        self, servers: list[McpServer], call_timeout: float = 60.0, interactive: bool = False
+        self,
+        servers: list[McpServer],
+        call_timeout: float = 60.0,
+        interactive: bool = False,
+        http_auth=None,
+        elicitation_callback=None,
+        allowed_tools: frozenset[str] | None = None,
+        connect_timeout: float | None = None,
     ):
         self.servers = servers
         self.call_timeout = call_timeout
         # Only `clayzer login` may open a browser to sign in; Batches use the saved sign-in.
         self.interactive = interactive
+        self.http_auth = http_auth
+        self.elicitation_callback = elicitation_callback
+        self.allowed_tools = allowed_tools
+        self.connect_timeout = connect_timeout
         self.versions: dict[str, str] = {}
         self.specs: list[ToolSpec] = []
         self._sessions: dict = {}
@@ -140,7 +156,7 @@ class Toolbox:
     def __enter__(self) -> Self:
         self._thread.start()
         try:
-            self._run(self._connect_all())
+            self._run(self._connect_all(), self.connect_timeout)
         except BaseException:
             self.__exit__()
             raise
@@ -190,7 +206,7 @@ class Toolbox:
                     stored_token_auth,
                 )
 
-                auth = None
+                auth = self.http_auth
                 if server.oauth and self.interactive:
                     auth = oauth_provider(server.name, server.url, True, blocked)
                 elif server.oauth:
@@ -208,7 +224,9 @@ class Toolbox:
                 command, args = server.launch()
                 params = StdioServerParameters(command=command, args=args, env=dict(os.environ))
                 read, write = await self._stack.enter_async_context(stdio_client(params))
-            session = await self._stack.enter_async_context(ClientSession(read, write))
+            session = await self._stack.enter_async_context(
+                ClientSession(read, write, elicitation_callback=self.elicitation_callback)
+            )
             info = await session.initialize()
             self._sessions[server.name] = session
             impl = getattr(info, "server_info", None)
@@ -216,6 +234,8 @@ class Toolbox:
                 f"{impl.name} {impl.version}" if impl else server.package or server.url or ""
             )
             for tool in (await session.list_tools()).tools:
+                if self.allowed_tools is not None and tool.name not in self.allowed_tools:
+                    continue
                 if tool.name in seen:
                     raise ValueError(
                         f"tool {tool.name!r} is in both {seen[tool.name]!r} and {server.name!r}"
@@ -234,7 +254,9 @@ class Toolbox:
         model is offered its own tools, and the verifier's stay out of its prompt."""
         return ToolView(self, [s for s in self.specs if s.server in servers])
 
-    def call(self, name: str, arguments: dict, timeout: float | None = None) -> ToolResult:
+    def call(
+        self, name: str, arguments: dict, timeout: float | None = None, *, meta=None
+    ) -> ToolResult:
         """Call a tool. Failures come back as results, not exceptions: a failing tool is data
         for the evaluation, and the model sees the error and can recover. `timeout` overrides
         the Toolbox's for this call (building an LGND classifier takes minutes)."""
@@ -243,10 +265,28 @@ class Toolbox:
             return ToolResult(f"unknown tool {name!r}", True, "UnknownTool")
         timeout = timeout or self.call_timeout
         try:
-            result = self._run(self._sessions[server].call_tool(name, arguments), timeout)
+            options = {"meta": meta} if meta is not None else {}
+            result = self._run(
+                self._sessions[server].call_tool(name, arguments, **options), timeout
+            )
         except TimeoutError:
             return ToolResult(f"{name} timed out after {timeout:.0f} s", True, "TimeoutError")
         except Exception as e:  # noqa: BLE001 - see docstring
+            # MCP 2025-11 URL elicitation is returned as error -32042. Preserve the URLs
+            # for an interactive caller; they never become model input or Trace text.
+            data = getattr(e, "data", None)
+            if getattr(e, "code", None) == -32042:
+                items = data.get("elicitations") if isinstance(data, dict) else []
+                urls = [
+                    item["url"]
+                    for item in (items if isinstance(items, list) else [])
+                    if isinstance(item, dict)
+                    and item.get("mode") == "url"
+                    and isinstance(item.get("url"), str)
+                ]
+                return ToolResult(
+                    "Tool requires browser authorization", True, "AuthorizationRequired", urls
+                )
             return ToolResult(f"{type(e).__name__}: {e}", True, type(e).__name__)
         parts = [
             getattr(b, "text", None) or b.model_dump_json() for b in getattr(result, "content", [])

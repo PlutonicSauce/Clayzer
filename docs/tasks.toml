@@ -798,7 +798,21 @@ step = "harness"
 title = "Run the agentic captioner on AgentCore, holding the LGND sign-in and reaching MCP tools"
 area = "Captioning"
 tier = "Could"
-status = "todo"
+status = "doing"
+notes = "Review remediation validated 2026-11-04: a hosted Run now contains a successful LGND readiness tool Step and a Nova Pro model Step, persisted outside scored Batches. The runtime role was denied access to the Cases canary. Traces checkpoint completed Steps; failures return locators; the ZIP uses a hashed lock and records provenance. Keep #23 open pending PR/CI and final review. See docs/deploy.md, AgentCore captioner."
+see_it = "uv run --extra ui --extra tools python -m clayzer.agentcore invoke <runtime-arn> <chip-id>; docs/deploy.md, AgentCore captioner"
+changes = [
+  "src/clayzer/agentcore.py: HTTP runtime adapter, Gateway JWT authentication, consent helpers, and S3 Trace persistence",
+  "src/clayzer/agentcore_trace.py: standalone checkpoints, bounded calls, deadlines, and failure locators",
+  "src/clayzer/batch.py: ignore incomplete and legacy standalone directories when listing scored Batches",
+  "src/clayzer/tools.py: HTTP authentication and MCP URL-elicitation support without exposing consent URLs to the model",
+  "src/clayzer/faults.py: missing browser authorization is an Environment Fault",
+  "infra/package_agentcore.py: ARM64 Python code-deployment ZIP builder",
+  "infra/update_agentcore.py: reviewed IAM policies, immutable artifact updates, and deployment receipts",
+  "infra/agentcore_policies.py: parameterized runtime and Gateway policies with explicit Answer Key denial",
+  "tests/test_agentcore.py: runtime contract, input isolation, tool restrictions, traces, and consent token binding",
+  "docs/deploy.md: deployment settings, two consent flows, validation evidence, and resource lifecycle",
+]
 closes = ["AWS-11"]
 start = "docs/caption-design.md §2.2 (AWS-11)"
 after = ["agentic-harness", "aws-observability-check"]

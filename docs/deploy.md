@@ -141,3 +141,188 @@ partway.
   sts:AssumeRoleWithWebIdentity", compare the role's trust policy with
   `gh api repos/PlutonicSauce/Clayzer/actions/oidc/customization/sub`.
 - **`cdk destroy`** removes everything except the store bucket, which is retained.
+
+## AgentCore captioner (#23)
+
+**Validation (2026-11-04):** the reviewed runtime completed both an LGND tool call and a Nova
+Pro caption inside AgentCore in `us-west-2`. The S3 Trace contains a successful
+`lgnd___toolbox_classifier_list` Step (`role: setup`) and an `llm` Step. The same runtime role
+was denied a HEAD request against a provisioned, harmless Cases canary
+(`case_read_denied: true` in the Trace). AgentCore Identity retains the LGND consent.
+The readiness call validates authentication before paying for inference; the model still
+chooses whether to call additional tools. Keep #23 open until the PR and CI are complete.
+
+The separate HTTP adapter in `src/clayzer/agentcore.py` runs the existing agentic Harness on
+AgentCore Runtime. Its request is only `{"chip_id": "..."}`. Deployment fixes the model, S3
+store, and Gateway; callers cannot supply prompts, Case labels, tool servers, or store paths.
+The runtime role reads Chip PNGs and writes under `runs/agentcore/`; its reviewed policy
+explicitly denies reads under `cases/` and `labels/`. Each invocation creates a new Run.
+
+The runtime uses IAM authentication. Gateway needs **JWT authentication** for LGND's
+authorization-code OAuth: AWS rejects a 3LO target on an `AWS_IAM` gateway, and a gateway's
+authorizer type cannot be changed after creation. A confidential Cognito client supplies the
+runtime's Gateway JWT. Its credential is in Secrets Manager; the environment contains only its
+secret ARN. AgentCore Identity holds the separate LGND client credential and consent.
+Configure Gateway's MCP `supportedVersions` as `["2025-11-25"]`: its default older protocol
+cannot initiate URL elicitation for OAuth.
+The captioner exposes 15 exact geospatial tool names. It excludes account-management tools,
+classifier creation, and any future names until they are explicitly reviewed. The filter
+runs before Bedrock name validation, so an unrelated long tool name cannot break connection.
+All Runtime callers share this deployment's consenting LGND identity; restrict
+`InvokeAgentRuntime` access accordingly. This is a single-participant deployment.
+
+### Invoke and inspect
+
+With local AWS credentials in `.env` and an authorized LGND target:
+
+```sh
+uv run --extra ui --extra tools python -m clayzer.agentcore invoke \
+  "$RUNTIME_ARN" "$CHIP_ID"
+```
+
+The response contains the Caption, call summary, and `trace_key`. The complete JSONL Trace is
+written to `runs/agentcore/agentcore-<uuid>/trace.jsonl` in the configured S3 store.
+`caption.json` next to it contains the successful response. These standalone Runs do not run
+the Judge or feed the regression gate. `batch_id` remains in the response/Trace for format
+compatibility; it is not a scored Batch. Batch discovery ignores legacy directories lacking
+`batch.json`, including the initial validation's old `batches/agentcore-*` output.
+
+The runtime checkpoints `run_start` before work and every completed Step. A graceful failure
+writes `run_end` with `stopped` or `harness_fault`. An abrupt VM termination leaves the last
+readable `running` snapshot, without a fabricated completion event. Storage outages can still
+prevent a checkpoint; the failure response reports `trace_saved: false`.
+
+Failed Runs return a JSON domain outcome with `status`, `run_id`, `trace_key`, and
+`trace_saved`. This uses HTTP 200 because AgentCore replaces non-2xx bodies with a generic
+`RuntimeClientError`, discarding the locator. The local invoke command prints that outcome
+and exits nonzero for failure. Input-validation and startup errors remain HTTP errors.
+
+A 600-second cooperative deadline stops new calls with a 100-second reserve. Runtime Bedrock
+calls use two total attempts, a five-second connection timeout, and a 35-second read timeout;
+MCP calls are bounded to 30 seconds and connection setup to 45 seconds. The platform's
+900-second limit remains the hard stop. Retry attempts are recorded in the Trace.
+
+### Package and runtime settings
+
+```sh
+uv run python infra/package_agentcore.py /tmp/clayzer-agentcore.zip
+```
+
+The builder installs the hashed `infra/agentcore-requirements.lock` for Linux ARM64 Python 3.12 and
+packages the Python source and an HTTP bootstrap. It excludes `.env`, local sign-ins, images,
+Cases, the UI, and installer-local metadata. ZIP ordering, timestamps and permissions are
+fixed. The embedded build record and sibling `.manifest.json` contain the source commit,
+dirty flag, source hashes, lock hash, and ZIP hash. CI tests against this lock on ARM64,
+extracts the built ZIP, and imports the actual deployed entry point.
+
+Regenerate the lock deliberately when upgrading dependencies:
+
+```sh
+uv pip compile infra/agentcore-requirements.in --python-version 3.12 \
+  --python-platform aarch64-manylinux2014 --generate-hashes \
+  --no-emit-index-url --no-emit-index-annotation -o infra/agentcore-requirements.lock
+```
+
+The AgentCore code configuration is:
+
+```json
+{
+  "codeConfiguration": {
+    "code": {"s3": {"bucket": "<artifact-bucket>", "prefix": "<zip-key>"}},
+    "runtime": "PYTHON_3_12",
+    "entryPoint": ["entrypoint.py"]
+  }
+}
+```
+
+Use protocol `HTTP`, port 8080, and IAM inbound authentication (the default). The bootstrap
+serves `GET /ping` and `POST /invocations`. For a participant-account validation, `PUBLIC`
+network mode reaches Cognito, Bedrock, S3, and LGND through Gateway; it does not make
+invocations anonymous. The validated session limits are 60 seconds idle and 900 seconds total.
+Wait for both the runtime and its endpoint to be `READY`.
+
+| Runtime environment setting | Value |
+|---|---|
+| `CLAYZER_STORE` | `s3://<store-bucket>/<prefix>` |
+| `CLAYZER_CAPTION_MODEL` | `us.amazon.nova-pro-v1:0` |
+| `CLAYZER_AGENTCORE_GATEWAY` | The JWT gateway's HTTPS `/mcp` URL |
+| `CLAYZER_AGENTCORE_GATEWAY_SECRET` | ARN of the Cognito client secret |
+
+The Cognito secret is a JSON object with `token_endpoint`, `client_id`, `client_secret`, and
+`scope` (`caption/invoke`). Tokens are cached within an invocation and refreshed once on a 401.
+Never put either the client secret or an access token in runtime environment variables.
+
+### LGND consent and permissions
+
+Create a custom OAuth provider in AgentCore Identity first, obtain its generated `callbackUrl`,
+register that exact URL with LGND, and update the provider with the registered confidential
+client. LGND supports `client_secret_post`. In AgentCore use
+`clientAuthenticationMethod: CLIENT_SECRET_POST`; also sending the deprecated
+`tokenEndpointAuthMethods` field is rejected.
+
+The Gateway target must be named `lgnd`, point at `https://geo.lgnd.ai/mcp`, use
+`AUTHORIZATION_CODE`, and request `openid profile email offline_access`. Initial discovery
+can enter `CREATE_PENDING_AUTH`. For a target configured with
+`defaultReturnUrl: http://localhost:33418/callback`, start the local consent helper:
+
+```sh
+uv run --extra ui --extra tools python -m clayzer.agentcore authorize \
+  "$GATEWAY_ID" "$TARGET_ID"
+```
+
+Open the printed localhost link in a browser. The helper binds the start and callback with a
+random HttpOnly cookie and completes AgentCore's resource-token authorization. A local
+`clayzer login lgnd` signs in a different client and does not authorize the Gateway.
+Discovery consent alone does not prove that tool invocation works: test an actual tool call.
+The runtime's Cognito caller has its own consent, completed once with:
+
+```sh
+uv run --extra ui --extra tools python -m clayzer.agentcore authorize-caller \
+  "$GATEWAY_ID" "$GATEWAY_SECRET_ARN"
+```
+
+This reads the configured confidential client, requests a Gateway tool, and handles MCP's
+`-32042` URL-elicitation response. Browser completion uses the exact JWT from that tool
+request (`userToken`); the discovery flow instead uses its returned `userId`.
+Use `--force` to replace an expired consent session. Consent URLs stay out of model inputs and Trace text.
+An expired or revoked consent is an Environment Fault, not a Harness Fault.
+
+Use separate runtime and Gateway roles, with service trust restricted by account and source
+ARN. Scope runtime permissions to Chip PNG reads, its artifact ZIP, its new Trace directories,
+Nova Pro invocation, its Cognito credential, and its log group. Scope Gateway OAuth access to
+its workload identity and directory, token vault, LGND credential provider, and the provider's
+Secrets Manager ARN. Check the current
+[AgentCore service authorization reference](https://docs.aws.amazon.com/service-authorization/latest/reference/list_amazonbedrockagentcore.html)
+when creating these policies.
+
+The exact parameterized policies are in [infra/agentcore_policies.py](../infra/agentcore_policies.py).
+For an existing deployment, the checked-in updater applies those policies and publishes an
+immutable ZIP key (its SHA-256), manifest, and deployment receipt:
+
+```sh
+uv run python infra/update_agentcore.py /private/path/state.json /tmp/clayzer-agentcore.zip
+```
+
+The private state file contains non-secret resource identifiers: `agentRuntimeId`, `gatewayId`,
+`storeUrl`, `assetBucket`, `gatewaySecretArn`, and `logGroup`. Obtain these from the existing
+runtime/Gateway and stack outputs. No credential values belong in it. The updater checks
+the account and ownership tags before modifying the two roles. It rejects dirty builds unless
+`--allow-dirty` is explicitly selected for development validation.
+
+The updater enables `CLAYZER_AGENTCORE_VALIDATE_IAM=1` and provisions a harmless object at
+`cases/agentcore-access-canary.json`. The runtime checks denial with HEAD, which requires the
+same S3 GetObject permission without reading any labels. Unexpected access stops the Run.
+The receipt records runtime version, artifact URI, commit, source hashes and policy; retain
+it with validation results. Initial Cognito/Identity registration and human consent remain
+the setup steps above; updating code does not recreate or revoke those identities.
+
+The account validation created resources tagged `project=clayzer`, `issue=23` separately from
+the `Clayzer` CDK stack: runtime, Gateway, two execution roles, OAuth provider, Cognito pool and
+client, Secrets Manager credential, and a KMS key for runtime logs with seven-day retention.
+They are not removed by `cdk destroy`. Keep them while using the captioner; remove this
+separate deployment explicitly when it is no longer needed.
+
+References:
+[direct Python deployment](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-get-started-code-deploy-python.html),
+[MCP Gateway targets](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway-target-MCPservers.html),
+[OAuth session binding](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/oauth2-authorization-url-session-binding.html).
