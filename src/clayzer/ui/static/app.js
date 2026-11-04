@@ -803,6 +803,11 @@ async function route() {
     a.toggleAttribute("aria-current", target === page || (page === "compare" && target === "batches"));
     if (a.hasAttribute("aria-current")) a.setAttribute("aria-current", "page");
   });
+  const devMenu = document.getElementById("dev-menu");
+  if (devMenu) {
+    devMenu.classList.toggle("has-current", !!devMenu.querySelector('a[aria-current="page"]'));
+    devMenu.removeAttribute("open");
+  }
   $view.innerHTML = '<p class="sub">Loading…</p>';
   try {
     if (page === "") await overview();
@@ -820,6 +825,19 @@ async function route() {
     if (!stale(me)) $view.innerHTML = `<p class="empty">Couldn't load this page: ${esc(e.message)}</p>`;
   }
 }
+
+// The For Dev Team menu closes on a click elsewhere or on Escape.
+document.addEventListener("click", (e) => {
+  const menu = document.getElementById("dev-menu");
+  if (menu && menu.open && !menu.contains(e.target)) menu.removeAttribute("open");
+});
+document.addEventListener("keydown", (e) => {
+  const menu = document.getElementById("dev-menu");
+  if (e.key === "Escape" && menu && menu.open) {
+    menu.removeAttribute("open");
+    menu.querySelector("summary").focus();
+  }
+});
 
 (async () => {
   CONFIG = await api("/api/config");
