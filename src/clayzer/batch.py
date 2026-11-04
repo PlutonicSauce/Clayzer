@@ -42,6 +42,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 from clayzer import harness, lgnd, provenance, verifiers
 from clayzer.cases import parse_jsonl, to_jsonl
 from clayzer.config import Settings, bedrock
+from clayzer.cost import per, run_cost, verified_claims
 from clayzer.grounding import grounding
 from clayzer.judge import fidelity
 from clayzer.retrieval import retrieval
@@ -231,6 +232,7 @@ def _run_one(
             }  # fmt: skip
             result["faults"] = tracer.finish(HARNESS_FAULT, None, str(e))
             result["workflow"] = workflow_score(tracer.run, tracer.steps)
+            result["cost"], result["verified_claims"] = run_cost(tracer.steps), 0
             return result, {**base, **empty}
         except (ClientError, BotoCoreError) as e:
             status = _classify(e)
@@ -259,6 +261,8 @@ def _run_one(
                 return {**failed, "faults": faults}, cap
         result["faults"] = tracer.finish(OK, cap["text"])
         result["workflow"] = workflow_score(tracer.run, tracer.steps)
+        result["cost"] = run_cost(tracer.steps)
+        result["verified_claims"] = verified_claims(result["grounding"])
         return result, cap
     except CredentialsExpired as e:
         tracer.finish("stopped", None, f"credentials expired: {e}"[:500])
@@ -490,6 +494,10 @@ def summarize(cfg: BatchConfig, cases: list[dict], results: list[dict], retr: li
     # The rubric's measure: how often the right Caption is the top result for a query.
     top1 = [row["recall@1"] for row in retr if row.get("recall@1") is not None]
     prep = [c.get("prep_seconds") for c in cases if c.get("prep_seconds") is not None]
+    # Verified Claims per dollar and per GPU-second, over the Runs whose cost is known: Runs
+    # from before Traces, or with an unpriced model, are left out of both sums (CAP-12).
+    priced = [r for r in scored if (r.get("cost") or {}).get("usd") is not None]
+    gpu = [r for r in scored if (r.get("cost") or {}).get("gpu_seconds")]
     return {
         "batch_id": cfg.batch_id,
         "cases": per_case,
@@ -506,6 +514,14 @@ def summarize(cfg: BatchConfig, cases: list[dict], results: list[dict], retr: li
             # Cost is partial on Bedrock: time to output and tokens, no GPU time (CAP-12).
             "seconds_per_caption": _mean(r.get("seconds_to_caption") for r in scored),
             "tokens_per_caption": _mean(r.get("caption_tokens") for r in scored),
+            "usd_per_caption": _mean(r["cost"]["usd"] for r in priced),
+            "verified_claims_per_caption": _mean(r.get("verified_claims") for r in scored),
+            "verified_claims_per_dollar": per(
+                sum(r["verified_claims"] for r in priced), sum(r["cost"]["usd"] for r in priced)
+            ),
+            "verified_claims_per_gpu_second": per(
+                sum(r["verified_claims"] for r in gpu), sum(r["cost"]["gpu_seconds"] for r in gpu)
+            ),
             "runs": {
                 "planned": len(cases) * cfg.repeats,
                 "ok": sum(r["status"] == OK for r in results),
@@ -524,9 +540,10 @@ def summarize(cfg: BatchConfig, cases: list[dict], results: list[dict], retr: li
 def rescore(batch_id: str, store) -> dict:
     """Score a Batch's stored Captions again with the current scorer, without calling any model.
 
-    Grounding is recomputed against the Batch's frozen Cases, and the Workflow Score from each
-    Run's stored Trace (Runs from before Traces get none); fidelity and retrieval are kept (they
-    don't depend on the scorers). Harness Faults stay scored as 0.
+    Grounding and verified Claims are recomputed against the Batch's frozen Cases, and the
+    Workflow Score and cost from each Run's stored Trace (Runs from before Traces get none);
+    fidelity and retrieval are kept (they don't depend on the scorers), so the Judge's saved
+    verdicts are reused, never requested again. Harness Faults stay scored as 0.
     """
     from dataclasses import replace
 
@@ -546,9 +563,13 @@ def rescore(batch_id: str, store) -> dict:
                 "correctness": 0.0,
                 "coverage": 0.0 if labels[r["case_id"]] else None,
             }
+        if r["status"] in (OK, HARNESS_FAULT):
+            r["verified_claims"] = verified_claims(r["grounding"])
         tkey = trace_key(batch_id, r["case_id"], r["repeat"])
         if r["status"] in (OK, HARNESS_FAULT) and store.exists(tkey):
-            r["workflow"] = workflow_score(*loads(store.get(tkey)))
+            run, steps = loads(store.get(tkey))
+            r["workflow"] = workflow_score(run, steps)
+            r["cost"] = run_cost(steps)
     cfg = replace(b["config"], scorer_version=SCORER_VERSION)
     store.put(
         _key(batch_id, "batch.json"), (json.dumps(asdict(cfg), indent=2) + "\n").encode(), JSON

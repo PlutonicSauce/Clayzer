@@ -381,6 +381,10 @@ def render_html(b: dict, store) -> str:
         ("Cost (partial)", f"{_f(batch['seconds_per_caption'], 1)} s",
          f"{_f(batch['tokens_per_caption'], 0)} tokens per Caption; no GPU time on Bedrock",
          " platform"),
+        ("Verified Claims per dollar", _f(batch.get("verified_claims_per_dollar"), 0),
+         (f"{_f(batch.get('verified_claims_per_caption'), 1)} verified Claims per Caption at "
+          f"${_f(batch.get('usd_per_caption'), 5)}; per GPU-second "
+          f"{_f(batch.get('verified_claims_per_gpu_second'))}"), " platform"),
     ]  # fmt: skip
     html = [
         "<!doctype html><html lang='en'><head><meta charset='utf-8'>",

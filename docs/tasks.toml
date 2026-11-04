@@ -1332,9 +1332,10 @@ step = "report"
 title = "Recorded-Trace replay: rescore stored Captions without calling the Harness"
 area = "Platform"
 tier = "Must"
-status = "todo"
+status = "done"
 closes = ["REQ-09"]
 start = "batches/<id>/captions.jsonl"
+notes = "Done 2026-11-04: `clayzer rescore` already rebuilt everything from the store; tests/test_replay.py now proves it. It runs a Batch, breaks its stored grounding, deletes its reports, then cuts the network (sockets refuse), AWS credentials, and the Bedrock client, and runs `clayzer rescore` through the CLI: grounding is recomputed, every Judge verdict and the retrieval results come back unchanged (none requested again), and the Batch report and every Run report are rewritten. No code change was needed for the replay itself."
 context = "The brief's fallback: a recorded Trace can be scored and reported with no model, MCP server, credentials, or network, with Judge verdicts replayed from saved results. `clayzer rescore` already re-scores stored Captions; extend it so reports rebuild fully offline, and prove it with the network off."
 done_when = [
   "A Batch rescored and reported with the network disabled",
@@ -1344,6 +1345,11 @@ done_when = [
 refs = [
   "docs/caption-design.md §2.3 (REQ-09)",
   "src/clayzer/batch.py (rescore)",
+]
+see_it = "CLI: `uv run clayzer rescore <batch-id>` with the network off (a local store, CLAYZER_STORE unset). The test: `uv run pytest tests/test_replay.py`."
+changes = [
+  "tests/test_replay.py: a Batch rescored and reported through the CLI with no network, AWS credentials, or Bedrock client; Judge verdicts and retrieval reused",
+  "src/clayzer/batch.py: rescore's docstring says Judge verdicts are reused, never requested again",
 ]
 
 [[task]]
@@ -1875,9 +1881,10 @@ step = "report"
 title = "Report verified Claims per dollar and per GPU-second next to cost per Caption"
 area = "Evaluation"
 tier = "Could"
-status = "todo"
+status = "done"
 closes = ["CAP-12", "CAP-10"]
 start = "src/clayzer/report.py"
+notes = "Done 2026-11-04: a Claim is verified when its type is in the Answer Key and every part scored on it is right (position, its type's count, attributes, change). Each Run records its verified Claims and its Harness cost from the Trace (Judge Steps left out); Batches report verified Claims per Caption, dollars per Caption, verified Claims per dollar, and per GPU-second (empty on Bedrock). Dollars use the on-demand price table in src/clayzer/cost.py (Nova Pro, Nova Lite, Claude Opus/Sonnet/Haiku 5.5; Claude rows are Anthropic list prices, to confirm against Bedrock's); an unpriced model gets no dollar figure. rescore backfills both from stored Traces. Shown with the fake Bedrock in tests/test_cost.py: at the same correctness (1.0), a vaguer prompt is cheaper per Caption but earns 625 verified Claims per dollar against the specific prompt's 1,000. Not yet run on the real base and vague Batches."
 context = "Clay cares about cost and quality together. One number joins them, and it fixes a known weakness: grounding rewards vaguer Captions (fewer Claims scores higher), but a vague Caption earns few verified Claims. Uses the token and timing data Runs already record."
 done_when = [
   "Each Batch report shows verified Claims per dollar (Bedrock prices) and per GPU-second where GPU time exists",
@@ -1888,6 +1895,15 @@ refs = [
   "docs/caption-design.md §8 (idea 8)",
   "src/clayzer/report.py",
   "src/clayzer/grounding.py",
+]
+see_it = "A Batch's report (#/batches/<id>, and report.md and report.html in the store): the Verified Claims per dollar card and row. Compare (#/compare/<a>/<b>, `clayzer compare`): Dollars per 1,000 Captions, Verified Claims per Caption, per dollar, and per GPU-second. `clayzer rescore <batch-id>` adds them to an older Batch that has Traces."
+changes = [
+  "src/clayzer/cost.py: the price table, a Run's Harness cost from its Trace, and verified_claims",
+  "src/clayzer/batch.py: each Run records cost and verified_claims; summarize rolls them up; rescore backfills them from Traces",
+  "src/clayzer/gate.py: Compare shows the change in each, missing (not zero) for Batches from before them",
+  "src/clayzer/report.py: a Verified Claims per dollar row",
+  "src/clayzer/report_html.py: a Verified Claims per dollar card",
+  "tests/test_cost.py: verified Claims, Harness-only cost, a vaguer prompt scoring worse per dollar at the same correctness, Compare, and rescore backfill",
 ]
 
 [[task]]
