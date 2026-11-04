@@ -27,6 +27,7 @@ from clayzer.config import REPO
 SETTINGS = [
     ("caption_model", "Caption model", "What was tested"),
     ("prompt_sha", "Caption prompt", "What was tested"),
+    ("change_prompt_sha", "Change prompt (Chip Pairs)", "What was tested"),
     ("prompt_source", "Prompt source", "What was tested"),
     ("tools", "MCP servers", "What was tested"),
     ("max_turns", "Turn budget", "What was tested"),

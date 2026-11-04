@@ -557,9 +557,9 @@ async function casesPage() {
     ${cases.length ? '<p class="sub">Click a Chip to open it large, with its labels on the grid and zoom.</p>' : ""}
     <div class="case-grid">${cases.map((c) => `<div class="case-card">
       <a href="#/cases/${encodeURIComponent(c.id)}"><img src="/api/chips/${encodeURIComponent(c.chip.id)}.png" alt="Chip ${esc(c.chip.id)}" loading="lazy"></a>
-      <div class="body"><b><a href="#/cases/${encodeURIComponent(c.id)}">${esc(c.id)}</a></b><br><small class="mono">${esc(c.chip.id)} · NAIP ${esc(c.chip.date)} · ${esc(c.chip.source)}</small>
+      <div class="body"><b><a href="#/cases/${encodeURIComponent(c.id)}">${esc(c.id)}</a></b><br><small class="mono">${c.kind === "change" ? `Chip Pair: NAIP ${esc(c.chips[0].date)} → ` : `${esc(c.chip.id)} · NAIP `}${esc(c.chip.date)} · ${esc(c.chip.source)}</small>
       <ul>${c.labels.map((l) => `<li>${l.count !== null ? `${esc(l.count)} × ` : ""}${esc(l.object.replace(/_/g, " "))}
-        at ${esc(l.position)} <small>(${esc(l.source)})</small></li>`).join("") || "<li>no labels</li>"}</ul>
+        at ${esc(l.position)}${l.change ? ` <small>(${esc(l.change)})</small>` : ""} <small>(${esc(l.source)})</small></li>`).join("") || "<li>no labels</li>"}</ul>
       <small>Built in ${f2(c.prep_seconds)} s</small></div></div>`).join("")}</div>`;
 }
 
@@ -628,9 +628,12 @@ async function casePage(id) {
         <h3>Reference Labels</h3>
         <ul>${c.labels.map((l) => `<li>${l.count !== null ? `${esc(l.count)} × ` : ""}${esc(l.object.replace(/_/g, " "))}
           at ${esc(l.position)}${(l.cells || []).length > 1 ? ` <small>(covers ${l.cells.map((x) => esc(x.replace(/_/g, " "))).join(", ")})</small>` : ""}
-          <small>· ${esc(l.source)}</small></li>`).join("") || "<li>no labels: nothing mapped here</li>"}</ul>
-        <h3>Chip</h3>
-        <p class="mono">${esc(c.chip.id)}<br>NAIP ${esc(c.chip.date)} · ${esc(c.chip.source)}<br>${lat}, ${lon}</p>
+          ${l.change ? ` <small>(${esc(l.change)})</small>` : ""}<small>· ${esc(l.source)}</small></li>`).join("") || "<li>no labels: nothing mapped here</li>"}</ul>
+        <h3>${c.kind === "change" ? "Chip Pair" : "Chip"}</h3>
+        ${c.kind === "change" ? `<p class="sub">A ${term("Change Case")}: the labels are drawn on the later Chip (above); the earlier one is below.</p>
+        <img class="chip-earlier" src="/api/chips/${encodeURIComponent(c.chips[0].id)}.png" alt="Earlier aerial image ${esc(c.chips[0].id)}" style="width:100%">
+        <p class="mono">Earlier: ${esc(c.chips[0].id)}<br>NAIP ${esc(c.chips[0].date)} · ${esc(c.chips[0].source)}</p>` : ""}
+        <p class="mono">${c.kind === "change" ? "Later: " : ""}${esc(c.chip.id)}<br>NAIP ${esc(c.chip.date)} · ${esc(c.chip.source)}<br>${lat}, ${lon}</p>
         <h3>Check it elsewhere</h3>
         <p>Current imagery and maps at the Chip's centre (they may be newer than ${esc(c.chip.date.slice(0, 4))}):<br>
           <a href="https://www.google.com/maps/@${lat},${lon},400m/data=!3m1!1e3" target="_blank" rel="noopener">Google satellite</a> ·

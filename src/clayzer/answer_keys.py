@@ -116,6 +116,11 @@ def usgs_near(
     return _get(USPVDB, _bbox_params(bbox, buffer_deg)), _get(USWTDB, _bbox_params(bbox, tb))
 
 
+def existed_by(records: list[dict], year: int) -> list[dict]:
+    """USGS records already built by `year` (their `p_year`); a record with no year is kept."""
+    return [r for r in records if not r.get("p_year") or int(r["p_year"]) <= year]
+
+
 def solar_size(area_m2: float) -> str:
     """Draft thresholds (caption-plan.md §5.2), from USPVDB's array area."""
     if area_m2 < 50_000:

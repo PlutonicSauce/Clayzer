@@ -99,6 +99,8 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument("kind", choices=["uspvdb", "uswtdb", "neg"])
     c.add_argument("args", nargs="+", help="a USGS case_id, or lon lat for a negative")
     c.add_argument("--n", type=int, default=1, help="negative number")
+    c.add_argument("--change", action="store_true",
+                   help="a Change Case: the site before and after its install year (a Chip Pair)")  # fmt: skip
     c.add_argument("--state", default="CA", help="state code for a negative")
 
     pu = sub.add_parser("push", help="copy a local chips/ + cases/ folder into the store")
@@ -197,7 +199,14 @@ def main(argv: list[str] | None = None) -> int:
     if a.cmd == "case":
         from clayzer.cases import build_negative, build_positive
 
-        if a.kind == "neg":
+        if a.change:
+            from clayzer.cases import build_change
+
+            if a.kind == "neg":
+                print("--change needs a USGS site: uspvdb or uswtdb", file=sys.stderr)
+                return 2
+            case = build_change(a.kind, int(a.args[0]), a.region, store, settings.naip_source)
+        elif a.kind == "neg":
             lon, lat = map(float, a.args)
             case = build_negative(lon, lat, a.n, a.state, a.region, store, settings.naip_source)
         else:
@@ -205,10 +214,11 @@ def main(argv: list[str] | None = None) -> int:
         save_case(store, key, case)
         labels = [
             f"{lb['object']}×{lb['count'] if lb['count'] is not None else '-'}@{lb['position']}"
+            + (f" ({lb['change']})" if lb.get("change") else "")
             for lb in case["reference_labels"]
         ]
-        chip = case["chips"][0]
-        print(f"{case['id']}: chip {chip['id']} ({chip['source']}), {case['prep_seconds']} s")
+        chips = " → ".join(f"{c['id']} ({c['source']})" for c in case["chips"])
+        print(f"{case['id']}: chip {chips}, {case['prep_seconds']} s")
         print("  labels: " + (", ".join(labels) or "none"))
         print(f"  stored in {store.url(key)}")
         return 0

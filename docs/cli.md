@@ -43,6 +43,19 @@ uv run clayzer case uswtdb 3025453             # wind: USWTDB turbine id
 uv run clayzer case neg -119.20 35.45 --n 1    # negative: lon lat; refused if USGS is nearby
 ```
 
+A **Change Case** is a Chip Pair of one place before and after a USGS site was built:
+
+```sh
+uv run clayzer case uspvdb 401501 --change     # Kingbird B Solar, built 2016: NAIP 2014 → 2022
+```
+
+Both Chips share one footprint: the latest NAIP image before the install year and the latest
+after it. Each USGS label says whether its object `appeared`, `disappeared`, or was `unchanged`;
+OSM is today's map with no history, so its labels carry `change: unknown` and aren't scored for
+change. The Harness gets both images (earlier first) and `harness.CHANGE_PROMPT`, whose hash the
+Batch records as `change_prompt_sha`. Change Cases aren't verified with LGND Geo: its images
+aren't dated to the pair.
+
 Positives use the latest NAIP image taken after the site was built. Site and turbine ids come
 from the USGS APIs (`https://energy.usgs.gov/api/uspvdb/v1/projects`,
 `https://energy.usgs.gov/api/uswtdb/v1/turbines`).

@@ -111,9 +111,11 @@ def find_naip(
     lat: float,
     after_year: int | None = None,
     offset_m: tuple[float, float] = (0.0, 0.0),
+    before_year: int | None = None,
 ):
     """The latest NAIP item that covers the whole Chip around a point, captured after
-    `after_year` if given.
+    `after_year` and before `before_year` if given (a Change Case's earlier Chip predates the
+    site).
 
     NAIP comes in tiles; a Chip that crosses a tile's edge would be read partly blank (seen
     2026-11-04 on 7 of 63 Chips). So the item must cover the Chip's whole footprint, not just
@@ -124,16 +126,18 @@ def find_naip(
 
     catalog = pystac_client.Client.open(STAC, modifier=planetary_computer.sign_inplace)
     start = f"{after_year + 1}-01-01" if after_year else "2010-01-01"
+    end = f"{before_year - 1}-12-31" if before_year else date.today().isoformat()
     footprint = chip_footprint(lon, lat, offset_m)
     items = catalog.search(
         collections=["naip"],
         intersects=footprint.__geo_interface__,
-        datetime=f"{start}/{date.today().isoformat()}",
+        datetime=f"{start}/{end}",
     ).items()
     item = covering_item(list(items), footprint)
     if item is None:
         raise LookupError(
-            f"no NAIP item after {after_year} covers the whole Chip at ({lon}, {lat})"
+            f"no NAIP item after {after_year} and before {before_year} covers the whole Chip"
+            f" at ({lon}, {lat})"
         )
     return item
 

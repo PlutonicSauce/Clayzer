@@ -134,7 +134,8 @@ def build(store, b: dict, result: dict) -> tuple[str, dict]:
     narrative = (b.get("narratives") or {}).get((case_id, repeat))
     tkey = trace_key(cfg.batch_id, case_id, repeat)
     info, steps = loads(store.get(tkey)) if store.exists(tkey) else (None, [])
-    chip = case["chips"][0]
+    # The later Chip of a Change Case's pair: Claims' positions are in it.
+    chip = case["chips"][-1]
     g = result.get("grounding") or {}
     fid = result.get("fidelity") or {}
 

@@ -8,7 +8,8 @@ import pytest
 
 from clayzer import answer_keys as ak
 from clayzer import importer
-from clayzer.importer import existed_by, footprint_chip, import_rows, problems, read_rows, too_small
+from clayzer.answer_keys import existed_by
+from clayzer.importer import footprint_chip, import_rows, problems, read_rows, too_small
 
 # A 0.003° square near Mojave: about 270 m × 330 m, UTM zone 11.
 W, S, E, N = -118.196, 35.228, -118.193, 35.231

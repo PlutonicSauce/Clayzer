@@ -423,7 +423,8 @@ def render_html(b: dict, store) -> str:
     by_id = {c["id"]: c for c in b["cases"]}
     for case_id, summ in s["cases"].items():
         case = by_id[case_id]
-        chip = case["chips"][0]
+        # The later Chip of a Change Case's pair: Claims' positions are in it.
+        chip = case["chips"][-1]
         rows = sorted(
             (r for r in b["results"] if r["case_id"] == case_id), key=lambda r: r["repeat"]
         )

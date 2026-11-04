@@ -96,18 +96,13 @@ def footprint_chip(row: dict):
     )  # fmt: skip
 
 
-def existed_by(records: list[dict], year: int) -> list[dict]:
-    """USGS records already built by `year`; a record with no year is kept."""
-    return [r for r in records if not r.get("p_year") or int(r["p_year"]) <= year]
-
-
 def reference_labels(chip) -> tuple[list[dict], dict]:
     """Reference Labels for a footprint at its date, and what they were built from."""
     from clayzer import answer_keys as ak
 
     year = int(chip.date[:4])
     solar, turbines = ak.usgs_near(chip.bbox, ak.SOLAR_SEARCH_DEG, turbine_buffer_deg=0.0)
-    built_solar, built_turbines = existed_by(solar, year), existed_by(turbines, year)
+    built_solar, built_turbines = ak.existed_by(solar, year), ak.existed_by(turbines, year)
     labels = ak.usgs_labels(chip, built_solar, built_turbines)
     labels += ak.osm_labels(chip, ak.overpass(chip.bbox))
     sources = {

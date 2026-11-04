@@ -86,6 +86,8 @@ class BatchConfig:
     verify: str | None = None
     # Provenance (provenance.py). None means the Batch predates recording it.
     judge_prompt_sha: str | None = None
+    # The change prompt's hash, set only when the Batch has a Change Case (harness.CHANGE_PROMPT).
+    change_prompt_sha: str | None = None
     ontology_version: str | None = None
     ontology_sha: str | None = None
     chips_sha: str | None = None
@@ -167,31 +169,47 @@ def _run_one(
     matches the one hashed when the Batch started is a Sandbox Failure: scoring it would score
     a different input under the same name.
     """
-    chip = case["chips"][0]
+    chips = case["chips"]
+    chip = chips[0]
+    # A Change Case's Chip Pair (earlier first) goes to the Harness and the Judge as a list.
+    pair = case.get("kind") == "change"
     run_id = f"{case['id']}#{repeat}"
     base = {"run_id": run_id, "case_id": case["id"], "repeat": repeat}
     # The Harness gets the Chip id and image only, read from chips/ and never from cases/
     # (ADR-0006).
-    if not chip["uri"].startswith("chips/"):
-        raise ValueError(f"Chip uri must be a chips/ key: {chip['uri']}")
-    png = store.get(chip["uri"])
-    expected = (chip_shas or {}).get(chip["uri"])
-    if expected and hashlib.sha256(png).hexdigest() != expected:
-        error = f"{chip['uri']} changed since the Batch started (SHA-256 no longer matches)"
-        return {**base, "status": SANDBOX_FAILURE, "error": error}, None
+    pngs, shas = [], []
+    for c in chips:
+        if not c["uri"].startswith("chips/"):
+            raise ValueError(f"Chip uri must be a chips/ key: {c['uri']}")
+        pngs.append(store.get(c["uri"]))
+        shas.append((chip_shas or {}).get(c["uri"]))
+        if shas[-1] and hashlib.sha256(pngs[-1]).hexdigest() != shas[-1]:
+            error = f"{c['uri']} changed since the Batch started (SHA-256 no longer matches)"
+            return {**base, "status": SANDBOX_FAILURE, "error": error}, None
+    png = pngs if pair else pngs[0]
+    uri = [c["uri"] for c in chips] if pair else chip["uri"]
+    prompt_sha = cfg.prompt_sha
+    if pair:
+        # The Batch's prompt is for one Chip; a Chip Pair gets the change prompt, and its Trace
+        # records that prompt's hash, not the Batch's.
+        prompt, prompt_sha = harness.CHANGE_PROMPT, cfg.change_prompt_sha
     tracer = Tracer(
         RunInfo(run_id=run_id, task="caption", case_id=case["id"], repeat=repeat,
-                batch_id=cfg.batch_id, model_id=cfg.caption_model, prompt_sha=cfg.prompt_sha,
-                tools=[], metadata={"chip_id": chip["id"], "chip_sha256": expected,
+                batch_id=cfg.batch_id, model_id=cfg.caption_model, prompt_sha=prompt_sha,
+                tools=[], metadata={"chip_id": [c["id"] for c in chips] if pair else chip["id"],
+                          "chip_sha256": shas if pair else shas[0],
                           "judge_model": cfg.judge_model}),
         [StoreSink(store), SummarySink(store)],
     )  # fmt: skip
     try:
         try:
-            # The verifier, not the model, gets the Chip's footprint (ADR-0009).
+            # The verifier, not the model, gets the Chip's footprint (ADR-0009). LGND's images
+            # aren't dated to a Chip Pair's two dates, so Change Cases aren't verified.
+            if pair:
+                verifier = None
             footprint = {"bbox": chip["bbox"], "date": chip.get("date")} if verifier else None
             cap, step = harness.caption(
-                client, cfg.caption_model, chip["id"], png, prompt, tracer, chip["uri"],
+                client, cfg.caption_model, chip["id"], png, prompt, tracer, uri,
                 toolbox, cfg.max_turns, verifier, footprint,
             )  # fmt: skip
         except harness.HarnessFault as e:
@@ -226,7 +244,7 @@ def _run_one(
         }  # fmt: skip
         if cfg.judge_model:
             try:
-                verdict, _ = fidelity(client, cfg.judge_model, cap, png, tracer, chip["uri"])
+                verdict, _ = fidelity(client, cfg.judge_model, cap, png, tracer, uri)
                 result["fidelity"] = verdict
             except (ClientError, BotoCoreError, RuntimeError) as e:
                 if isinstance(e, ClientError | BotoCoreError):
@@ -307,6 +325,9 @@ def create(
         tools=list(tools or []),
         verify=verify,
         judge_prompt_sha=_sha(judge_prompt) if judge else None,
+        change_prompt_sha=_sha(harness.CHANGE_PROMPT.encode())
+        if any(c.get("kind") == "change" for c in cases)
+        else None,
         ontology_version=onto_version,
         ontology_sha=onto_sha,
         chips_sha=_sha(chips),
@@ -336,6 +357,8 @@ def resume(batch_id: str, settings: Settings, store, progress=print, narrate: bo
     if cfg.judge_prompt_sha and _sha(provenance.judge_prompt().encode()) != cfg.judge_prompt_sha:
         # Finishing with a different rubric would mix two Judges in one Batch.
         raise ValueError(f"the Judge's rubric changed since {batch_id} started; start a new Batch")
+    if cfg.change_prompt_sha and _sha(harness.CHANGE_PROMPT.encode()) != cfg.change_prompt_sha:
+        raise ValueError(f"the change prompt changed since {batch_id} started; start a new Batch")
     client = bedrock(settings)  # models come from the Batch's own config, not the settings
     watch_retries(client)
     done = {(r["case_id"], r["repeat"]) for r in b["results"] if r["status"] != SANDBOX_FAILURE}

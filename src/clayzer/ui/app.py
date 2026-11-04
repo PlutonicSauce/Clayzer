@@ -191,7 +191,7 @@ def create_app(
             ]  # fmt: skip
             right = sum(c["verdict"] == "matched" and c["position_score"] == 1.0 for c in claims)
             out.append({
-                "case_id": case_id, "run_id": r["run_id"], "chip": case["chips"][0],
+                "case_id": case_id, "run_id": r["run_id"], "chip": case["chips"][-1],
                 "text": cap["text"], "claims": claims,
                 "labels": [{"object": lb["object"], "cells": lb["cells"]} for lb in case["reference_labels"]],
                 "missed": g.get("missed", []), "unscored": g.get("unscored", []),
@@ -305,7 +305,9 @@ def create_app(
             {
                 "id": c["id"],
                 "kind": c.get("kind", "fixed"),
-                "chip": c["chips"][0],
+                # A Change Case's labels sit on its later Chip; `chips` keeps the pair.
+                "chip": c["chips"][-1],
+                "chips": c["chips"],
                 "labels": c["reference_labels"],
                 "prep_seconds": c.get("prep_seconds"),
             }

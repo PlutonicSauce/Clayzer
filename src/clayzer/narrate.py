@@ -92,7 +92,12 @@ def digest(info: RunInfo, steps: list[Step]) -> str:
             lines.append(f"    output: {_clip(json.dumps(s.output, default=str))}")
             continue
         if isinstance(s.input, dict) and s.name == "caption":
-            lines.append(f"    asked about image {s.input.get('image', {}).get('key', '?')}")
+            image = s.input.get("image") or {}
+            if isinstance(image, list):  # a Change Case's Chip Pair, earlier first
+                lines.append("    asked about the image pair "
+                             + " then ".join(i.get("key", "?") for i in image))  # fmt: skip
+            else:
+                lines.append(f"    asked about image {image.get('key', '?')}")
         out = s.output if isinstance(s.output, dict) else {}
         for block in out.get("content", []):
             if "toolUse" in block:
