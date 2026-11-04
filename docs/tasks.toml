@@ -61,7 +61,7 @@ tier = "Must"
 status = "doing"
 closes = ["CAP-01", "CAP-16"]
 start = "uv run clayzer case uspvdb <id>  ·  src/clayzer/cases.py"
-notes = "4 built. Mix sizes and surroundings; include ordinary land (caption-plan.md §3)."
+notes = "63 built 2026-11-04: 30 solar (9 under 5 MW, 11 at 5 to 50 MW, 10 over 50 MW), 13 wind turbines from 13 projects, and 20 negatives (5 farmland, 4 residential, 2 industrial, 2 parking, 1 retail, 1 commercial, 4 open desert, and the first one, near Bakersfield), every Chip at least 1 km from the others; picked with a fixed seed from USGS and OSM. Left: the by-eye check of each Case's Reference Labels, and a new Baseline on the full set."
 context = "The regression gate is only as good as the Case set: with 4 Cases it can't see drops smaller than about 0.1 to 0.2. Build about 60 development Cases in Mojave/Tehachapi: about 40 positives (solar arrays and wind turbines of mixed sizes and surroundings) and about 20 negatives (farmland, towns, desert, look-alikes). Positives start from a USGS record; `clayzer case` offsets the Chip automatically so the site can land in any grid cell, and uses a NAIP image taken after the site was built."
 done_when = [
   "About 40 positive and 20 negative Cases in `cases/caption-dev.jsonl`",
@@ -105,7 +105,17 @@ step = "case"
 title = "Commit fixtures/caption/ (Cases + ~50 Chips) with an ODbL notice for OSM labels"
 area = "Data and Cases"
 tier = "Must"
-status = "todo"
+status = "done"
+notes = "Done 2026-11-04: the 63 development Cases (dev-cases) and their 63 Chips, 20 MB, with an ODbL notice; no URLs, tokens, or account ids in them. A teammate with no AWS account loads them with one command and sees them on the Cases page."
+see_it = "`uv run clayzer push --from fixtures/caption`, then `uv run clayzer ui` and open Cases. fixtures/caption/README.md says what's in the set."
+changes = [
+  "fixtures/caption/cases/caption-dev.jsonl: the 63 Cases and their Reference Labels",
+  "fixtures/caption/chips/: each Chip's PNG and JSON",
+  "fixtures/caption/cases/NOTICE.md: © OpenStreetMap contributors, ODbL 1.0, for the OSM-derived Reference Labels",
+  "fixtures/caption/README.md: what the set is and how to load it",
+  "README.md: Getting started loads the Cases before starting the web app; the first Batch runs on two Cases",
+  "tests/test_fixtures.py: every Case has its Chip, the notice is present, nothing private, and push fills an empty store a Batch runs on",
+]
 closes = ["REQ-15", "REQ-14"]
 start = "uv run clayzer push --from fixtures/caption (teammates load it into their bucket)"
 after = ["dev-cases"]
@@ -148,7 +158,15 @@ step = "case"
 title = "Use USPVDB polygons, not centroids, for solar positions and cells"
 area = "Data and Cases"
 tier = "Should"
-status = "todo"
+status = "done"
+notes = "Done 2026-11-04: solar labels come from USPVDB's array polygons (the GeoJSON download, v4.0 2026-04-14, cached in ~/.cache/clayzer and recorded on each Case as `answer_keys`). A cell counts when the panels cover at least 2% of it, and a site centred outside the Chip counts where its panels reach in. All 30 solar Cases relabelled: most large sites now cover every cell. Negatives are refused when a polygon reaches within 300 m (neg-18 was, and is replaced). Existing Batches keep the labels they froze; the next Baseline uses the new ones."
+see_it = "A solar Case's page (#/cases/fixed-dev-uspvdb-400117, Pine Tree Solar): the solar_array label lists every cell the panels cover."
+changes = [
+  "src/clayzer/answer_keys.py: uspvdb_outlines() loads the polygons; usgs_labels measures each cell they cover, falls back to the centroid without one, and keeps the turbine query to the Chip",
+  "src/clayzer/cases.py: positives search for arrays around the Chip, negatives are refused when a polygon is near, and each Case records its USPVDB version",
+  "fixtures/caption/cases/caption-dev.jsonl: the 30 solar Cases relabelled, and neg-18 replaced",
+  "tests/test_answer_keys.py: a multi-cell array, an array centred outside the Chip, the centroid fallback, and an edge sliver",
+]
 closes = ["CAP-10"]
 start = "src/clayzer/answer_keys.py usgs_labels"
 context = "Solar labels use the USPVDB centroid today, so an array that covers several cells is labelled in one, and a correct Claim in another of its cells scores as a neighbour. The USPVDB GeoJSON download has the array polygons: clip each to the Chip and record every cell it covers, as OSM labels already do."
@@ -267,6 +285,34 @@ done_when = [
 ]
 refs = [
   "docs/caption-design.md §3.5",
+  "ontology/objects.toml",
+]
+
+[[task]]
+id = "dataset-corroboration"
+step = "case"
+title = "Corroborate and enrich Case Reference Labels with SkyScript and MegaEarth"
+area = "Data and Cases"
+tier = "Could"
+status = "todo"
+closes = []
+start = "fixtures/caption/cases/caption-dev.jsonl; then the SkyScript repo and the MegaEarth dataset card"
+after = ["dev-cases"]
+context = "Our Reference Labels come from USGS and OSM, and nothing outside them checks those labels today. Two public datasets could. SkyScript (wangzhecheng/skyscript) pairs remote-sensing images, including a NAIP subset, with captions templated from OSM tags. MegaEarth (Mead0w1ark/megaearth-osm-sentinel2 on Hugging Face) pairs Sentinel-2 windows with OSM labels over 485 classes, split by geography. For each Case, find any image that overlaps its Chip and compare their labels with ours. Both label from OSM, so agreeing on an OSM class mostly shows the OSM snapshots match. The useful checks are USGS-labelled solar and wind (an outside source agreeing), and disagreement in either direction, which marks a Case to look at by eye. The second aim is enrichment: their labels can add objects our Answer Keys miss in a Chip, and their samples can suggest new Case locations for classes we have few of. An added label has to map to an ontology class (a missing class goes through ontology-review first), records which dataset it came from, and is checked by eye before it becomes a Reference Label. Sentinel-2 is 10 m against NAIP's 0.6 m, so only large objects compare. Neither dataset's captions are gold (caption-plan.md §3). Check each license first; download at run time, never commit."
+done_when = [
+  "Each dataset's license and coverage checked and added to docs/sources.toml",
+  "A script that, for each development Case, finds overlapping SkyScript or MegaEarth samples and lists where their labels agree or disagree with our Reference Labels",
+  "Disagreements reviewed by eye; any wrong Reference Label fixed or the Case replaced",
+  "Labels they add that our Answer Keys miss mapped to ontology classes, checked by eye, and added to the Cases with their source recorded",
+  "Candidate Case locations from their samples listed for classes with few Cases",
+  "Nothing from either dataset in git",
+]
+refs = [
+  "docs/caption-plan.md §3 (What scores what; SkyScript not gold)",
+  "docs/caption-design.md §1 (Auxiliary datasets row)",
+  "docs/tech-hackathon.md (datasets table)",
+  "docs/sources.toml",
+  "src/clayzer/answer_keys.py",
   "ontology/objects.toml",
 ]
 
@@ -675,10 +721,18 @@ step = "output"
 title = "Stop \"centre\" earning half credit for position on every Case"
 area = "Evaluation"
 tier = "Must"
-status = "decide"
+status = "done"
 closes = ["CAP-10"]
 start = "src/clayzer/grounding.py _position_score; caption-plan.md §8"
-notes = "The centre cell neighbours all 8 others, so a Claim at centre always scores at least 0.5. Options: no neighbour credit, or only along a row or column."
+notes = "Decided and done 2026-11-04: exact cell only, no neighbour credit. Row-and-column credit still left centre the safest blind guess (0.33 against 0.22 at a corner); exact cell gives 1/9 for every cell. With labels listing every cell an object covers, a near miss is a wrong cell. All 8 Batches rescored and base-v2 re-accepted as the Baseline (its position scores fall, e.g. 0.58 to 0.17 on one Case)."
+see_it = "uv run clayzer rescore <batch-id>: position counts only the cells the object covers"
+changes = [
+  "src/clayzer/grounding.py: _position_score gives 1 for a covered cell and 0 otherwise",
+  "src/clayzer/batch.py: SCORER_VERSION grounding-4, so the gate warns when comparing across the change",
+  "tests/test_grounding.py: neighbouring cells score 0, and guessing any cell earns 1/9",
+  "docs/caption-plan.md: the §8 risk resolved and a Position credit row in §10",
+  "baselines/default/: base-v2 re-accepted under the new scorer",
+]
 context = "A Claim one cell away from its label gets 0.5 for position. The centre cell neighbours all eight others, so a Claim at centre always earns at least 0.5: a safe guess the Proposer would learn to exploit. Options: no neighbour credit, or credit only along a row or column (not diagonally). This is a team decision first."
 done_when = [
   "The decision recorded in caption-plan.md §10",

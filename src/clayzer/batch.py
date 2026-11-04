@@ -50,7 +50,7 @@ from clayzer.workflow import score as workflow_score
 
 # Bump when grounding or summary logic changes, so the regression gate warns that scores from
 # before and after aren't comparable.
-SCORER_VERSION = "grounding-3+workflow-1"  # correctness and coverage; the Workflow Score
+SCORER_VERSION = "grounding-4+workflow-1"  # exact-cell position; the Workflow Score
 
 OK, HARNESS_FAULT, SANDBOX_FAILURE = "ok", "harness_fault", "sandbox_failure"
 EXPIRED = {
