@@ -1,5 +1,7 @@
 # Clayzer
 
+[![CI](https://github.com/PlutonicSauce/Clayzer/actions/workflows/ci.yml/badge.svg)](https://github.com/PlutonicSauce/Clayzer/actions/workflows/ci.yml)
+
 Caption generation and evaluation for the text-native Clay v2 model, built for the Clay Earth
 Dataset Foundry hackathon. The plan is [docs/caption-plan.md](docs/caption-plan.md); terms are
 in [GLOSSARY.md](GLOSSARY.md).
@@ -242,6 +244,27 @@ Leave out `-c store=...` to have the stack create a new bucket. With Podman, set
 `CDK_DOCKER=podman`. The hosted app never starts Batches, and its role can only read the store
 prefix. `npx aws-cdk@2 destroy` removes everything except the bucket.
 
+#### Deploying from CI
+
+CI deploys the same stack on every push to main, and on a manual run (Actions → CI → Run
+workflow) from any branch the `aws` environment allows. It assumes a role through GitHub's OIDC,
+so no AWS keys are stored in GitHub. Set it up once per account:
+
+1. From a laptop with that account's credentials, after `cdk bootstrap`:
+   ```sh
+   cd infra
+   npx aws-cdk@2 --app "uv run --group infra python github_oidc.py" deploy
+   ```
+   The role can only assume the CDK bootstrap roles, and only jobs in the `aws` environment can
+   assume it.
+2. In the repo's Settings → Environments, create `aws`. Limit it to `main` (and any branch you
+   want to deploy by hand), and add required reviewers if you want an approval step.
+3. Give it the secret `AWS_DEPLOY_ROLE_ARN` (the `RoleArn` output) and the variables `AWS_REGION`
+   (e.g. `us-west-2`) and `CLAYZER_STORE` (`s3://<bucket>/<prefix>`, the live store).
+
+The job builds the ARM64 image on an ARM runner, deploys, and checks `/api/config` on the
+CloudFront URL. The account ID is masked in the public logs.
+
 To build the image on its own: `docker build -t clayzer .` (see the
 [Dockerfile](Dockerfile) for mirror and proxy options).
 
@@ -250,6 +273,21 @@ To build the image on its own: `docker build -t clayzer .` (see the
 ```sh
 uv run pytest
 ```
+
+CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs on every push and PR. To run the
+same checks before you push:
+
+```sh
+uv run ruff check src tests
+uv run ruff format --check src tests
+uv run vulture
+uv run --extra ui --extra tools pytest --cov
+node tests/deck_smoke.mjs
+npx --yes jscpd@5.4.2 src --min-tokens 50 --threshold 3 --ignore "**/vendor/**"
+```
+
+Ruff also caps function complexity at 15. Vulture flags dead code, coverage must stay at or above
+75%, and duplicated code must stay under 3%.
 
 ### Not built yet
 
