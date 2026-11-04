@@ -18,8 +18,11 @@ From this checkout, run all dev chips:
 
 Output: `data/clay/dev-embeddings.jsonl`, plus `.meta.json` recording preprocessing,
 model path, device and elapsed time. Existing outputs require `--overwrite`.
-No checkpoints or embeddings are committed. No model download or cloud inference
-is performed. The script does not upload the checkpoint.
+The completed 63-chip dev export is committed at
+`data-embeddings/clay/dev-embeddings.jsonl`, with portable run metadata and its
+SHA-256 checksum in the adjacent `.meta.json` file. New inference outputs under
+`data/` remain ignored by Git. No checkpoint is committed, and no model download
+or cloud inference is performed. The script does not upload the checkpoint.
 
 Small native-resolution check:
 
