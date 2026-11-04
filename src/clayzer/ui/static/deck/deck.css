@@ -184,3 +184,10 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .ex-wrong span { white-space: nowrap; }
 .ex-wrong span::before { content: "· "; }
 .ex-wrong i { font-style: normal; font-weight: 600; color: var(--ink); }
+
+/* A slide that is one looping, muted video under its kicker. */
+.video-slide { align-items: center; }
+.video-slide .kicker { align-self: flex-start; }
+.slide-video { width: 100%; max-height: 640px; aspect-ratio: 16 / 9; border-radius: 14px;
+  border: 1px solid var(--line); background: var(--paper); object-fit: contain; }
+.video-slide .source { align-self: flex-start; margin-top: 14px; }

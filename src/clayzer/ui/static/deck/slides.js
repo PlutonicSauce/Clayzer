@@ -108,6 +108,17 @@ function Downstream() {
   </div>`;
 }
 
+// The example search, animated (HyperFrames project in ../Clayzer-videos/flood-search-motion).
+// It loops muted; the deck mounts one slide at a time, so it starts from the top on arrival.
+function ExampleSearch() {
+  return html`<div class="video-slide">
+    <${Kicker}>Example · searching in words<//>
+    <video class="slide-video" src="static/deck/media/flood-search.mp4" poster="static/deck/media/flood-search-poster.jpg" autoplay muted loop playsInline
+      aria-label="A text search for the economic impact of flooding in Bangkok and access to aid returns four images whose checked captions match: a flooded district, a market and road under water, a relief site on dry ground, and an open route from the relief site to the flooded district. Then: results are only as good as the captions; Clayzer checks them."></video>
+    <p class="source">Illustrative: not real search results.</p>
+  </div>`;
+}
+
 function Next() {
   return html`<div class="title-slide closing">
     <${Kicker}>What it means for Clay<//>
@@ -120,8 +131,8 @@ function Next() {
   </div>`;
 }
 
-// Eight slides, exactly 4:00: problem, one real caption and its answer key, the architecture as
-// a story, the novel ideas, the site, the downstream value for Clay v2, and the close. Results
+// Nine slides, exactly 4:00: problem, one real caption and its answer key, the architecture as
+// a story, the novel ideas, the site, the downstream value for Clay, an example search, and the close. Results
 // ride on the demo's live Overview; scale rides on the downstream slide.
 export const SLIDES = [
   { title: "Clayzer", seconds: 10, theme: "dark", component: Title,
@@ -139,12 +150,15 @@ export const SLIDES = [
   { title: "Our approach · what's new", seconds: 35, component: Approach,
     spoken: "Three things set this apart. Verify-then-write: each claim is checked against imagery as the caption is written. Hidden answer keys: the captioner never sees the ground truth, so a good score is earned. And an ontology learned from captions and fed back into the model, so it confuses a greenhouse for a solar array less often. It scores captions and teaches the next ones.",
     notes: ["Verify-then-write, hidden keys, the ontology that feeds the model.", "The loop: the ontology scores AND teaches, proven by the gate."] },
-  { title: "Live demo", seconds: 45, component: Demo,
+  { title: "Live demo", seconds: 35, component: Demo,
     spoken: "Now the site. The overview shows the current baseline. A caption, with each claim marked supported or not, right on the image. The report, five criteria side by side, which can read itself aloud. And compare to baseline: the gate says better, worse, or inconclusive.",
     notes: ["Overview → a Caption on its grid → report and Listen → Compare.", "Keep the recorded Batch open as the offline fallback."] },
-  { title: "Downstream value", seconds: 30, component: Downstream,
-    spoken: "Why this matters for Clay. Imagery and public records go into Clayzer. We write each caption from the image alone, then check every fact against the records. Only pairs that pass go on to Clay, which makes the imagery searchable in words. Search for floods in Thailand, and you get the images whose captions say so. That search is only as good as the captions, and that is what we check.",
+  { title: "Downstream value", seconds: 22, component: Downstream,
+    spoken: "Why this matters for Clay. Imagery and public records go into Clayzer. We write each caption from the image alone and check every fact against the records. Only pairs that pass go on to Clay, which makes the imagery searchable in words.",
     notes: ["Left to right: public data, Clayzer (our part, the dashed box), Clay.", "The line to land: search results are only as good as the captions behind them.", "The Thailand flood search is an illustration: our Cases today are US solar, wind and land cover. Don't imply we have run it.", "The dashed loop back is planned, not built: say 'next'."] },
+  { title: "Example search", seconds: 18, component: ExampleSearch,
+    spoken: "Here is what that looks like. Ask in plain words, like the economic impact of flooding in Bangkok and access to aid, and you get the images whose checked captions match: flooded streets, a market under water, a relief site, and the route to reach it.",
+    notes: ["Let the video play; it loops every 16 s.", "Illustrative, not real results: don't imply we have run this search."] },
   { title: "What it means for Clay", seconds: 20, theme: "dark", component: Next,
     spoken: "Hand Clayzer a caption set and get a verdict: how much to trust, where it fails, what it costs to fix. Our ask is Clay's real caption set and its rubric weights. And any slide here reads itself aloud.",
     notes: ["Close on the ask: Clay's real caption set and its rubric weights.", "Mention Listen (A) as the accessibility point."] },
