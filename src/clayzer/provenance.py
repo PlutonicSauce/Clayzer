@@ -108,7 +108,8 @@ def chip_manifest(store, cases: list[dict]) -> dict[str, str]:
     """Every Chip's store key -> the SHA-256 of its image, as the Batch starts."""
     uris = sorted({chip["uri"] for case in cases for chip in case["chips"]})
     with ThreadPoolExecutor(8) as pool:
-        return dict(zip(uris, pool.map(lambda u: hashlib.sha256(store.get(u)).hexdigest(), uris)))
+        hashes = pool.map(lambda u: hashlib.sha256(store.get(u)).hexdigest(), uris)
+        return dict(zip(uris, hashes, strict=True))
 
 
 def allowed_file(name: str) -> bool:

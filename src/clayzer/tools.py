@@ -146,7 +146,7 @@ class Toolbox:
             raise
         return self
 
-    def __exit__(self, *exc) -> None:
+    def __exit__(self, *_exc) -> None:
         if self._stack is not None:
             # A server that won't shut down mustn't hide the error that got us here.
             with contextlib.suppress(Exception):

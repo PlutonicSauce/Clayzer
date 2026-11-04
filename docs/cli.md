@@ -259,3 +259,8 @@ Leave out `-c store=...` to have the stack create a new bucket. With Podman, set
 `CDK_DOCKER=podman`. The hosted app never starts Batches, and its role can only read the store
 prefix. `npx aws-cdk@2 destroy` removes everything except the bucket. To build the image on its
 own: `docker build -t clayzer .` (see the [Dockerfile](../Dockerfile)).
+
+CI ([.github/workflows/ci.yml](../.github/workflows/ci.yml)) can deploy the same stack on every
+push to main, assuming a role through GitHub's OIDC so no AWS keys are stored in GitHub.
+[deploy.md](deploy.md) walks through the manual deploy, what each step becomes in CI, and the
+one-time setup the CI deploy needs.
