@@ -25,7 +25,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from botocore.exceptions import BotoCoreError, ClientError
 
 from clayzer import harness
-from clayzer.agentcore import contract
+from clayzer.agentcore import contract, telemetry
 from clayzer.agentcore.contract import ContractError, RunRequest, RunResponse
 from clayzer.mcp_auth import NotSignedIn
 from clayzer.trace import RunInfo, Tracer, watch_retries
@@ -98,26 +98,62 @@ def run_request(request: RunRequest, client, cache: ToolboxCache) -> RunResponse
         [],
     )  # fmt: skip
     versions: dict = {}
-    try:
-        model_tools, verifier, versions = cache.get(request.tools, request.verify)
-        cap, step = harness.caption(
-            client, request.model, request.chip_id, png, request.prompt, tracer,
-            request.image_key, model_tools, request.max_turns, verifier, request.footprint,
-        )  # fmt: skip
-        return _response(tracer, versions, caption=cap, step=step)
-    except harness.HarnessFault as e:
-        return _response(
-            tracer, versions, step=e.step,
-            error={"kind": contract.HARNESS_FAULT, "code": "HarnessFault", "message": str(e)[:1000]},
-        )  # fmt: skip
-    except NotSignedIn as e:
-        return RunResponse.failure(contract.NOT_SIGNED_IN, "NotSignedIn", str(e), build=build())
-    except (ClientError, BotoCoreError) as e:
-        code = e.response["Error"]["Code"] if isinstance(e, ClientError) else type(e).__name__
-        return _response(
-            tracer, versions,
-            error={"kind": contract.BEDROCK, "code": code, "message": str(e)[:1000]},
-        )  # fmt: skip
+    # One parent span per Run for AgentCore Observability (telemetry.py). The ADOT
+    # auto-instrumentation traces the Bedrock and tool-server HTTP calls underneath it; after the
+    # Run, each Trace Step becomes a child span so the tool call and each model turn are visible.
+    with telemetry.span(
+        "caption", **{"gen_ai.operation.name": "caption", "gen_ai.request.model": request.model,
+                      "clayzer.chip_id": request.chip_id, "clayzer.tools": ",".join(request.tools),
+                      "clayzer.verify": request.verify or ""},
+    ):  # fmt: skip
+        try:
+            model_tools, verifier, versions = cache.get(request.tools, request.verify)
+            cap, step = harness.caption(
+                client, request.model, request.chip_id, png, request.prompt, tracer,
+                request.image_key, model_tools, request.max_turns, verifier, request.footprint,
+            )  # fmt: skip
+            _spans_from_trace(tracer)
+            telemetry.add_event(
+                "caption.submitted", **{"gen_ai.response.finish_reason": "submit_caption"}
+            )
+            return _response(tracer, versions, caption=cap, step=step)
+        except harness.HarnessFault as e:
+            _spans_from_trace(tracer)
+            telemetry.add_event("caption.harness_fault", **{"error.message": str(e)[:200]})
+            return _response(
+                tracer, versions, step=e.step,
+                error={"kind": contract.HARNESS_FAULT, "code": "HarnessFault", "message": str(e)[:1000]},
+            )  # fmt: skip
+        except NotSignedIn as e:
+            return RunResponse.failure(contract.NOT_SIGNED_IN, "NotSignedIn", str(e), build=build())
+        except (ClientError, BotoCoreError) as e:
+            _spans_from_trace(tracer)
+            code = e.response["Error"]["Code"] if isinstance(e, ClientError) else type(e).__name__
+            return _response(
+                tracer, versions,
+                error={"kind": contract.BEDROCK, "code": code, "message": str(e)[:1000]},
+            )  # fmt: skip
+
+
+def _spans_from_trace(tracer) -> None:
+    """Emit one child span per recorded Step, so the OTEL trace shows each model turn and tool
+    call. The Trace itself (trace.py) is the full record; these are the readable export."""
+    for s in tracer.steps:
+        a = s.attributes or {}
+        if s.kind == "tool":
+            attrs = {"gen_ai.operation.name": "execute_tool", "gen_ai.tool.name": s.name,
+                     "clayzer.tool.server": a.get("server"), "clayzer.tool.is_error": a.get("is_error"),
+                     "clayzer.tool.error_code": a.get("error_code")}  # fmt: skip
+        elif s.kind == "llm":
+            usage = a.get("usage") or {}
+            attrs = {"gen_ai.operation.name": "chat", "gen_ai.request.model": a.get("model_id"),
+                     "gen_ai.usage.input_tokens": usage.get("inputTokens"),
+                     "gen_ai.usage.output_tokens": usage.get("outputTokens")}  # fmt: skip
+        else:
+            attrs = {"gen_ai.operation.name": s.kind}
+        attrs["clayzer.latency_ms"] = a.get("latency_ms")
+        with telemetry.span(f"{s.kind}.{s.name}", **attrs):
+            pass
 
 
 def answer(body: bytes, client, cache: ToolboxCache) -> RunResponse:
@@ -159,6 +195,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(404, b'{"error": "not found"}')
         length = int(self.headers.get("Content-Length", 0))
         body = self.rfile.read(length)
+        # Tie every span of this Run to the caller's session, so the dashboard groups a Batch's
+        # Runs together (the header AgentCore forwards, or OTEL's own trace otherwise).
+        session = self.headers.get("X-Amzn-Bedrock-AgentCore-Runtime-Session-Id")
+        token = telemetry.set_session(session) if session else None
         with type(self)._count:
             type(self).busy += 1
         try:
@@ -166,6 +206,7 @@ class Handler(BaseHTTPRequestHandler):
         finally:
             with type(self)._count:
                 type(self).busy -= 1
+            telemetry.detach(token)
         self._send(200, response.to_json())
 
     def log_message(self, fmt, *args) -> None:  # one line per request, to the container log

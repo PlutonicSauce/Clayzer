@@ -28,8 +28,15 @@ COPY src/clayzer/agentcore ./src/clayzer/agentcore
 COPY ontology ./ontology
 ARG BUILD=unknown
 ENV PYTHONPATH=/app/src \
-    CLAYZER_BUILD=${BUILD}
+    CLAYZER_BUILD=${BUILD} \
+    OTEL_PYTHON_DISTRO=aws_distro \
+    OTEL_PYTHON_CONFIGURATOR=aws_configurator \
+    OTEL_SERVICE_NAME=clayzer-harness \
+    OTEL_RESOURCE_ATTRIBUTES=service.name=clayzer-harness \
+    OTEL_TRACES_EXPORTER=otlp
 RUN useradd --create-home clayzer && chown -R clayzer /app
 USER clayzer
 EXPOSE 8080
-CMD ["python", "-m", "clayzer.agentcore.runtime"]
+# AgentCore Observability: run under ADOT auto-instrumentation so Bedrock and HTTP calls are
+# traced and exported to CloudWatch. telemetry.py adds the named caption/turn/tool spans on top.
+CMD ["opentelemetry-instrument", "python", "-m", "clayzer.agentcore.runtime"]

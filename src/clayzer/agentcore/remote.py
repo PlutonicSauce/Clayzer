@@ -14,6 +14,9 @@ Run is scored by exactly the same code whichever Harness produced the Caption. W
 
 from __future__ import annotations
 
+import urllib.error
+import urllib.parse
+import urllib.request
 import uuid
 
 from botocore.exceptions import ClientError
@@ -21,12 +24,14 @@ from botocore.exceptions import ClientError
 from clayzer import harness
 from clayzer.agentcore import contract
 from clayzer.agentcore.contract import ContractError, RunRequest, RunResponse
+from clayzer.agentcore.inbound import InboundAuth, InboundTokens
 from clayzer.mcp_auth import NotSignedIn
 from clayzer.trace import Step
 
 # A Run can take minutes: eight model turns, each with tool calls, then verification. The default
 # 60 s read timeout would cut it off.
 READ_TIMEOUT = 900
+SESSION_HEADER = "X-Amzn-Bedrock-AgentCore-Runtime-Session-Id"
 
 
 def runtime_client(region: str | None = None):
@@ -43,10 +48,18 @@ def region_of(arn: str) -> str:
     return arn.split(":")[3]
 
 
+def _invocation_url(runtime_arn: str, qualifier: str = "DEFAULT") -> str:
+    region = region_of(runtime_arn)
+    encoded = urllib.parse.quote(runtime_arn, safe="")
+    return (f"https://bedrock-agentcore.{region}.amazonaws.com/runtimes/{encoded}"
+            f"/invocations?qualifier={qualifier}")  # fmt: skip
+
+
 class RemoteHarness:
     """Runs the Harness in an AgentCore Runtime."""
 
-    def __init__(self, runtime_arn: str, client=None, session_id: str | None = None):
+    def __init__(self, runtime_arn: str, client=None, session_id: str | None = None,
+                 inbound: InboundAuth | None = None, opener=None):  # fmt: skip
         self.runtime_arn = runtime_arn
         self._client = client
         # One session for the Batch: the Runtime keeps its tool connections between Runs. The
@@ -54,6 +67,13 @@ class RemoteHarness:
         self.session_id = session_id or f"clayzer-{uuid.uuid4().hex}"
         self.versions: dict = {}  # what the Runtime's MCP servers reported
         self.build: str | None = None  # which build of the Runtime image answered
+        # When the endpoint has inbound OAuth, invoke it over HTTPS with a bearer token minted by
+        # Cognito (inbound.py). Without it, the SigV4 boto3 call (the client property) is used.
+        if inbound is None:
+            inbound = InboundAuth.from_env()
+        self._opener = opener or urllib.request.build_opener(urllib.request.ProxyHandler())
+        # Token minting and the invoke share one opener, so a proxy or custom TLS applies to both.
+        self._inbound = InboundTokens(inbound, self._opener) if inbound else None
 
     @property
     def client(self):
@@ -62,12 +82,36 @@ class RemoteHarness:
         return self._client
 
     def _invoke(self, request: RunRequest) -> RunResponse:
+        if self._inbound is not None:
+            return self._invoke_https(request)
         reply = self.client.invoke_agent_runtime(
             agentRuntimeArn=self.runtime_arn, runtimeSessionId=self.session_id,
             contentType="application/json", accept="application/json",
             payload=request.to_json(),
         )  # fmt: skip
         return RunResponse.from_json(reply["response"].read())
+
+    def _invoke_https(self, request: RunRequest, retry: bool = True) -> RunResponse:
+        """Invoke the JWT-protected endpoint with a bearer token. On a 401/403 (an expired
+        token), mint a fresh one and retry once; any other HTTP error is an environment fault."""
+        token = self._inbound.token()
+        http = urllib.request.Request(
+            _invocation_url(self.runtime_arn), data=request.to_json(), method="POST",
+            headers={"Content-Type": "application/json", "Accept": "application/json",
+                     "Authorization": f"Bearer {token}", SESSION_HEADER: self.session_id},
+        )  # fmt: skip
+        try:
+            with self._opener.open(http, timeout=READ_TIMEOUT) as reply:
+                return RunResponse.from_json(reply.read())
+        except urllib.error.HTTPError as e:
+            if e.code in (401, 403) and retry:
+                self._inbound.token(force=True)
+                return self._invoke_https(request, retry=False)
+            body = e.read().decode()[:300]
+            raise ClientError(
+                {"Error": {"Code": f"AgentCoreInbound{e.code}", "Message": body}},
+                "InvokeAgentRuntime",
+            ) from e
 
     def caption(self, cfg, chip: dict, png: bytes, prompt: str, tracer, footprint: dict | None):
         """Caption one Chip in the Runtime. Returns (Caption, step) like harness.caption."""

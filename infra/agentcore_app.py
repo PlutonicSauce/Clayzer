@@ -31,6 +31,7 @@ from pathlib import Path
 
 import aws_cdk as cdk
 from aws_cdk import aws_bedrockagentcore as agentcore
+from aws_cdk import aws_cognito as cognito
 from aws_cdk import aws_ecr_assets as ecr_assets
 from aws_cdk import aws_iam as iam
 from constructs import Construct
@@ -149,6 +150,32 @@ class AgentCoreStack(cdk.Stack):
             resources=[client_secret],
         ))  # fmt: skip
 
+        # Inbound OAuth on the endpoint: AgentCore Identity validates a JWT before the agent runs.
+        # The provider is a Cognito user pool with a client-credentials app client, since a Batch
+        # is a machine caller and LGND's user-login provider can't mint machine tokens.
+        pool = cognito.UserPool(self, "InboundPool", removal_policy=cdk.RemovalPolicy.DESTROY)
+        domain = pool.add_domain(
+            "InboundDomain",
+            cognito_domain=cognito.CognitoDomainOptions(
+                domain_prefix=f"clayzer-{self.account}-{self.region}"
+            ),
+        )
+        scope = cognito.ResourceServerScope(
+            scope_name="invoke", scope_description="Invoke the Harness"
+        )
+        resource_server = pool.add_resource_server(
+            "InboundResourceServer", identifier="clayzer-runtime", scopes=[scope]
+        )
+        client = pool.add_client(
+            "InboundClient",
+            generate_secret=True,
+            o_auth=cognito.OAuthSettings(
+                flows=cognito.OAuthFlows(client_credentials=True),
+                scopes=[cognito.OAuthScope.resource_server(resource_server, scope)],
+            ),
+        )
+        pool_url = f"https://cognito-idp.{self.region}.amazonaws.com/{pool.user_pool_id}"
+
         runtime = agentcore.CfnRuntime(
             self, "Runtime", agent_runtime_name=RUNTIME_NAME,
             description="The Clayzer caption Harness (draft, verify, rewrite) and its tools",
@@ -162,6 +189,12 @@ class AgentCoreStack(cdk.Stack):
                 network_mode="PUBLIC"
             ),
             protocol_configuration="HTTP",
+            authorizer_configuration=agentcore.CfnRuntime.AuthorizerConfigurationProperty(
+                custom_jwt_authorizer=agentcore.CfnRuntime.CustomJWTAuthorizerConfigurationProperty(
+                    discovery_url=f"{pool_url}/.well-known/openid-configuration",
+                    allowed_clients=[client.user_pool_client_id],
+                )
+            ),
             environment_variables={
                 "AWS_REGION": self.region,
                 "CLAYZER_TOKEN_SOURCE": "agentcore",  # the LGND sign-in comes from Identity
@@ -179,6 +212,18 @@ class AgentCoreStack(cdk.Stack):
                       description="Set CLAYZER_AGENTCORE_RUNTIME to this")  # fmt: skip
         cdk.CfnOutput(self, "RuntimeRoleArn", value=role.role_arn)
         cdk.CfnOutput(self, "Build", value=build)
+        # Inbound OAuth: what a Batch needs to mint a token. The client secret is not an output
+        # (CloudFormation won't expose it); read it with the printed command.
+        cdk.CfnOutput(self, "InboundTokenUrl", value=f"{domain.base_url()}/oauth2/token",
+                      description="CLAYZER_AGENTCORE_INBOUND_TOKEN_URL")  # fmt: skip
+        cdk.CfnOutput(self, "InboundClientId", value=client.user_pool_client_id,
+                      description="CLAYZER_AGENTCORE_INBOUND_CLIENT_ID")  # fmt: skip
+        cdk.CfnOutput(self, "InboundScope", value="clayzer-runtime/invoke",
+                      description="CLAYZER_AGENTCORE_INBOUND_SCOPE")  # fmt: skip
+        cdk.CfnOutput(self, "InboundClientSecretCommand", value=(
+            f"aws cognito-idp describe-user-pool-client --user-pool-id {pool.user_pool_id} "
+            f"--client-id {client.user_pool_client_id} --query UserPoolClient.ClientSecret --output text"),
+            description="Prints the inbound client secret for CLAYZER_AGENTCORE_INBOUND_CLIENT_SECRET")  # fmt: skip
 
 
 def main() -> None:
