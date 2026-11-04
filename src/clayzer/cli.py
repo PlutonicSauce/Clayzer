@@ -10,7 +10,8 @@ clayzer batch --resume <batch-id>           finish a Batch (expired credentials,
 clayzer batches                             list Batches
 clayzer report <batch-id>                   rebuild a Batch's report.md and report.html
 clayzer rescore <batch-id>                  score stored Captions again with the current scorer
-clayzer trace <batch-id> <case-id> [-r N]   show one Run's Trace, Step by Step
+clayzer trace <batch-id> <case-id> [-r N]   show one Run's summary and Trace, Step by Step
+clayzer summarize <batch-id>                rebuild every Run's summary from its Trace, offline
 clayzer compare <batch-a> <batch-b>         what changed, and by how much
 clayzer baseline accept <batch-id>          make a Batch the Baseline (baselines/<name>/)
 clayzer gate <batch-id>                     regression gate: exit 0 pass, 1 fail, 2 inconclusive
@@ -20,6 +21,7 @@ Everything is read from and written to the store: local folders, or CLAYZER_STOR
 """
 
 import argparse
+import json
 import sys
 from dataclasses import replace
 from pathlib import Path
@@ -105,6 +107,8 @@ def main(argv: list[str] | None = None) -> int:
     b.add_argument("--only", nargs="*", help="Case ids to run")
     b.add_argument("--no-judge", action="store_true", help="skip the fidelity Judge")
     b.add_argument("--resume", metavar="BATCH_ID", help="finish an existing Batch")
+    b.add_argument("--no-narrate", action="store_true",
+                   help="skip the model-written Trace summaries")  # fmt: skip
 
     sub.add_parser("batches", help="list Batches in the store")
     rp = sub.add_parser("report", help="rebuild a Batch's reports")
@@ -118,6 +122,12 @@ def main(argv: list[str] | None = None) -> int:
     tr.add_argument("case_id")
     tr.add_argument("-r", "--repeat", type=int, default=1)
     tr.add_argument("--json", action="store_true", help="print the raw Trace")
+
+    sm = sub.add_parser("summarize", help="rebuild every Run's summary from its Trace, offline")
+    sm.add_argument("batch_id")
+    sm.add_argument("--narrate", action="store_true",
+                    help="also have a model write missing narratives (needs Bedrock)")  # fmt: skip
+    sm.add_argument("--force", action="store_true", help="with --narrate, rewrite all of them")
 
     cp = sub.add_parser("compare", help="compare two Batches")
     cp.add_argument("a")
@@ -178,7 +188,7 @@ def main(argv: list[str] | None = None) -> int:
 
         if a.resume:
             print(f"resuming {a.resume}")
-            summary = batches.resume(a.resume, settings, store)
+            summary = batches.resume(a.resume, settings, store, narrate=not a.no_narrate)
             batch_id = a.resume
         else:
             cases = load_cases(store, key)
@@ -196,6 +206,7 @@ def main(argv: list[str] | None = None) -> int:
             batch_id = batches.start(
                 cases, settings, store, a.repeats, a.label, a.region, prompt,
                 str(a.prompt) if a.prompt else "built-in", judge=not a.no_judge,
+                narrate=not a.no_narrate,
             )  # fmt: skip
             summary = batches.load(store, batch_id)["summary"]
         print(f"Batch {batch_id} in {store.url(f'batches/{batch_id}/')}")
@@ -245,6 +256,16 @@ def main(argv: list[str] | None = None) -> int:
             print(body.decode(), end="")
             return 0
         info, steps = loads(body)
+        from clayzer.narrate import narrative_key
+        from clayzer.summarize import summarize, to_markdown
+
+        nkey = narrative_key(a.batch_id, a.case_id, a.repeat)
+        if store.exists(nkey):
+            narrative = json.loads(store.get(nkey))
+            print(narrative["markdown"])
+            print(f"\n(written by {narrative['model']} from this Trace)\n")
+        else:
+            print(to_markdown(summarize(info, steps)))
         took = (info.ended_at or info.started_at) - info.started_at
         print(f"Run {info.run_id} · {info.status} · {took:.1f} s · {info.model_id}")
         if info.error:
@@ -268,6 +289,22 @@ def main(argv: list[str] | None = None) -> int:
             )
         if info.final_answer:
             print(f"  Caption: {info.final_answer}")
+        return 0
+
+    if a.cmd == "summarize":
+        from clayzer.batch import _key, _load_jsonl, resummarize
+
+        if a.narrate:
+            from clayzer.config import bedrock
+            from clayzer.narrate import narrate_batch
+
+            results = _load_jsonl(store, _key(a.batch_id, "results.jsonl"))
+            counts = narrate_batch(bedrock(settings), store, a.batch_id, results, force=a.force)
+            print(f"narratives: {counts['written']} written, {counts['skipped']} already up to date, "
+                  f"{counts['no trace']} Runs without a Trace, {counts['rejected']} rejected, "
+                  f"{counts['failed']} failed")  # fmt: skip
+        n = resummarize(a.batch_id, store)
+        print(f"rebuilt {n} summaries for {a.batch_id} from their Traces; reports updated")
         return 0
 
     if a.cmd == "compare":

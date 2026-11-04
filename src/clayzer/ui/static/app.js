@@ -75,9 +75,9 @@ const FLOW = [
   },
   {
     key: "summarize", phase: "observe", title: "Summarize", sub: "what the agent did, where it struggled", area: "Platform",
-    what: "Each raw Trace becomes a short, readable account of the Run: which tools the Harness called and why, which Claims it verified or dropped, what failed, and whether it recovered.",
+    what: "Each Trace becomes a short, readable account of the Run: what the Harness did, where it struggled and whose fault, and a one-line verdict. A model writes it from the Trace alone, once, and it's saved so replays never call a model; the code-written facts sit under it and stand in when there's no narrative. A narrative that names a fault the Trace doesn't have is rejected.",
     why: "Clay's explicit ask is to “summarize traces from agentic activity”. A summary is what a person reads before trusting a score, and what a Proposer would read to suggest the next change.",
-    code: ["batches/<batch-id>/traces/", "the Sandbox's summarize.py (to port)"],
+    code: ["src/clayzer/summarize.py (facts, in code)", "src/clayzer/narrate.py (narrative, by a model)", "uv run clayzer summarize <batch-id> [--narrate]", "uv run clayzer trace <batch-id> <case-id>"],
   },
   {
     key: "workflow", phase: "score", title: "Workflow Score", sub: "how it worked, from the Trace", area: "Evaluation",

@@ -39,6 +39,7 @@ from clayzer.config import Settings, bedrock
 from clayzer.grounding import grounding
 from clayzer.judge import fidelity
 from clayzer.retrieval import retrieval
+from clayzer.summarize import SummarySink
 from clayzer.trace import RunInfo, StoreSink, Tracer, watch_retries
 
 # Bump when grounding or summary logic changes, so the regression gate warns that scores from
@@ -146,7 +147,7 @@ def _run_one(client, cfg: BatchConfig, prompt: str, case: dict, repeat: int, sto
         RunInfo(run_id=run_id, task="caption", case_id=case["id"], repeat=repeat,
                 batch_id=cfg.batch_id, model_id=cfg.caption_model, prompt_sha=cfg.prompt_sha,
                 tools=[], metadata={"chip_id": chip["id"], "judge_model": cfg.judge_model}),
-        [StoreSink(store)],
+        [StoreSink(store), SummarySink(store)],
     )  # fmt: skip
     try:
         try:
@@ -210,10 +211,11 @@ def start(
     prompt_source: str = "built-in",
     judge: bool = True,
     progress=print,
+    narrate: bool = True,
 ) -> str:
     """Create a Batch and run it. Returns the Batch id."""
     batch_id = create(cases, settings, store, repeats, label, region, prompt, prompt_source, judge)
-    resume(batch_id, settings, store, progress)
+    resume(batch_id, settings, store, progress, narrate)
     return batch_id
 
 
@@ -255,8 +257,9 @@ def create(
     return batch_id
 
 
-def resume(batch_id: str, settings: Settings, store, progress=print) -> dict:
-    """Run every Run the Batch doesn't have a final outcome for, then summarize."""
+def resume(batch_id: str, settings: Settings, store, progress=print, narrate: bool = True) -> dict:
+    """Run every Run the Batch doesn't have a final outcome for, then summarize. With `narrate`,
+    a model writes a readable summary of each Run's Trace, saved for replay (narrate.py)."""
     b = load(store, batch_id)
     cfg, cases = b["config"], b["cases"]
     prompt = store.get(_key(batch_id, "prompt.txt")).decode()
@@ -282,6 +285,10 @@ def resume(batch_id: str, settings: Settings, store, progress=print) -> dict:
         store.put(_key(batch_id, "captions.jsonl"), to_jsonl(captions), NDJSON)
 
     retr = [] if stopped else _retrieval(client, cfg, cases, captions)
+    if narrate and not stopped:
+        from clayzer.narrate import narrate_batch
+
+        narrate_batch(client, store, batch_id, results, progress=progress)
     store.put(_key(batch_id, "retrieval.jsonl"), to_jsonl(retr), NDJSON)
     summary = summarize(cfg, cases, results, retr)
     summary["stopped"] = stopped
@@ -418,11 +425,53 @@ def rescore(batch_id: str, store) -> dict:
     return summary
 
 
+def load_summaries(store, batch_id: str, results: list[dict]) -> dict:
+    """Each Run's Trace summary, keyed by (case id, repeat); Runs without one are left out."""
+    from clayzer.summarize import summary_key
+
+    out = {}
+    for r in results:
+        key = summary_key(batch_id, r["case_id"], r["repeat"])
+        if store.exists(key):
+            out[(r["case_id"], r["repeat"])] = json.loads(store.get(key))
+    return out
+
+
+def load_narratives(store, batch_id: str, results: list[dict]) -> dict:
+    """Each Run's saved model-written narrative, keyed by (case id, repeat)."""
+    from clayzer.narrate import narrative_key
+
+    out = {}
+    for r in results:
+        key = narrative_key(batch_id, r["case_id"], r["repeat"])
+        if store.exists(key):
+            out[(r["case_id"], r["repeat"])] = json.loads(store.get(key))
+    return out
+
+
+def resummarize(batch_id: str, store) -> int:
+    """Rebuild every Run's summary from its recorded Trace, with no model or network beyond the
+    store. Returns how many were written."""
+    from clayzer.summarize import SummarySink
+    from clayzer.trace import loads, trace_key
+
+    sink, n = SummarySink(store), 0
+    for r in _load_jsonl(store, _key(batch_id, "results.jsonl")):
+        key = trace_key(batch_id, r["case_id"], r["repeat"])
+        if store.exists(key):
+            sink.write(*loads(store.get(key)))
+            n += 1
+    write_reports(store, batch_id)
+    return n
+
+
 def write_reports(store, batch_id: str) -> None:
     from clayzer.report import render
     from clayzer.report_html import render_html
 
     b = load(store, batch_id)
+    b["summaries"] = load_summaries(store, batch_id, b["results"])
+    b["narratives"] = load_narratives(store, batch_id, b["results"])
     store.put(_key(batch_id, "report.md"), render(b).encode(), "text/markdown")
     html = render_html(b, store).encode()
     store.put(_key(batch_id, "report.html"), html, "text/html; charset=utf-8")

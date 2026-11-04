@@ -60,6 +60,14 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .b-warn { color: var(--warn); border-color: #e3cfa8; background: #fbf4e6; }
 .b-na { color: var(--muted); border-color: var(--line); background: #f7f3f1; }
 ul.issues { margin: 4px 0; padding-left: 18px; }
+.trace-summary { margin: 10px 0; padding: 10px 14px; border-radius: 8px; background: #faf6f3;
+  border: 1px solid var(--line); }
+.trace-summary .verdict { margin: 0 0 4px; font-weight: 650; }
+.trace-summary ol, .trace-summary ul { margin: 2px 0 6px; padding-left: 20px; font-size: 13.5px; }
+.trace-summary h3 { margin: 8px 0 2px; }
+.trace-summary.narrative p { margin: 4px 0; }
+.trace-summary .facts { margin-top: 8px; border: 0; padding: 0; }
+.trace-summary .facts .trace-summary { background: #fff; }
 details { border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; margin: 6px 0; }
 details > summary { cursor: pointer; }
 small { color: var(--muted); }
@@ -228,13 +236,84 @@ def _ms(d: dict | None) -> str:
     return _badge(d["mean"]) + spread
 
 
-def _repeat_row(r: dict, cap: dict | None, labels: list[dict]) -> str:
-    """One Repeat: a summary line that opens into its Caption, Claims, and Judge notes."""
+def _markdown(text: str) -> str:
+    """The small Markdown a narrative uses (### headings, - bullets, **bold**), as escaped HTML."""
+    import re
+
+    html, items = [], []
+
+    def flush():
+        if items:
+            html.append("<ul>" + "".join(f"<li>{i}</li>" for i in items) + "</ul>")
+            items.clear()
+
+    for line in text.splitlines():
+        line = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", escape(line.strip()))
+        if not line:
+            flush()
+        elif line.startswith("### "):
+            flush()
+            html.append(f"<h3>{line[4:]}</h3>")
+        elif line.startswith(("- ", "* ")):
+            items.append(line[2:])
+        else:
+            flush()
+            html.append(f"<p>{line}</p>")
+    flush()
+    return "".join(html)
+
+
+def _trace_summary(summary: dict | None, narrative: dict | None = None) -> str:
+    """The Run's Trace summary: the saved model-written narrative if there is one (narrate.py),
+    with the code-written facts (summarize.py) under it; otherwise the facts alone."""
+    if narrative and narrative.get("markdown"):
+        facts = (
+            f"<details class='facts'><summary>Facts from the Trace</summary>{_trace_summary(summary)}</details>"
+            if summary
+            else ""
+        )
+        return (
+            f"<div class='trace-summary narrative'>{_markdown(narrative['markdown'])}"
+            f"<p class='sub'>Written by {escape(narrative['model'].removeprefix('us.'))} from this "
+            f"Run's Trace alone; saved, so replays don't call a model.</p>{facts}</div>"
+        )
+    if not summary:
+        return ""
+    struggled = [x for x in summary["struggled"] if x != "Nothing notable."]
+    out = [
+        "<div class='trace-summary'>",
+        f"<p class='verdict'>{escape(summary['verdict'])}</p>",
+        "<h3>What the Harness did</h3><ol>",
+        *[f"<li>{escape(x)}</li>" for x in summary["did"]],
+        "</ol>",
+        "<h3>Where it struggled</h3>",
+        ("<ul>" + "".join(f"<li>{escape(x)}</li>" for x in struggled) + "</ul>")
+        if struggled
+        else "<p class='sub'>Nothing notable.</p>",
+    ]
+    if summary.get("evaluation"):
+        out.append(
+            "<p class='sub'>Evaluation: " + escape("; ".join(summary["evaluation"])) + "</p>"
+        )
+    out.append("</div>")
+    return "".join(out)
+
+
+def _repeat_row(
+    r: dict,
+    cap: dict | None,
+    labels: list[dict],
+    summary: dict | None = None,
+    narrative: dict | None = None,
+) -> str:
+    """One Repeat: a summary line that opens into its Trace summary, Caption, Claims, and Judge
+    notes."""
     if r["status"] == "sandbox_failure":
         return (
             f"<details><summary>Repeat {r['repeat']} · "
             "<span class='badge b-na'>Sandbox Failure</span></summary>"
-            f"<p class='sub'>{escape(r.get('error') or '')}</p></details>"
+            f"<p class='sub'>{escape(r.get('error') or '')}</p>"
+            f"{_trace_summary(summary, narrative)}</details>"
         )
     g = r["grounding"]
     fid = r.get("fidelity") or {}
@@ -249,6 +328,7 @@ def _repeat_row(r: dict, cap: dict | None, labels: list[dict]) -> str:
             f"coverage {_badge(g['coverage'])} · "
             f"fidelity {_badge(fid.get('score'))}{fault}</summary>"
         ),
+        _trace_summary(summary, narrative),
         f"<blockquote>{escape(cap['text'] if cap and cap['text'] else '(no Caption)')}</blockquote>",
         _claim_table(g, labels),
     ]
@@ -373,7 +453,13 @@ def render_html(b: dict, store) -> str:
             "<h3>Repeats</h3>",
         ]
         html += [
-            _repeat_row(r, captions.get((case_id, r["repeat"])), case["reference_labels"])
+            _repeat_row(
+                r,
+                captions.get((case_id, r["repeat"])),
+                case["reference_labels"],
+                (b.get("summaries") or {}).get((case_id, r["repeat"])),
+                (b.get("narratives") or {}).get((case_id, r["repeat"])),
+            )
             for r in rows
         ]
         html.append("</div></section>")

@@ -115,6 +115,14 @@ failed Step is attributed (ADR-0003, `faults.py`): a Harness Fault (a bad reques
 `submit_caption` call, anything unrecognized), an Environment Fault (throttling, timeouts,
 network, access), or a Sandbox Failure (the Judge). Runs and Batch summaries carry the counts.
 
+Every Run also gets a **summary** of its Trace: what the Harness did, where it struggled and whose
+fault, and a one-line verdict. Code writes the facts (`summarize.py`); a model writes a readable
+narrative from the Trace alone (`narrate.py`, `CLAYZER_SUMMARY_MODEL`, default Nova Pro), once,
+at the end of the Batch. The narrative is saved with a hash of its Trace, so replays and reports
+never call a model, and one that names a fault the Trace doesn't have is rejected.
+`--no-narrate` skips it; `clayzer summarize <batch-id>` rebuilds the facts offline, and
+`--narrate` writes any missing narratives.
+
 ```sh
 uv run clayzer trace <batch-id> <case-id> --repeat 1          # one Run, Step by Step
 uv run clayzer trace <batch-id> <case-id> --repeat 1 --json   # the raw Trace

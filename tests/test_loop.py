@@ -44,10 +44,20 @@ class FakeBedrock:
     bag-of-words embeddings. `fail` maps a call number to an exception to raise."""
 
     def __init__(self, fail=None, wrong=False, no_caption=(), retries=0):
-        self.calls, self.fail = 0, fail or {}
+        self.calls, self.fail, self.narrations = 0, fail or {}, 0
         self.wrong, self.no_caption, self.retries = wrong, set(no_caption), retries
 
-    def converse(self, modelId, messages, toolConfig, inferenceConfig):
+    def converse(self, modelId, messages, toolConfig=None, inferenceConfig=None, system=None):
+        if toolConfig is None:  # a Trace narrative (narrate.py), not a caption or Judge call
+            self.narrations += 1
+            text = messages[0]["content"][0]["text"]
+            status = text.split("status: ", 1)[1].split(";", 1)[0]
+            md = (f"### What the Harness did\n- Captioned the Chip.\n### Where it struggled\n"
+                  f"- Nothing notable.\n### Verdict\nRun ended {status}.")  # fmt: skip
+            return {
+                "output": {"message": {"content": [{"text": md}]}},
+                "usage": {"totalTokens": 50},
+            }
         self.calls += 1
         if self.calls in self.fail:
             raise self.fail[self.calls]
