@@ -10,7 +10,10 @@
 #           any existing label for the object, whose count becomes `count` if the correction
 #           gives one and unknown (None) if not.
 #           "drop": the label names something the image doesn't show.
-#   cells   for "add": every cell the object covers; the first is where most of it is
+#           "cells": the label is right but its cells aren't (a USPVDB polygon over a pond):
+#           its cells become `cells`, keeping its count, attributes and source ids.
+#   cells   for "add" and "cells": every cell the object covers; the first is where most of
+#           it is
 #   count   for "add", optional: how many there are, once corrected
 #   reason  what the image shows, for the next person checking
 
@@ -273,3 +276,18 @@ object = "water"
 action = "add"
 cells = ["north_east", "north"]
 reason = "A wet, muddy pond across the top: OSM maps it as intermittent water, which the water rule now drops, but it's wet in this image (2022-08-25). The centre and sides are dry field."
+
+[[correction]]
+case = "fixed-dev-uspvdb-405019"
+object = "solar_array"
+action = "cells"
+cells = ["south_east", "west", "centre", "east", "south_west", "south"]
+reason = "Panels fill the middle and south rows only; the north-west cell is a pond, not panels."
+
+[[correction]]
+case = "fixed-dev-uspvdb-405019"
+object = "water"
+action = "add"
+cells = ["north_west", "north", "north_east"]
+count = 2
+reason = "Two ponds with standing water across the north (April 2022); OSM has no water here."

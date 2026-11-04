@@ -1,13 +1,13 @@
 # The shared development Cases
 
-The team's development Case set for the Mojave / Tehachapi region (caption-plan.md §3): 74 Cases,
+The team's development Case set for the Mojave / Tehachapi region (caption-plan.md §3): 78 Cases,
 each one NAIP Chip (or, for a Change Case, a Chip Pair) and the Reference Labels a good Caption
 would agree with.
 
 | | Cases | Spread |
 |---|---|---|
-| Solar | 30 | 9 under 5 MW, 11 at 5 to 50 MW, 10 over 50 MW |
-| Wind | 13 | turbines from 13 different projects |
+| Solar | 31 | 9 under 5 MW, 11 at 5 to 50 MW, 11 over 50 MW; one beside year-round ponds (SEGS IX) |
+| Wind | 16 | turbines from 16 different projects; 2 on grassland hills, 2 in pinyon-juniper woodland |
 | Negatives | 20 | farmland, towns, industry, parking lots, shops, open desert |
 | Change | 1 | Kingbird B Solar (USPVDB 401501, built 2016): farmland in NAIP 2014, panels in 2022 |
 | Look-alike negatives | 10 | things that look like solar from the air: 4 greenhouses, 4 parking lots, 2 reflective roofs |
@@ -35,6 +35,20 @@ uv run clayzer ui     # the Cases page shows them
 
 This replaces the store's `cases/caption-dev.jsonl`. Don't edit these files by hand: build a Case
 with `clayzer case`, then copy the store's files back here in a PR.
+
+## Setting gaps
+
+Four Cases were added on 2026-11-04 because `clayzer spread` found settings the set lacked:
+Tehachapi Windplant I (USWTDB 3073276) and Voyager II (3087460) on grassland hills, Sky River
+Repower (3114946) in pinyon-juniper woodland, and SEGS IX (USPVDB 405019) beside two ponds,
+water being a solar look-alike. USPVDB lists SEGS IX as fixed-tilt PV; its 1990 year is the
+original solar-thermal plant's. Its labels have two hand corrections: the north-west cell is
+pond, not panels, and the ponds are water.
+
+`--suggest` proposed more. Two turbine Cases in desert scrub, the setting most wind Cases already
+have, were left out; two solar sites (USPVDB 404709, 404762) were built after California's
+latest NAIP, 2022, so no image shows them. Rooftop and car-park solar have no USPVDB site to
+start from (it lists sites of 1 MW and up).
 
 ## Look-alike negatives
 
