@@ -107,6 +107,9 @@ class ClayzerStack(cdk.Stack):
             ),
         )
         service.target_group.configure_health_check(path="/api/config")
+        # One read-only task with short requests: drain in 30 s, not the default 300 s, so deploys
+        # and destroys don't wait five minutes on the old task.
+        service.target_group.set_attribute("deregistration_delay.timeout_seconds", "30")
 
         # Least privilege (AWS-13): the read-only app only reads its own prefix of the store.
         bucket.grant_read(service.task_definition.task_role, f"{prefix}/*")
