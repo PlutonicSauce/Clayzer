@@ -1,4 +1,4 @@
-from clayzer.grid import cell_at, cell_distance, directions
+from clayzer.grid import GRID, cell_at, cell_distance, directions
 from clayzer.grounding import grounding
 
 
@@ -45,7 +45,7 @@ def test_road_position_counts_anywhere_along_the_road():
     assert g["position"] == 1.0
 
 
-def test_false_positive_miss_and_neighbouring_cell():
+def test_false_positive_miss_and_neighbouring_cell_scores_nothing():
     labels = [label("wind_turbine", "west", count=3), label("building", "east", count=2)]
     cap = caption(
         [claim("o1", "wind_turbine", "centre", count=2), claim("o2", "greenhouse", "south")]
@@ -54,7 +54,7 @@ def test_false_positive_miss_and_neighbouring_cell():
     assert g["precision"] == 0.5
     assert g["recall"] == 0.5
     assert g["missed"] == ["building"]
-    assert g["position"] == 0.5
+    assert g["position"] == 0.0
     assert g["count"] == 0.5
 
 
@@ -67,7 +67,18 @@ def test_claims_split_over_cells_are_counted_together():
     g = grounding(cap, labels)
     assert g["counts"] == {"solar_array": {"claimed": 3, "reference": 1}}
     assert g["count"] == 0.0
-    assert g["position"] == (1.0 + 0.5 + 0.5) / 3
+    assert g["position"] == 1.0 / 3
+
+
+def test_guessing_centre_earns_no_more_than_any_other_cell():
+    def mean_position(guess):
+        scores = [
+            grounding(caption([claim("o1", "solar_array", guess)]), [label("solar_array", cell)])
+            for cell in GRID
+        ]
+        return sum(s["position"] for s in scores) / len(GRID)
+
+    assert {mean_position(guess) for guess in GRID} == {1 / 9}
 
 
 def test_unkeyed_claims_are_reported_not_scored():

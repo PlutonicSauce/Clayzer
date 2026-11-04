@@ -9,6 +9,10 @@
         "mean": 0.5940740740740741,
         "spread": 0.11496286750664231
       },
+      "workflow": {
+        "mean": null,
+        "spread": null
+      },
       "coverage": {
         "mean": 0.4666666666666666,
         "spread": 0.11547005383792512
@@ -32,8 +36,12 @@
       "harness_faults": 0,
       "sandbox_failures": 0,
       "correctness": {
-        "mean": 0.46527777777777773,
-        "spread": 0.1478041434291164
+        "mean": 0.3611111111111111,
+        "spread": 0.14632852434517693
+      },
+      "workflow": {
+        "mean": null,
+        "spread": null
       },
       "coverage": {
         "mean": 0.5,
@@ -47,7 +55,7 @@
         "precision": 0.611111111111111,
         "recall": 0.5,
         "count": 0.3333333333333333,
-        "position": 0.5833333333333334,
+        "position": 0.16666666666666666,
         "attributes": 0.3333333333333333,
         "relations": null
       },
@@ -58,8 +66,12 @@
       "harness_faults": 0,
       "sandbox_failures": 0,
       "correctness": {
-        "mean": 0.5169444444444444,
-        "spread": 0.10491508912413847
+        "mean": 0.4880555555555555,
+        "spread": 0.11605893298633212
+      },
+      "workflow": {
+        "mean": null,
+        "spread": null
       },
       "coverage": {
         "mean": 0.8888888888888888,
@@ -73,7 +85,7 @@
         "precision": 0.9166666666666666,
         "recall": 0.8888888888888888,
         "count": 0.0,
-        "position": 0.8694444444444445,
+        "position": 0.7388888888888889,
         "attributes": 0.0,
         "relations": 1.0
       },
@@ -84,8 +96,12 @@
       "harness_faults": 0,
       "sandbox_failures": 0,
       "correctness": {
-        "mean": 0.7314814814814815,
-        "spread": 0.18907942459872354
+        "mean": 0.6851851851851851,
+        "spread": 0.19510469912690254
+      },
+      "workflow": {
+        "mean": null,
+        "spread": null
       },
       "coverage": {
         "mean": 0.8333333333333334,
@@ -99,7 +115,7 @@
         "precision": 1.0,
         "recall": 0.8333333333333334,
         "count": 0.3333333333333333,
-        "position": 0.8611111111111112,
+        "position": 0.7222222222222222,
         "attributes": null,
         "relations": null
       },
@@ -107,7 +123,8 @@
     }
   },
   "batch": {
-    "correctness": 0.5769444444444445,
+    "correctness": 0.5321064814814814,
+    "workflow": null,
     "coverage": 0.6722222222222222,
     "fidelity": 0.5358333333333333,
     "retrieval_mrr": {
@@ -137,5 +154,5 @@
     }
   },
   "stopped": null,
-  "rescored": "2026-11-04T08:11:52+00:00"
+  "rescored": "2026-11-04T16:16:21+00:00"
 }

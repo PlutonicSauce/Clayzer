@@ -300,7 +300,7 @@ used_in = [
   { path = "src/clayzer/answer_keys.py", symbol = "def solar_size", what = "size attribute from p_area" },
   { path = "src/clayzer/cases.py", symbol = "p_sys_type", what = "keeps ground-mounted sites only; NAIP must post-date p_year" },
 ]
-notes = "Positions use the centroid today; using the polygon is a Should (usgs-polygons). Never visible to the Harness (ADR-0006)."
+notes = "Solar positions and cells come from the array polygons (the GeoJSON download, cached outside the repo); the API gives only centroids. Never visible to the Harness (ADR-0006)."
 tasks = ["dev-cases", "texas-cases", "usgs-polygons", "change-cases"]
 
 [[source]]

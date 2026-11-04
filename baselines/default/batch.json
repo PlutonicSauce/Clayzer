@@ -16,5 +16,16 @@
   "embed_model": "amazon.titan-embed-text-v2:0",
   "prompt_sha": "d1ffc8393867",
   "prompt_source": "built-in",
-  "scorer_version": "grounding-3"
+  "scorer_version": "grounding-4+workflow-1",
+  "tools": [],
+  "max_turns": 8,
+  "verify": null,
+  "judge_prompt_sha": null,
+  "ontology_version": null,
+  "ontology_sha": null,
+  "chips_sha": null,
+  "code_commit": null,
+  "code_dirty": null,
+  "summary_model": null,
+  "extra": {}
 }
