@@ -30,6 +30,16 @@ def test_the_set_is_the_planned_mix():
     assert kinds.count("neg") >= 20 and kinds.count("uspvdb") + kinds.count("uswtdb") >= 40
 
 
+def test_change_cases_are_a_pair_of_one_footprint_with_a_known_change():
+    pairs = [case for case in CASES if case["kind"] == "change"]
+    assert pairs
+    for case in pairs:
+        before, after = case["chips"]
+        assert before["bbox"] == after["bbox"] and before["date"] < after["date"]
+        assert any(lb["change"] in ("appeared", "disappeared", "unchanged")
+                   for lb in case["reference_labels"]), case["id"]  # fmt: skip
+
+
 def test_osm_labels_carry_the_odbl_notice():
     assert any(lbl["source"] == "osm" for case in CASES for lbl in case["reference_labels"])
     notice = (ROOT / "cases" / "NOTICE.md").read_text()
@@ -72,8 +82,9 @@ def test_no_chip_is_partly_blank():
     from clayzer.chips import MAX_BLANK, blank_share
 
     for case in CASES + TEST_CASES:
-        img = np.asarray(Image.open(ROOT / case["chips"][0]["uri"]).convert("RGB"))
-        assert blank_share(np.moveaxis(img, -1, 0)) <= MAX_BLANK, case["id"]
+        for chip in case["chips"]:  # both Chips of a Change Case's pair
+            img = np.asarray(Image.open(ROOT / chip["uri"]).convert("RGB"))
+            assert blank_share(np.moveaxis(img, -1, 0)) <= MAX_BLANK, chip["id"]
 
 
 def test_the_committed_cases_carry_every_hand_correction():
