@@ -50,6 +50,30 @@ def test_batches_report_gate_and_compare(client):
     assert c.get(f"/api/compare?a={bid}&b={bid}").json()["settings"] == []
 
 
+@pytest.mark.parametrize("tolerance", ["-0.1", "nan", "inf"])
+def test_gate_refuses_invalid_tolerance(client, tolerance):
+    c, bid = client
+    assert c.get(f"/api/gate/{bid}", params={"tolerance": tolerance}).status_code == 400
+
+
+def test_gate_api_checks_actual_results_instead_of_a_stale_summary(client, tmp_path):
+    import json
+
+    c, bid = client
+    path = tmp_path / "batches" / bid / "results.jsonl"
+    rows = [json.loads(line) for line in path.read_text().splitlines()]
+    rows[0]["grounding"]["correctness"] = 0
+    path.write_text("".join(json.dumps(row) + "\n" for row in rows))
+    response = c.get(f"/api/gate/{bid}")
+    assert response.status_code == 400
+    assert "summary disagrees" in response.json()["detail"]
+
+
+def test_gate_api_reports_a_missing_batch(client):
+    c, _ = client
+    assert c.get("/api/gate/does-not-exist").status_code == 404
+
+
 def test_cases_and_chips(client):
     c, _ = client
     cases = c.get("/api/cases").json()
@@ -88,8 +112,15 @@ def test_the_real_task_board_and_glossary_parse():
     assert {"Case", "Chip", "Batch", "Baseline", "Spread"} <= terms
 
 
-def test_launch_runs_a_batch_in_the_background(client, tmp_path):
+def test_launch_runs_a_batch_in_the_background(client, tmp_path, monkeypatch):
     import time
+
+    from test_listen import FakePolly
+
+    from clayzer import listen
+    from clayzer.store import LocalStore
+
+    monkeypatch.setattr(listen, "polly", FakePolly)
 
     # A second app over the fixture's store, with launching allowed.
     del client
@@ -110,6 +141,10 @@ def test_launch_runs_a_batch_in_the_background(client, tmp_path):
         time.sleep(0.05)
     assert jobs[-1]["state"] == "done", jobs[-1]["lines"]
     assert any(b["batch_id"] == job["batch_id"] for b in launcher.get("/api/batches").json())
+    # It ends with a spoken summary, made against the fixture's Baseline.
+    assert any(line.startswith("spoken summary: ") for line in jobs[-1]["lines"])
+    store = LocalStore(tmp_path / "data", tmp_path / "batches")
+    assert store.exists(listen.audio_key(job["batch_id"]))
 
 
 def test_the_data_sources_parse_and_point_at_real_code(client):

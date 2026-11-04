@@ -44,6 +44,24 @@ They don't show you this image, so describe only what the image itself shows. Ca
 submit_caption exactly once, when you're done.
 """
 
+CHANGES = ("appeared", "disappeared", "unchanged")
+
+# A Change Case's Chip Pair: two images of one place, the earlier first (caption-plan.md §5.2).
+CHANGE_PROMPT = """\
+These are two aerial images of the same place (NAIP, 0.6 m per pixel, about 300 m across, north
+is up). The first is the earlier date, the second the later. Write a caption saying what changed
+between them, as training text for an Earth observation model, then submit it with the
+submit_caption tool.
+
+- text: 1 to 3 sentences on what appeared, disappeared, or stayed the same, where, and how many.
+- objects: every object type you assert in either image, with a count and a position in the
+  image it's in (the later one, unless it disappeared), and change: appeared (only in the later
+  image), disappeared (only in the earlier one), or unchanged (in both). Position is one cell of
+  a 3x3 grid over the image: {grid}. Allowed object types: {objects}.
+- relations: how objects sit relative to each other in the later image, from: {relations}.
+- uncertain: anything you think may have changed but would not assert.
+"""
+
 MAX_TURNS = 8  # model turns per Caption in the tool-use loop
 MAX_TOOL_TEXT = 20_000  # characters of one tool result the model sees; the Trace keeps it all
 
@@ -80,6 +98,11 @@ CAPTION_TOOL = {
                                 "object": {"type": "string", "enum": list(OBJECTS)},
                                 "count": {"type": "integer", "minimum": 1},
                                 "position": {"type": "string", "enum": list(GRID)},
+                                "change": {
+                                    "type": "string",
+                                    "enum": list(CHANGES),
+                                    "description": "Chip Pairs only: appeared, disappeared, or unchanged",
+                                },
                                 "attributes": {
                                     "type": "object",
                                     "properties": {
@@ -205,7 +228,6 @@ def _draft(
     tokens, and retries. With a `toolbox` that has tools, the model may call them first (see the
     module docstring).
     """
-    from clayzer.trace import image_ref
 
     prompt = prompt_template.format(
         grid=", ".join(GRID), objects=", ".join(OBJECTS), relations=", ".join(RELATIONS)
@@ -213,7 +235,7 @@ def _draft(
     if ontology_context:
         prompt = f"{prompt}\n{ontology_context}"
     if toolbox is not None and toolbox.specs:
-        ref = image_ref(image_key or f"chips/{chip_id}.png", png)
+        ref = _image_refs(png, image_key, chip_id)
         return _with_tools(client, model, chip_id, png, prompt, tracer, ref, toolbox, max_turns)
     request = {
         "modelId": model,
@@ -221,7 +243,7 @@ def _draft(
             {
                 "role": "user",
                 "content": [
-                    {"image": {"format": "png", "source": {"bytes": png}}},
+                    *_image_blocks(png),
                     {"text": prompt},
                 ],
             }
@@ -235,7 +257,7 @@ def _draft(
     else:
         recorded = {
             "prompt": prompt,
-            "image": image_ref(image_key or f"chips/{chip_id}.png", png),
+            "image": _image_refs(png, image_key, chip_id),
             "tools": ["submit_caption"],
             "tool_choice": "submit_caption",
             "max_tokens": 1500,
@@ -270,7 +292,7 @@ def _with_tools(client, model, chip_id, png, prompt, tracer, image, toolbox, max
     ]  # fmt: skip
     names = [t["toolSpec"]["name"] for t in specs]
     messages = [{"role": "user", "content": [
-        {"image": {"format": "png", "source": {"bytes": png}}},
+        *_image_blocks(png),
         {"text": prompt + TOOLS_NOTE},
     ]}]  # fmt: skip
     usage = {"inputTokens": 0, "outputTokens": 0, "totalTokens": 0}
@@ -346,10 +368,27 @@ def _with_tools(client, model, chip_id, png, prompt, tracer, image, toolbox, max
     )
 
 
+def _image_blocks(png) -> list[dict]:
+    """Converse image blocks for one Chip (bytes) or a Chip Pair (a list, earlier first)."""
+    return [{"image": {"format": "png", "source": {"bytes": p}}}
+            for p in (png if isinstance(png, list) else [png])]  # fmt: skip
+
+
+def _image_refs(png, image_key, chip_id: str):
+    """How the Trace records the image or images: store key and hash, not bytes."""
+    from clayzer.trace import image_ref
+
+    if isinstance(png, list):
+        return [image_ref(k, p) for k, p in zip(image_key, png, strict=True)]
+    return image_ref(image_key or f"chips/{chip_id}.png", png)
+
+
 def _clean(c: dict) -> dict:
-    """Keep only well-formed Claims; drop relations to unknown object ids."""
+    """Keep only well-formed Claims; drop relations to unknown object ids, and a `change` that
+    isn't one of CHANGES."""
     objects = [
-        o for o in c.get("objects", [])
+        {k: v for k, v in o.items() if k != "change" or v in CHANGES}
+        for o in c.get("objects", [])
         if o.get("object") in OBJECTS and o.get("position") in GRID and isinstance(o.get("count"), int)
     ]  # fmt: skip
     ids = {o["id"] for o in objects}

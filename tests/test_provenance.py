@@ -9,7 +9,7 @@ from test_loop import SOLAR, WIND, env, run  # noqa: F401
 from test_ui import client  # noqa: F401
 
 from clayzer import batch as batches
-from clayzer import judge, provenance
+from clayzer import judge, ontology, provenance
 from clayzer.gate import gate, load_baseline, setting_changes
 
 
@@ -26,7 +26,7 @@ def test_a_batch_records_its_rubric_chips_ontology_and_commit(env):  # noqa: F81
         for c in (SOLAR, WIND)
     }
     assert cfg.chips_sha == provenance.sha(store.get(f"batches/{bid}/chips.json"))
-    assert cfg.ontology_version == "0.2" and len(cfg.ontology_sha) == 12
+    assert cfg.ontology_version == ontology.load().version and len(cfg.ontology_sha) == 12
     assert cfg.code_commit is None or len(cfg.code_commit) == 40
     assert cfg.summary_model
 
@@ -91,6 +91,8 @@ def test_the_app_shows_a_runs_provenance(client):  # noqa: F811
     p = app.get(f"/api/batches/{bid}/runs/fixed-dev-solar--r1/provenance").json()
     assert p["case"]["chip_uri"] == "chips/c-solar.png"
     assert p["case"]["chip_sha256"] == hashlib.sha256(b"c-solar").hexdigest()
+    assert [c["uri"] for c in p["case"]["chips"]] == ["chips/c-solar.png"]
+    assert p["case"]["chips"][0]["sha256"] == p["case"]["chip_sha256"]
     assert p["case"]["reference_labels"] == 1
     files = {f["name"]: f for f in p["files"]}
     assert files["traces/fixed-dev-solar--r1.jsonl"]["exists"]

@@ -55,7 +55,7 @@ def _unit(v: list[float]) -> list[float]:
 
 def _cos(a: list[float], b: list[float]) -> float:
     # Centroids are stored as unit vectors; the query need not be, so normalise by both norms.
-    dot = sum(x * y for x, y in zip(a, b))
+    dot = sum(x * y for x, y in zip(a, b, strict=False))
     na = math.sqrt(sum(x * x for x in a)) or 1.0
     nb = math.sqrt(sum(x * x for x in b)) or 1.0
     return dot / (na * nb)
@@ -148,7 +148,7 @@ def build(
 
     centroids, counts = {}, {}
     for cid, embs in groups.items():
-        mean = [sum(col) / len(embs) for col in zip(*embs)]
+        mean = [sum(col) / len(embs) for col in zip(*embs, strict=False)]
         centroids[cid] = _unit(mean)
         counts[cid] = len(embs)
 

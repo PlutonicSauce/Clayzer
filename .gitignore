@@ -6,6 +6,10 @@ __pycache__/
 .venv/
 .pytest_cache/
 .ruff_cache/
+baselines/.lock
+baselines/.*.backup/
+baselines/.*-*/
+.coverage
 dist/
 
 # Records the package index used on the machine that generated it; regenerate against public PyPI before sharing.

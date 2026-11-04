@@ -569,7 +569,7 @@ caption set, not only our own ([caption-design.md §3.6](caption-design.md#36-ev
 
 ### Object Ontology tasks
 
-v0.1 of [`ontology/objects.toml`](../ontology/objects.toml) matches the code's lists today, and
+v0.2 of [`ontology/objects.toml`](../ontology/objects.toml) (reviewed 2026-11-04) matches the code's lists today, and
 `tests/test_ontology.py` fails if they drift ([caption-design.md §3.5](caption-design.md#35-object-ontology)).
 
 | Task | Area | Tier | When |
@@ -626,6 +626,7 @@ the keyed Answer-Key classes; Layer B becomes enrichment. Design approved; build
 | Bedrock batch inference for large caption runs | AWS-10 | Captioning | Could | After the prompt is settled |
 | AgentCore captioner holding the LGND sign-in | AWS-11 | Captioning | Could | Only after checking AgentCore in an account |
 | Confirm no disallowed services | AWS-12 | Demo and delivery | Must | In the readiness check before the demo |
+| Spoken summary of each Batch: Nova Pro script, Polly MP3, played on the Batch page | AWS-14 | Evaluation | Could | Done: docs/cli.md, Listening to a result |
 
 **What a participant account allows** (checked 2026-11-04 in one account): writing X-Ray trace
 segments, CloudWatch metrics, and CloudWatch Logs all worked. Turning on Bedrock model
@@ -654,7 +655,7 @@ runtimes yet).
 | A dataset verdict from ~100 items is over-read | Every rate carries a 95% interval, per stratum; the card says where estimates are thin |
 | Grounding rewarded Captions that say less (seen 2026-11-04: a vague one-Claim prompt raised two solar Cases from 0.43 and 0.67 to 0.88) | Resolved 2026-11-04: positives' Chips are offset so the site lands in any of the 9 cells (it was always in the centre), and grounding is two numbers, correctness and coverage. The vague prompt now fails the gate on coverage (0.67 → 0.27 overall) |
 | A noisy candidate relaxed its own regression gate (seen 2026-11-04: drops of 0.31 and 0.32 passed) | Resolved 2026-11-04: the allowed drop uses the Baseline's Spread only, and a Case whose Spread grows sharply is warned about. A Batch-level statistical check is still to come once the ~60 Cases exist |
-| "Centre" always earns half credit for position, because the centre cell neighbours every other cell | Open: drop neighbour credit, or give it only along a row or column; decide before the prompt work starts |
+| "Centre" always earns half credit for position, because the centre cell neighbours every other cell | Resolved 2026-11-04: position scores only an exact cell (any cell the object covers), so a blind guess earns 1/9 whichever cell it names |
 | SageMaker GPU quota is zero in a new account | Request it before kickoff; if it isn't granted, cost stays Partial on Bedrock (CAP-12) |
 | A GPU endpoint left running runs up cost | Delete the endpoint at the end of each session; `cdk destroy` tears down the stack |
 | Teammates' accounts drift apart | One CDK app (AWS-07); each account deploys the same stack |
@@ -714,13 +715,15 @@ decisions is in ADR-0006 and ADR-0007.
 | Caption Runs and the loop | Verify-then-write over MCP with LGND Geo's imagery check as the verifier, so caption Runs get Traces, summaries, a Workflow Score, and replay (REQ-01, REQ-04 to REQ-09) |
 | Order of work | The evaluation loop (Repeats, Batches, Compare, gate) before caption quality; verify-then-write after |
 | Grounding | Two numbers, correctness and coverage, reported and gated separately; positives' Chips offset so the site can be in any cell (decided 2026-11-04) |
+| Hand label corrections | Where a Chip clearly contradicts USGS or OSM, a person records the fix in `fixtures/caption/cases/label-corrections.toml` (add a missing object as `source = "manual"` with no count, or drop one the image doesn't show); every Case build applies it (decided 2026-11-04) |
+| Position credit | Exact cell only, no neighbour credit: with labels listing every cell an object covers, a near miss is a wrong cell (decided 2026-11-04) |
 | Regression gate | A drop regresses when it exceeds max(0.05, the Baseline's Spread); a sharp rise in Spread warns (decided 2026-11-04) |
 | Tracing | Hybrid (ADR-0001, confirmed 2026-11-04): JSONL Traces in S3 are the record and feed scoring, replay, and the Clayzer app; an OpenTelemetry export goes through ADOT to X-Ray, with CloudWatch metrics per Run, for the ops view; spans carry no prompt text or outputs |
 | Harness tools | Allowed and forbidden MCP servers listed in section 3 (ADR-0006); a verifier is never a scorer |
 | Rubric coverage | All five criteria in Must (CAP-14): label preparation time measured as wall-clock time; cost partial on Bedrock, full GPU comparison Should |
 | Caption data from any source | The Sandbox scores Clay's own caption sets, not only ours: an importer (Must, CAP-20), a dataset verdict with confidence intervals and a dataset card (Should, CAP-21, CAP-22); training Clay v2 to measure downstream benefit stays out of scope |
 | Object classes | One Object Ontology file (`ontology/objects.toml`, ADR-0008): ~20 classes, at most three levels, a crosswalk over OSM tags and standard land-cover classes; Captions stay free text, only Claims use classes |
-| AWS services | Each maps to a rubric criterion or brief constraint (AWS-01 to AWS-13). Must: Bedrock, Titan, S3, IAM. Should: SageMaker GPU endpoint, ADOT to X-Ray and CloudWatch, CDK, Fargate and CloudFront. Could: Step Functions, batch inference, AgentCore |
+| AWS services | Each maps to a rubric criterion or brief constraint (AWS-01 to AWS-14). Must: Bedrock, Titan, S3, IAM. Should: SageMaker GPU endpoint, ADOT to X-Ray and CloudWatch, CDK, Fargate and CloudFront. Could: Step Functions, batch inference, AgentCore, Polly (done) |
 | Traceability | CAP-01 to CAP-19 for caption requirements, REQ-01 to REQ-19 ([caption-design.md §2.3](caption-design.md#23-evaluation-loop-requirements)) for the loop; section 11 maps both |
 | Vocabulary | Chip, Chip Pair, Fixed Case, Change Case, Caption, Claim, Reference Label, Answer Key, Reference Caption |
 
@@ -805,3 +808,4 @@ architecture in §3.4. Tasks are in section 7, "AWS service tasks".
 | AWS-11 | AgentCore captioner with the LGND sign-in | §2 Could; §8 | Could; checked in an account first |
 | AWS-12 | No disallowed services | §2 Out; §7 AWS tasks | Must |
 | AWS-13 | Least-privilege, short-lived access; nothing secret in the repo | §2 Must; §7 Day 1 | Must |
+| AWS-14 | A spoken summary of each Batch, through Polly | §7 AWS tasks | Could (done) |

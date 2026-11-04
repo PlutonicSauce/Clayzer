@@ -12,7 +12,7 @@ are defined in [GLOSSARY.md](../GLOSSARY.md).
   of `tech-hackathon.docx` and `vision-hackathon.docx`. They are **newer** than
   `Clay-Foundry-Technical-Hackathon.md` and `Clay-Foundry-Vision-Hackathon.md` and add most of
   the caption-track detail.
-- Section 2 gives every requirement an ID: CAP-01 to CAP-19 (caption), AWS-01 to AWS-13 (AWS),
+- Section 2 gives every requirement an ID: CAP-01 to CAP-19 (caption), AWS-01 to AWS-14 (AWS),
   and REQ-01 to REQ-19 (the evaluation loop as a whole).
 - Facts marked *(from memory)* in sections 6–8 come from general knowledge of the field, not from
   the source documents, and should be re-checked before they go into a demo or the spec.
@@ -105,6 +105,7 @@ teammate has their own hackathon AWS account in us-west-2.
 | AWS-11 | The agentic captioner can run as a managed agent that holds the LGND sign-in and reaches MCP tools | Amazon Bedrock AgentCore (Runtime, Gateway, Identity, Observability) | REQ-02 (LGND), agentic captioning | judging criteria; *Technical* §Confirmed Data Sources (LGND Geo MCP) |
 | AWS-12 | No disallowed services: no HyperPod or large Trainium, no cross-account deployment, no warehouse (Traces stay files in S3) | — | REQ-17 | *Technical* §Service Disallow List |
 | AWS-13 | Access is least-privilege and short-lived: no credentials in the repo, a role per service, public access blocked on every bucket | AWS IAM | REQ-13, REQ-15 | judging criteria (technical execution); public repo |
+| AWS-14 | A Batch's result is read aloud as a short spoken summary, for teammates and judges who'd rather hear it than read a report; it's made once and replayed, so the hosted app never calls a model | Amazon Polly (generative or neural voice), with the script from Bedrock Nova Pro | REQ-09, REQ-12 | judging criteria |
 
 Facts about newer services (AgentCore's components, SageMaker GPU instance
 types and default quotas) are from general knowledge and must be checked in an account before
@@ -264,6 +265,7 @@ flowchart LR
 | ECS Fargate, ALB, CloudFront (AWS-08) | Hosts the read-only UI and API container | A live HTTPS URL for the judges with no domain or certificate to manage. App Runner was the first choice but the participant role can't use it (checked 2026-11-03). One ARM64 task in a public subnet, no NAT gateway; the load balancer only accepts CloudFront |
 | Step Functions (AWS-09) | Runs the caption pipeline with parallel fan-out | The pipeline is visible as a workflow, and retries and failures are per Chip |
 | AgentCore (AWS-11) | Hosts the agentic captioner and holds the LGND OAuth sign-in | LGND's MCP server is remote and needs OAuth, which a laptop MCP client handles poorly |
+| Polly (AWS-14) | Reads each Batch's result aloud: code computes the facts, Nova Pro writes the script, Polly makes the MP3 (`listen.py`) | Saved next to the Batch and replayed, so the read-only web app needs no Polly or Bedrock access; only whoever runs a Batch or `clayzer listen` needs `polly:SynthesizeSpeech` (the Step Functions role too, once AWS-09 runs the pipeline) |
 
 Order of value against effort: AWS-04 and AWS-05 first (each closes a rubric gap), then AWS-07
 and AWS-08 (a reproducible stack and a live URL), then AWS-09, AWS-10, and AWS-11.
@@ -272,21 +274,24 @@ and AWS-08 (a reproducible stack and a live URL), then AWS-09, AWS-10, and AWS-1
 
 Every Object Class a Claim can name is defined once, in
 [`ontology/objects.toml`](../ontology/objects.toml)
-([ADR-0008](adr/0008-object-classes-live-in-one-ontology-file.md)). Version 0.1 has the 11
+([ADR-0008](adr/0008-object-classes-live-in-one-ontology-file.md)). Version 0.2 has the 11
 claimable classes the code uses today under five roots (energy infrastructure, transportation,
 built structures, water features, land cover), plus candidate classes for later (substation,
-transmission tower, runway, storage tank).
+transmission tower, well pad, runway, storage tank, construction site). Each class has a
+one-line definition of what a Claim of it asserts. Water is only water there all year: OSM's
+intermittent streams and ditches, dry washes in the desert, don't count.
 
 ```mermaid
 flowchart TB
     EN["Energy infrastructure"] --> SOL["solar_array"] & WT["wind_turbine"]
-    EN -.-> SUB["substation"] & TT["transmission_tower"]
+    EN -.-> SUB["substation"] & TT["transmission_tower"] & WP["well_pad"]
     TR["Transportation"] --> RD["road"] & RR["railroad"] & PK["parking_lot"]
     TR -.-> RW["runway"]
     BS["Built structure"] --> BLD["building"] --> GH["greenhouse"]
     BS -.-> ST["storage_tank"]
     HY["Water features"] --> WA["water"]
     LC["Land cover"] --> FLD["field"] & VEG["vegetation"] & BG["bare_ground"]
+    LC -.-> CS["construction_site"]
 
     classDef root fill:#252323,stroke:#252323,color:#ffffff
     classDef keyed fill:#dfe9df,stroke:#c9d7c9,color:#252323
@@ -295,7 +300,7 @@ flowchart TB
     class EN,TR,BS,HY,LC root
     class SOL,WT,RD,RR,PK,BLD,GH,WA,FLD keyed
     class VEG,BG unscored
-    class SUB,TT,RW,ST candidate
+    class SUB,TT,WP,RW,ST,CS candidate
 ```
 
 Green classes have an Answer Key; amber classes are claimable but unscored (no Answer Key);
@@ -314,8 +319,11 @@ dashed classes are candidates, not yet claimable.
 **Today vs planned.** The file matches the code's existing lists exactly, and
 `tests/test_ontology.py` keeps them matched. Still to do: have the code read its lists from the
 file, add partial credit to grounding, expand retrieval with synonyms, and put look-alikes in the
-prompt (plan §7). Land-cover crosswalks come from general knowledge and need checking against the
-published NLCD and WorldCover legends.
+prompt (plan §7). The land-cover crosswalks were checked on 2026-11-04 against the MRLC NLCD
+legend and the WorldCover v2.0 user manual, and `tests/test_ontology.py` keeps their names to
+those legends. They only partly match: WorldCover counts pasture as grassland and orchards as
+tree cover, and NLCD calls most Mojave desert Shrub/Scrub, so a land-cover score would disagree
+with Captions that call it bare ground (each class's `note`).
 
 **Data-driven extension (the team's differentiator; [ADR-0010](adr/0010-the-ontology-is-data-driven-and-feeds-the-captioner.md),
 [docs/ontology-data-driven.md](ontology-data-driven.md)).** The ontology now also flows *into*
@@ -391,13 +399,14 @@ same.
 | `caption` | string | yes | The caption text |
 | `kind` | `fixed` or `change` | yes | One date or two |
 | `geometry` | polygon, EPSG:4326 | yes | The chip's footprint (WKB in GeoParquet, GeoJSON in JSON Lines) |
-| `datetime` | ISO date, or a list of two for `change` | yes | Acquisition date or dates |
+| `datetime` | ISO date, or a list of two for `change` | yes | Acquisition date or dates; null only for an unlocated caption |
 | `sensor` | string, e.g. `naip`, `sentinel-2-l2a` | yes | Which imagery the caption describes |
-| `gsd_m` | number | yes | Ground sample distance, metres per pixel |
+| `gsd_m` | number | yes | Ground sample distance, metres per pixel; null when unknown (RSICD), and then too-small Claims can't be checked |
 | `stac_item` | string | no | Source scene (STAC collection and item id), used to fetch the image |
 | `image_uri` | string | no | A direct link to the chip image, if there is one |
 | `generator` | string | no | The model or pipeline that wrote the caption, with its version |
 | `claims` | JSON | no | Structured Claims in the ADR-0007 format, if the source has them |
+| `scene` | string | no | A scene class the source gives the image (RSICD's `airport`, `pond`), kept for stratifying |
 
 One row in JSON Lines:
 
@@ -418,6 +427,12 @@ One row in JSON Lines:
 - `claims` is used when present; otherwise Claims are extracted from `caption` by a model, as
   described above.
 - `generator` lets one Caption Set mix pipelines and compare them, like Batches.
+- **As built** (`src/clayzer/importer.py`, 2026-11-04): a USGS site counts only if its
+  `p_year` is no later than the acquisition year; OSM has no history here, so OSM labels are
+  today's map and the Case says so. `geometry` may be `null` for sets without locations, such as
+  RSICD: the Case is kept with no Reference Labels (`located: false`), for fidelity and retrieval
+  only. A Claim is flagged too small when its class's `min_visible_m` is below the row's `gsd_m`.
+  Only `fixed` rows are imported until Change Cases exist.
 
 **If the real format differs,** only a small adapter changes: the importer maps any source onto
 these columns, and everything downstream stays the same. Until Clay's data arrives, the importer

@@ -21,6 +21,7 @@ class ObjectClass:
     name: str
     parent: str
     claimable: bool
+    definition: str = ""
     keyed_by: tuple[str, ...] = ()
     osm: tuple[dict, ...] = ()
     osm_reference: tuple[dict, ...] = ()
@@ -150,6 +151,7 @@ def load(path: str | Path = DEFAULT) -> Ontology:
             name=entry["name"],
             parent=entry.get("parent", ""),
             claimable=bool(entry.get("claimable", False)),
+            definition=entry.get("definition", ""),
             keyed_by=_tuple(entry, "keyed_by"),
             osm=_tuple(entry, "osm"),
             osm_reference=_tuple(entry, "osm_reference"),

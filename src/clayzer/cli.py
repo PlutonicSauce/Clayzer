@@ -9,17 +9,24 @@ clayzer batch --repeats 3 --label base      run every Case 3 times; writes a Bat
 clayzer batch --resume <batch-id>           finish a Batch (expired credentials, failures)
 clayzer batches                             list Batches
 clayzer report <batch-id>                   rebuild a Batch's report.md and report.html
+clayzer replay <batch-id> [--cases KEY]     rescore a recorded Batch against updated Cases, offline
 clayzer rescore <batch-id>                  score stored Captions again with the current scorer
 clayzer trace <batch-id> <case-id> [-r N]   show one Run's summary and Trace, Step by Step
 clayzer summarize <batch-id>                rebuild every Run's summary from its Trace, offline
 clayzer compare <batch-a> <batch-b>         what changed, and by how much
 clayzer baseline accept <batch-id>          make a Batch the Baseline (baselines/<name>/)
 clayzer gate <batch-id>                     regression gate: exit 0 pass, 1 fail, 2 inconclusive
+clayzer listen <batch-id> [--play]          a spoken summary of the result (Nova Pro + Polly MP3)
+clayzer experiment <id> --hypothesis TEXT   record a gated attempt; --accept keeps it if it passes
 clayzer ui [--allow-launch]                 the team web app on http://127.0.0.1:8770
+clayzer ui --calibrate                      also let /label save hand-made labels into labels/
 
 clayzer login lgnd                          sign in to an MCP server that needs it (browser, once)
 clayzer tools roda                          list an MCP server's tools
 clayzer tools lgnd --call TOOL --args JSON  call one tool and print the result
+clayzer verifier calibrate [--write]        measure each class's verifier on dev Cases; choose routes
+clayzer verifier routes                     which verifier checks each class, and why
+clayzer spread [--suggest]                  how varied the Cases' surroundings are, and the gaps
 
 Everything is read from and written to the store: local folders, or CLAYZER_STORE=s3://...
 """
@@ -178,6 +185,10 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument("kind", choices=["uspvdb", "uswtdb", "neg"])
     c.add_argument("args", nargs="+", help="a USGS case_id, or lon lat for a negative")
     c.add_argument("--n", type=int, default=1, help="negative number")
+    c.add_argument("--dated-by", choices=["usgs", "grw"],
+                   help="with --change: which date to use when USGS and GRW disagree, after a look")  # fmt: skip
+    c.add_argument("--change", action="store_true",
+                   help="a Change Case: the site before and after its install year (a Chip Pair)")  # fmt: skip
     c.add_argument("--state", default="CA", help="state code for a negative")
 
     pu = sub.add_parser("push", help="copy a local chips/ + cases/ folder into the store")
@@ -198,6 +209,8 @@ def main(argv: list[str] | None = None) -> int:
         help="check each drafted Claim with LGND Geo before writing (needs `clayzer login lgnd`)",
     )  # fmt: skip
     b.add_argument("--resume", metavar="BATCH_ID", help="finish an existing Batch")
+    b.add_argument("--no-listen", action="store_true",
+                   help="don't make the spoken summary (Nova Pro + Polly) at the end")  # fmt: skip
     b.add_argument("--no-narrate", action="store_true",
                    help="skip the model-written Trace summaries")  # fmt: skip
     b.add_argument(
@@ -241,8 +254,29 @@ def main(argv: list[str] | None = None) -> int:
     g.add_argument("--tolerance", type=float, default=None)
     g.add_argument("--max-token-increase", type=float, default=None, help="0.5 = +50%%")
 
+    li = sub.add_parser("listen", help="a spoken summary of a Batch's result, saved as an MP3")
+    li.add_argument("batch_id")
+    li.add_argument("--baseline", default="default")
+    li.add_argument("--no-model", action="store_true", help="use the code-written script")
+    li.add_argument(
+        "--force", action="store_true", help="rewrite it even if the facts are the same"
+    )
+    li.add_argument("--play", action="store_true", help="then play it (macOS afplay)")
+
+    ex = sub.add_parser("experiment", help="record one labelled prompt experiment, offline")
+    ex.add_argument("batch_id")
+    ex.add_argument("--hypothesis", required=True, help="what this one change should improve")
+    ex.add_argument("--baseline", default="default")
+    ex.add_argument("--tolerance", type=float, default=None)
+    ex.add_argument("--max-token-increase", type=float, default=None, help="0.5 = +50%%")
+    ex.add_argument("--accept", action="store_true", help="keep a passing, comparable candidate")
+    recovery = sub.add_parser("experiment-recover", help="recover a kept log after a store failure")
+    recovery.add_argument("--baseline", default="default")
+
     ui = sub.add_parser("ui", help="the team web app: workflow, tasks, Cases, Batches")
     ui.add_argument("--allow-launch", action="store_true", help="let the browser run Batches")
+    ui.add_argument("--calibrate", action="store_true",
+                    help="let the /label page save hand-made labels into labels/")  # fmt: skip
     ui.add_argument("--host", default="127.0.0.1")
     ui.add_argument("--port", type=int, default=8770)
 
@@ -278,6 +312,39 @@ def main(argv: list[str] | None = None) -> int:
     bp.add_argument("--embedding-model", default="clay-v1", help="the embedding model id")
     bp.add_argument("--out", type=Path, help="output path (default ontology/prototypes/vN.json)")
     on_sub.add_parser("show", help="print the current prototype index, if built")
+    rp2 = sub.add_parser("replay", help="a recorded Batch rescored against updated Cases, offline")
+    rp2.add_argument("batch_id")
+    rp2.add_argument("--cases", metavar="KEY",
+                     help="the store's Case file to score against (default: the region's)")  # fmt: skip
+    rp2.add_argument("--label", default="replay", help="a short name for the new Batch")
+    rp2.add_argument("--no-reports", action="store_true", help="skip the per-Run reports")
+
+    im = sub.add_parser("import", help="a Caption Set from any source becomes Cases")
+    im.add_argument(
+        "file", nargs="?", type=Path, help="JSON Lines or GeoParquet, one caption per row"
+    )
+    im.add_argument("--name", help="the Caption Set's name: Cases go to cases/import-<name>.jsonl")
+    im.add_argument("--from-batch", metavar="BATCH_ID",
+                    help="import a Batch's own Captions, to check the importer against known Cases")  # fmt: skip
+    im.add_argument("--export", type=Path, metavar="JSONL",
+                    help="with --from-batch: also write the Caption Set itself to this file")  # fmt: skip
+
+    rs = sub.add_parser("rsicd", help="RSICD's human captions as a Caption Set file, to import")
+    rs.add_argument("--split", choices=["train", "val", "test"], default="test")
+    rs.add_argument("--limit", type=int, help="only the split's first N images (5 captions each)")
+    rs.add_argument(
+        "--out", type=Path, help="JSON Lines to write (default data/rsicd-<split>.jsonl)"
+    )
+
+    sub.add_parser("embeddings",
+                   help="LGND's Clay embeddings for the region's Chips (anonymous; CC BY 4.0)")  # fmt: skip
+
+    ex = sub.add_parser("extract", help="the Claims a caption's text makes; or calibrate that")
+    ex.add_argument("text", nargs="?", help="a caption")
+    ex.add_argument("--check", metavar="BATCH_ID",
+                    help="extract from every Caption in a Batch; compare with its Claims")  # fmt: skip
+    ex.add_argument("--labels", type=Path, metavar="JSONL",
+                    help='compare with hand-made Claims: lines of {"id", "text", "claims"}')  # fmt: skip
 
     lg = sub.add_parser("login", help="sign in to an MCP server that needs it (opens a browser)")
     lg.add_argument("server")
@@ -286,18 +353,61 @@ def main(argv: list[str] | None = None) -> int:
     tl.add_argument("--call", metavar="TOOL", help="call this tool")
     tl.add_argument("--args", default="{}", help="the tool's arguments as JSON")
 
+    vf = sub.add_parser("verifier", help="which verifier checks each object class")
+    vf_sub = vf.add_subparsers(dest="action", required=True)
+    cal = vf_sub.add_parser("calibrate", help="measure the verifiers on development Cases")
+    cal.add_argument("--per-class", type=int, default=6,
+                     help="true and false probes per class, each (at most 15)")  # fmt: skip
+    cal.add_argument("--write", action="store_true", help="save the chosen routes to "
+                     "ontology/verifiers.toml")  # fmt: skip
+    cal.add_argument("--max-calls", type=int, default=100,
+                     help="stop before starting if it would take more LGND calls")  # fmt: skip
+    vf_sub.add_parser("routes", help="show the routes in ontology/verifiers.toml")
+
+    sp = sub.add_parser("spread", help="how varied the Cases' surroundings are, and the gaps")
+    sp.add_argument("--suggest", action="store_true",
+                    help="search LGND for each gap and print `clayzer case` commands")  # fmt: skip
+    sp.add_argument("--max-calls", type=int, default=100,
+                    help="stop before starting if it would take more LGND calls")  # fmt: skip
+    co = sub.add_parser("corroborate",
+                        help="check the Cases' USGS labels against OSM's power mapping")  # fmt: skip
+    co.add_argument("cases", nargs="+", type=Path, help="Case files (.jsonl)")
+    co.add_argument("--json", type=Path, help="also write every Case's result here")
+
     a = p.parse_args(argv)
     if a.cmd in ("login", "tools"):
         return _tools_command(a)
     if a.cmd == "ontology":
         return _ontology_command(a, settings)
+    if a.cmd == "verifier" and a.action == "routes":
+        from clayzer import verifiers
+
+        routes = verifiers.load()
+        print(f"default {routes.default}; classifier {routes.classifier}")
+        for cls, r in routes.routes.items():
+            print(f"  {cls:<14} {r['method']:<14} {r.get('reason', '')}")
+        return 0
     store = settings.store()
     key = cases_key(a.region)
 
     if a.cmd == "case":
         from clayzer.cases import build_negative, build_positive
 
-        if a.kind == "neg":
+        if a.change:
+            from clayzer.cases import build_change
+
+            if a.kind == "neg":
+                print("--change needs a USGS site: uspvdb or uswtdb", file=sys.stderr)
+                return 2
+            from clayzer.grw import Flagged
+
+            try:
+                case = build_change(a.kind, int(a.args[0]), a.region, store,
+                                    settings.naip_source, a.dated_by)  # fmt: skip
+            except Flagged as e:
+                print(f"not built: {e}", file=sys.stderr)
+                return 2
+        elif a.kind == "neg":
             lon, lat = map(float, a.args)
             case = build_negative(lon, lat, a.n, a.state, a.region, store, settings.naip_source)
         else:
@@ -305,11 +415,17 @@ def main(argv: list[str] | None = None) -> int:
         save_case(store, key, case)
         labels = [
             f"{lb['object']}×{lb['count'] if lb['count'] is not None else '-'}@{lb['position']}"
+            + (f" ({lb['change']})" if lb.get("change") else "")
             for lb in case["reference_labels"]
         ]
-        chip = case["chips"][0]
-        print(f"{case['id']}: chip {chip['id']} ({chip['source']}), {case['prep_seconds']} s")
+        chips = " → ".join(f"{c['id']} ({c['source']})" for c in case["chips"])
+        print(f"{case['id']}: chip {chips}, {case['prep_seconds']} s")
         print("  labels: " + (", ".join(labels) or "none"))
+        if d := case.get("dating"):
+            print(f"  dated by {d['source']}: USGS {d['usgs_year'] or 'no year'}, "
+                  f"GRW {', '.join(d['grw']) or 'no match'}")  # fmt: skip
+            if d["flag"]:
+                print(f"  flagged: {d['flag']}; dated by {d['source']}, chosen by {d['chosen_by']}")
         print(f"  stored in {store.url(key)}")
         return 0
 
@@ -354,6 +470,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Batch {batch_id} in {store.url(f'batches/{batch_id}/')}")
         _print_summary(summary)
         print(f"open {_local_report(store, settings, batch_id)}")
+        if not a.no_listen and not summary.get("stopped"):
+            from clayzer.listen import after_batch
+
+            after_batch(store, settings, batch_id)
         return 0 if not summary.get("stopped") else 3
 
     if a.cmd == "batches":
@@ -419,7 +539,9 @@ def main(argv: list[str] | None = None) -> int:
         for st in steps:
             at = st.attributes
             tokens = (at.get("usage") or {}).get("totalTokens", "")
-            result = st.error or (st.output or {}).get("stop_reason", "")
+            # A tool Step's output is the tool's text; an llm Step's is a dict.
+            out = st.output if isinstance(st.output, dict) else {}
+            result = st.error or out.get("stop_reason", "")
             if at.get("fault"):
                 f = at["fault"]
                 result = (
@@ -462,7 +584,10 @@ def main(argv: list[str] | None = None) -> int:
         from clayzer.batch import load
         from clayzer.gate import accept_baseline
 
-        target = accept_baseline(load(store, a.batch_id), settings.baselines_dir, a.name)
+        try:
+            target = accept_baseline(load(store, a.batch_id), settings.baselines_dir, a.name)
+        except (ValueError, OSError) as e:
+            p.error(str(e))
         print(f"Baseline {a.name!r} is now {a.batch_id}: {target} (commit it to share)")
         return 0
 
@@ -470,14 +595,214 @@ def main(argv: list[str] | None = None) -> int:
         from clayzer.batch import load
         from clayzer.gate import DEFAULT_TOLERANCE, gate, load_baseline, render_gate
 
-        result = gate(
-            load_baseline(settings.baselines_dir, a.baseline),
-            load(store, a.batch_id),
-            DEFAULT_TOLERANCE if a.tolerance is None else a.tolerance,
-            a.max_token_increase,
-        )
+        try:
+            result = gate(
+                load_baseline(settings.baselines_dir, a.baseline),
+                load(store, a.batch_id),
+                DEFAULT_TOLERANCE if a.tolerance is None else a.tolerance,
+                a.max_token_increase,
+            )
+        except (ValueError, FileNotFoundError) as e:
+            p.error(str(e))
         print(render_gate(result), end="")
         return result.exit_code
+
+    if a.cmd == "listen":
+        import subprocess
+        import tempfile
+
+        from clayzer.config import bedrock
+        from clayzer.gate import load_baseline
+        from clayzer.listen import audio_key, listen, polly
+
+        try:
+            base = load_baseline(settings.baselines_dir, a.baseline)
+        except FileNotFoundError:
+            base = None
+        try:
+            rec = listen(store, a.batch_id, base, None if a.no_model else bedrock(settings),
+                         polly(), force=a.force)  # fmt: skip
+        except (ValueError, FileNotFoundError) as e:
+            p.error(str(e))
+        print(rec["text"])
+        how = f"{rec['model']} wrote it" if rec["source"] == "model" else "code wrote it"
+        state = "written" if rec["written"] else "already up to date"
+        print(f"\n({how}; read by Polly {rec['voice']}, {rec['engine']}; {state})")
+        print(store.url(audio_key(a.batch_id)))
+        if a.play:
+            with tempfile.NamedTemporaryFile(suffix=".mp3") as tmp:
+                tmp.write(store.get(audio_key(a.batch_id)))
+                tmp.flush()
+                subprocess.run(["afplay", tmp.name], check=False)
+        return 0
+
+    if a.cmd == "experiment":
+        from clayzer.batch import load
+        from clayzer.experiments import record_experiment
+        from clayzer.gate import DEFAULT_TOLERANCE, render_gate
+
+        try:
+            result, record = record_experiment(
+                load(store, a.batch_id),
+                store,
+                settings.baselines_dir,
+                a.hypothesis,
+                baseline_name=a.baseline,
+                accept=a.accept,
+                tolerance=DEFAULT_TOLERANCE if a.tolerance is None else a.tolerance,
+                max_token_increase=a.max_token_increase,
+            )
+        except (ValueError, OSError) as e:
+            p.error(str(e))
+        print(render_gate(result), end="")
+        print(f"Experiment record: {store.url(record + '.json')}")
+        print(f"PR log: {store.url(record + '.md')}")
+        if a.accept and result.verdict == "pass":
+            print(f"Kept {a.batch_id} as Baseline {a.baseline!r} (commit it to share)")
+        return result.exit_code
+
+    if a.cmd == "experiment-recover":
+        from clayzer.experiments import recover_experiment
+
+        try:
+            record = recover_experiment(store, settings.baselines_dir, a.baseline)
+        except (ValueError, OSError) as e:
+            p.error(str(e))
+        print(f"Recovered experiment: {store.url(record + '.json')}")
+        print(f"PR log: {store.url(record + '.md')}")
+        return 0
+
+    if a.cmd == "replay":
+        from clayzer import batch as batches
+
+        cases_file = a.cases or key
+        new_id = batches.replay(a.batch_id, store, load_cases(store, cases_file), a.label,
+                                reports=not a.no_reports)  # fmt: skip
+        print(
+            f"replayed {a.batch_id} against {store.url(cases_file)} as {new_id}, with no model calls"
+        )
+        _print_summary(batches.load(store, new_id)["summary"])
+        return 0
+
+    if a.cmd == "import":
+        from clayzer.importer import caption_rows, import_key, import_rows, read_rows
+
+        if a.from_batch:
+            from clayzer import batch as batches
+
+            rows, name = caption_rows(batches.load(store, a.from_batch)), a.name or a.from_batch
+            if a.export:
+                a.export.write_text("".join(json.dumps(r) + "\n" for r in rows))
+                print(f"wrote the Caption Set to {a.export}")
+        elif a.file:
+            rows, name = read_rows(a.file), a.name or a.file.stem
+        else:
+            print("give a Caption Set file, or --from-batch <batch-id>", file=sys.stderr)
+            return 2
+        print(f"{len(rows)} captions → {store.url(import_key(name))}")
+        result = import_rows(rows, name)
+        store.put(import_key(name), to_jsonl(result.cases), "application/x-ndjson")
+        located = sum(c["located"] for c in result.cases)
+        small = sum(1 for c in result.cases if c["imported"]["too_small"])
+        unknown = sum(1 for c in result.cases if c["imported"]["too_small"] is None)
+        print(f"  {len(result.cases)} Cases ({located} located), {len(result.skipped)} skipped, "
+              f"{small} with Claims possibly too small for their imagery"
+              + (f", {unknown} with no imagery resolution to check against" if unknown else ""))  # fmt: skip
+        for s in result.skipped[:10]:
+            print(f"  skipped {s['caption_id']}: {s['reason']}")
+        return 0 if result.cases else 1
+
+    if a.cmd == "rsicd":
+        from clayzer import rsicd
+
+        rows = rsicd.rows(json.loads(rsicd.captions_file().read_text()), a.split, a.limit)
+        out = a.out or settings.data_dir / f"rsicd-{a.split}.jsonl"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text("".join(json.dumps(r) + "\n" for r in rows))
+        images = len({r["chip_id"] for r in rows})
+        print(f"{len(rows)} captions of {images} RSICD {a.split} images → {out}")
+        print("  never commit it (no license stated; cite Lu et al. 2017). Next:")
+        print(f"  uv run clayzer import {out} --name rsicd-{a.split}")
+        return 0
+
+    if a.cmd == "embeddings":
+        from clayzer import embeddings as emb
+
+        points = emb.chip_points(load_cases(store, cases_key(a.region)))
+        print(f"{len(points)} Chips in {cases_key(a.region)}; reading {emb.ROOT} anonymously")
+        rows = emb.for_chips(points)
+        store.put(emb.embeddings_key(a.region), to_jsonl(rows), "application/x-ndjson")
+        missing = [r for r in rows if "missing" in r]
+        print(f"  {len(rows) - len(missing)} joined to a cell, {len(missing)} without one; "
+              f"saved in {store.url(emb.embeddings_key(a.region))}")  # fmt: skip
+        for r in missing:
+            print(f"  {r['chip_id']}: {r['missing']}")
+        print(f"  {emb.ATTRIBUTION}")
+        return 0
+
+    if a.cmd == "extract":
+        from clayzer.config import bedrock
+        from clayzer.extract import batch_items, calibrate, extract, extract_model
+
+        model = extract_model(settings)
+        client = bedrock(settings)
+        if a.text and not (a.check or a.labels):
+            claims, _ = extract(client, model, a.text)
+            print(json.dumps(claims, indent=2))
+            return 0
+        if a.check:
+            items, prefix = batch_items(store, a.check), f"batches/{a.check}/extraction"
+        elif a.labels:
+            rows = [json.loads(line) for line in a.labels.read_text().splitlines() if line.strip()]
+            items = [r for r in rows if r.get("claims")]  # lines nobody has labelled yet wait
+            prefix = f"calibration/extraction/{a.labels.stem}"
+        else:
+            print("give a caption, --check <batch-id>, or --labels <file>", file=sys.stderr)
+            return 2
+        print(f"{len(items)} captions, extracted by {model}")
+        r = calibrate(client, model, items, store, prefix)
+        keys = ("type_precision", "type_recall", "count_exact", "position_exact",
+                "position_within_one", "count_not_stated", "position_not_stated")  # fmt: skip
+        print("  " + " · ".join(f"{k.replace('_', ' ')} {r[k]}" for k in keys))
+        for source, g in r.get("by_source", {}).items():
+            print(f"  {source} ({g['captions']}): " + " · ".join(
+                f"{k.replace('_', ' ')} {g[k]}" for k in keys[:4]))  # fmt: skip
+        if r.get("edit_rate") is not None:
+            print(f"  proposals a person changed: {r['edit_rate']:.0%}")
+        print(f"  {r['failed']} failed; saved in {store.url(prefix)}/agreement.json")
+        return 0
+
+    if a.cmd == "corroborate":
+        from clayzer import corroborate
+
+        cases = [c for f in a.cases for c in parse_jsonl(f.read_bytes())]
+        done = {}
+        if a.json and a.json.exists():  # resume an interrupted run
+            done = {r["case"]: r for r in json.loads(a.json.read_text())["cases"]}
+
+        def save(rows):
+            if a.json:
+                a.json.write_text(json.dumps(
+                    {"summary": corroborate.summary(rows), "cases": rows}, indent=2) + "\n")  # fmt: skip
+
+        print(f"{len(cases)} Cases, {len(done)} done before: one Overpass query per "
+              f"{corroborate.BATCH} Chips", flush=True)  # fmt: skip
+        rows = corroborate.corroborate(cases, done=done, save=save,
+                                       progress=lambda m: print(m, flush=True))  # fmt: skip
+        s = corroborate.summary(rows)
+        print(f"solar agrees on {s['solar_agree']} of {s['solar_cases']} Cases with solar; "
+              f"wind on {s['wind_agree']} of {s['wind_cases']} with turbines")  # fmt: skip
+        print("to check by eye: " + (", ".join(s["to_check"]) or "none"))
+        print("OSM candidate classes, Cases with each: "
+              + (", ".join(f"{k} {v}" for k, v in s["candidate_cases"].items()) or "none"))  # fmt: skip
+        if s["failed"]:
+            print(f"{len(s['failed'])} failed; run the same command again to retry them")
+        if a.json:
+            print(f"written to {a.json}")
+        return 1 if s["failed"] else 0
+
+    if a.cmd in ("verifier", "spread"):
+        return _lgnd_command(a, store, load_cases(store, key))
 
     if a.cmd == "ui":
         try:
@@ -486,10 +811,75 @@ def main(argv: list[str] | None = None) -> int:
             print("the web app needs the ui extra: uv sync --extra ui", file=sys.stderr)
             return 1
         mode = "can run Batches" if a.allow_launch else "read-only"
+        if a.calibrate:
+            mode += f"; labels at http://{a.host}:{a.port}/label"
         print(f"Clayzer on http://{a.host}:{a.port} ({mode}; store {store.url('').rstrip('/')})")
-        serve(settings, a.region, a.allow_launch, a.host, a.port)
+        serve(settings, a.region, a.allow_launch, a.host, a.port, a.calibrate)
         return 0
     return 1
+
+
+def _lgnd_command(a, store, cases: list[dict]) -> int:
+    """`clayzer verifier calibrate` and `clayzer spread`: both read the region's Cases and spend
+    LGND's daily calls (150 on the free tier), so each says what it will cost first."""
+    from clayzer import lgnd
+
+    if a.region == "test":
+        print("calibrate and measure on development Cases only (CAP-16)", file=sys.stderr)
+        return 2
+    cases = [c for c in cases if c["id"].startswith("fixed-")]
+    if not cases:
+        print(f"no Cases for region {a.region!r}; `clayzer push --from fixtures/caption`",
+              file=sys.stderr)  # fmt: skip
+        return 1
+    cached = lgnd.Lookups(None, store)
+    if a.cmd == "verifier":
+        from clayzer import calibrate, verifiers
+
+        routes = verifiers.load()
+        plan = calibrate.probes(cases, min(a.per_class, 15))
+        cost = calibrate.estimate(plan, cached, routes)
+        print(f"{len(plan)} probes from {len(cases)} Cases: about {cost} LGND calls")
+    else:
+        from clayzer import spread
+
+        cost = spread.estimate(cases, cached, a.suggest)
+        print(f"{len(cases)} Cases: at most {cost} LGND calls")
+    if cost > a.max_calls:
+        print(f"that's over --max-calls {a.max_calls}; raise it, or use --per-class",
+              file=sys.stderr)  # fmt: skip
+        return 2
+    try:
+        from clayzer.mcp_auth import NotSignedIn
+        from clayzer.tools import Toolbox
+    except ImportError:
+        print("MCP tools need the tools extra: uv sync --extra tools", file=sys.stderr)
+        return 1
+    try:
+        with Toolbox.named(["lgnd"]) as box:
+            if a.cmd == "verifier":
+                result = calibrate.run(cases, box.call, store, a.per_class, routes)
+                prefix = calibrate.save(store, result, routes)
+                print(calibrate.to_markdown(result, routes))
+                print(f"saved in {store.url(prefix)}")
+                if a.write:
+                    new = calibrate.updated(routes, result)
+                    verifiers.DEFAULT.write_text(verifiers.render(new))
+                    print(f"routes written to {verifiers.DEFAULT} (commit it to share)")
+                return 0
+            measured = spread.measure(cases, box.call, store)
+            found = spread.suggest(cases, measured, box.call) if a.suggest else None
+            text = spread.to_markdown(measured, found)
+    except NotSignedIn as e:
+        print(e, file=sys.stderr)
+        return 1
+    from datetime import UTC, datetime
+
+    key = f"spread/{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}/report.md"
+    store.put(key, text.encode(), "text/markdown")
+    print(text)
+    print(f"saved in {store.url(key)}")
+    return 0
 
 
 def _tools_command(a) -> int:

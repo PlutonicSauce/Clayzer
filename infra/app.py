@@ -107,18 +107,24 @@ class ClayzerStack(cdk.Stack):
             ),
         )
         service.target_group.configure_health_check(path="/api/config")
+        # One read-only task with short requests: drain in 30 s, not the default 300 s, so deploys
+        # and destroys don't wait five minutes on the old task.
+        service.target_group.set_attribute("deregistration_delay.timeout_seconds", "30")
 
         # Least privilege (AWS-13): the read-only app only reads its own prefix of the store.
         bucket.grant_read(service.task_definition.task_role, f"{prefix}/*")
 
-        # Only CloudFront reaches the load balancer.
-        cloudfront_prefixes = ec2.PrefixList.from_lookup(
-            self,
-            "CloudFrontOrigins",
-            prefix_list_name="com.amazonaws.global.cloudfront.origin-facing",
+        # Only CloudFront reaches the load balancer. The lookup needs an account, so CI's
+        # credential-free synth passes a placeholder as `-c cloudfront_prefix_list=pl-...`.
+        cloudfront_prefixes = self.node.try_get_context("cloudfront_prefix_list") or (
+            ec2.PrefixList.from_lookup(
+                self,
+                "CloudFrontOrigins",
+                prefix_list_name="com.amazonaws.global.cloudfront.origin-facing",
+            ).prefix_list_id
         )
         service.load_balancer.connections.allow_from(
-            ec2.Peer.prefix_list(cloudfront_prefixes.prefix_list_id), ec2.Port.tcp(80)
+            ec2.Peer.prefix_list(cloudfront_prefixes), ec2.Port.tcp(80)
         )
 
         distribution = cloudfront.Distribution(
@@ -138,9 +144,14 @@ class ClayzerStack(cdk.Stack):
 
         cdk.CfnOutput(self, "Url", value=f"https://{distribution.distribution_domain_name}")
         cdk.CfnOutput(self, "StoreUrl", value=f"s3://{bucket.bucket_name}/{prefix}")
+        # Physical names stay generated; outputs are how people and scripts find them.
+        cdk.CfnOutput(self, "ClusterName", value=cluster.cluster_name)
+        cdk.CfnOutput(self, "ServiceName", value=service.service.service_name)
 
 
 app = cdk.App()
+# Groups the stack's resources in the console, Cost Explorer, and Resource Groups.
+cdk.Tags.of(app).add("project", "clayzer")
 ClayzerStack(
     app,
     "Clayzer",

@@ -3,7 +3,8 @@
 The formula is the walkthrough's proposal (prototype/flow-walkthrough.html), with two changes
 for real Answer Keys:
 - Position is right if the Claim's cell is any cell the object covers (a road crosses several);
-  a neighbouring cell scores 0.5.
+  any other cell scores 0. Neighbour credit was dropped (decided 2026-11-04): the centre cell
+  neighbours all eight others, so "centre" was a safe guess worth at least 0.5.
 - Relations are scored as precision only: each directional relation the Caption asserts between
   two labelled types is checked against the labels' positions. Real OSM labels imply many
   relations, so recall would punish every Caption for not listing them all.
@@ -40,7 +41,7 @@ def _count_score(claimed: int, ref: int) -> float:
 
 def _position_score(claimed: str, cells: list[str]) -> float:
     d = min(cell_distance(claimed, c) for c in cells)
-    return 1.0 if d == 0 else 0.5 if d == 1 else 0.0
+    return 1.0 if d == 0 else 0.0
 
 
 def grounding(caption: dict, labels: list[dict]) -> dict:
@@ -48,15 +49,21 @@ def grounding(caption: dict, labels: list[dict]) -> dict:
     claims = [o for o in caption["objects"] if o["object"] in KEYED]
     unkeyed = [o for o in caption["objects"] if o["object"] not in KEYED]
 
-    rows, counts, positions, attributes = [], [], [], []
+    rows, counts, positions, attributes, changes = [], [], [], [], []
     for cl in claims:
         ref = refs.get(cl["object"])
         if ref is None:
             rows.append({"claim": cl, "verdict": "false positive"})
             continue
         row = {"claim": cl, "verdict": "matched", "ref_position": ref["position"]}
-        row["position"] = _position_score(cl["position"], ref["cells"])
-        positions.append(row["position"])
+        # A Claim extracted from free text may not say where (extract.py): skip, don't guess.
+        if cl.get("position") is not None:
+            row["position"] = _position_score(cl["position"], ref["cells"])
+            positions.append(row["position"])
+        # Change Cases: a Claim's change against its label's, where the label's is known.
+        if ref.get("change") in ("appeared", "disappeared", "unchanged"):
+            row["change"] = 1.0 if cl.get("change") == ref["change"] else 0.0
+            changes.append(row["change"])
         for key, value in (cl.get("attributes") or {}).items():
             if key in ref["attributes"]:
                 ok = 1.0 if value == ref["attributes"][key] else 0.0
@@ -66,13 +73,15 @@ def grounding(caption: dict, labels: list[dict]) -> dict:
 
     # A Caption may split one type over several Claims ("3 turbines north, 2 south"); the
     # count is their total against the label's.
-    claimed_counts: dict[str, int] = {}
+    # Likewise a type with any Claim that doesn't say how many isn't count-scored.
+    claimed_counts: dict[str, int | None] = {}
     for cl in claims:
-        claimed_counts[cl["object"]] = claimed_counts.get(cl["object"], 0) + cl["count"]
+        n, total = cl.get("count"), claimed_counts.get(cl["object"], 0)
+        claimed_counts[cl["object"]] = None if n is None or total is None else total + n
     count_by_type = {}
     for obj, n in claimed_counts.items():
         ref = refs.get(obj)
-        if ref is not None and ref["count"] is not None:
+        if ref is not None and ref["count"] is not None and n is not None:
             count_by_type[obj] = {"claimed": n, "reference": ref["count"]}
             counts.append(_count_score(n, ref["count"]))
 
@@ -102,6 +111,8 @@ def grounding(caption: dict, labels: list[dict]) -> dict:
         "position": _mean(positions),
         "attributes": _mean(attributes),
         "relations": relations,
+        # Only Change Cases' labels carry a known change, so a Fixed Case has none to score.
+        "change": _mean(changes),
     }
     total = len(caption["objects"])
     return {

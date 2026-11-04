@@ -5,18 +5,26 @@ Each function returns Reference Labels for one Chip, one label per object type:
     {"object", "count", "position", "cells", "attributes", "source", "source_ids"}
 
 `position` is the cell holding most of the object; `cells` is every cell it covers, so a road
-crossing the Chip is in the right place wherever a Claim puts it along the road. `count` is
+crossing the Chip is in the right place wherever a Claim puts it along the road. Solar arrays
+use USPVDB's polygons (the GeoJSON download, cached outside the repo) for the same reason: a
+large array covers several cells, and its centroid is in only one. `count` is
 None where counting isn't meaningful (roads, water, fields).
 
 Only the Case builder and scoring may call these (ADR-0006); never the caption Harness.
 """
 
+import io
+import json
 import os
 import time
+import zipfile
 from collections import Counter, defaultdict
+from functools import cache
+from pathlib import Path
 
 import httpx
-from shapely.geometry import LineString, Polygon, box
+from shapely.geometry import LineString, Polygon, box, shape
+from shapely.ops import unary_union
 
 from clayzer.chips import Chip
 from clayzer.grid import GRID
@@ -25,6 +33,13 @@ USPVDB = "https://energy.usgs.gov/api/uspvdb/v1/projects"
 USWTDB = "https://energy.usgs.gov/api/uswtdb/v1/turbines"
 OVERPASS = os.environ.get("CLAYZER_OVERPASS_URL", "https://overpass-api.de/api/interpreter")
 USER_AGENT = "clayzer-caption-eval/0.1 (+https://github.com/PlutonicSauce/Clayzer)"
+# Every USPVDB array polygon (public domain), downloaded once into CLAYZER_CACHE_DIR.
+USPVDB_GEOJSON = "https://energy.usgs.gov/uspvdb/assets/data/uspvdbGeoJSON.zip"
+# Solar sites whose centroid is this far outside a Chip can still cover part of it.
+SOLAR_SEARCH_DEG = 0.03
+# A solar array is in a cell when it covers at least this share of it (about 210 m²), so an
+# array that only grazes the Chip's edge doesn't count.
+SOLAR_MIN_CELL_SHARE = 0.02
 
 
 def _get(url: str, params: list[tuple[str, str]]) -> list[dict]:
@@ -55,6 +70,28 @@ def _bbox_params(bbox, buffer_deg: float = 0.0) -> list[tuple[str, str]]:
 # ── USGS ────────────────────────────────────────────────────────────────────────────────
 
 
+def _cache_dir() -> Path:
+    return Path(os.environ.get("CLAYZER_CACHE_DIR") or Path.home() / ".cache" / "clayzer")
+
+
+@cache
+def uspvdb_outlines() -> tuple[str, dict]:
+    """(USPVDB version, case_id -> array polygon in lon/lat), downloading the GeoJSON once."""
+    cached = sorted(_cache_dir().glob("uspvdb_*.geojson"))
+    if not cached:
+        r = httpx.get(USPVDB_GEOJSON, timeout=300, headers={"User-Agent": USER_AGENT})
+        r.raise_for_status()
+        with zipfile.ZipFile(io.BytesIO(r.content)) as z:
+            name = next(n for n in z.namelist() if n.endswith(".geojson"))
+            _cache_dir().mkdir(parents=True, exist_ok=True)
+            (_cache_dir() / Path(name).name).write_bytes(z.read(name))
+        cached = sorted(_cache_dir().glob("uspvdb_*.geojson"))
+    path = cached[-1]
+    features = json.loads(path.read_text())["features"]
+    outlines = {f["properties"]["case_id"]: shape(f["geometry"]) for f in features if f["geometry"]}
+    return path.stem, outlines
+
+
 def uspvdb_site(case_id: int) -> dict:
     rows = _get(USPVDB, [("case_id", f"eq.{case_id}")])
     if not rows:
@@ -69,10 +106,19 @@ def uswtdb_turbine(case_id: int) -> dict:
     return rows[0]
 
 
-def usgs_near(bbox, buffer_deg: float) -> tuple[list[dict], list[dict]]:
-    """Solar sites and turbines whose points fall in `bbox` grown by `buffer_deg`."""
-    params = _bbox_params(bbox, buffer_deg)
-    return _get(USPVDB, params), _get(USWTDB, params)
+def usgs_near(
+    bbox, buffer_deg: float, turbine_buffer_deg: float | None = None
+) -> tuple[list[dict], list[dict]]:
+    """Solar sites whose points fall in `bbox` grown by `buffer_deg`, and turbines in it grown by
+    `turbine_buffer_deg` (default the same). Keep the turbine box small: a wide one over the
+    Tehachapi wind farms is a heavy query the USWTDB API fails on."""
+    tb = buffer_deg if turbine_buffer_deg is None else turbine_buffer_deg
+    return _get(USPVDB, _bbox_params(bbox, buffer_deg)), _get(USWTDB, _bbox_params(bbox, tb))
+
+
+def existed_by(records: list[dict], year: int) -> list[dict]:
+    """USGS records already built by `year` (their `p_year`); a record with no year is kept."""
+    return [r for r in records if not r.get("p_year") or int(r["p_year"]) <= year]
 
 
 def solar_size(area_m2: float) -> str:
@@ -95,16 +141,49 @@ def _point_label(obj: str, points: list[tuple[str, str]], source: str, ids: list
     }
 
 
-def usgs_labels(chip: Chip, solar: list[dict], turbines: list[dict]) -> list[dict]:
+def _solar_label(chip: Chip, solar: list[dict], outlines: dict) -> dict | None:
+    """One solar_array label from the sites whose polygon covers part of the Chip; a site
+    with no polygon falls back to its centroid."""
+    frame = box(0, 0, chip.size, chip.size)
+    min_area = SOLAR_MIN_CELL_SHARE * (chip.size / 3) ** 2
+    sites, shapes, points = [], [], []
+    for s in solar:
+        outline = outlines.get(s["case_id"])
+        if outline is not None:
+            part = chip.to_pixels(outline).intersection(frame)
+            if _cell_measure(part, chip.size, min_area):
+                sites.append(s)
+                shapes.append(part)
+        elif chip.inside(s["xlong"], s["ylat"]):
+            sites.append(s)
+            points.append(chip.cell(s["xlong"], s["ylat"]))
+    if not sites:
+        return None
+    measure = _cell_measure(unary_union(shapes), chip.size, min_area) if shapes else Counter()
+    for cell in points:
+        measure[cell] += min_area + 1
+    return {
+        "object": "solar_array",
+        "count": len(sites),
+        "position": measure.most_common(1)[0][0],
+        "cells": sorted(measure, key=GRID.index),
+        "attributes": {},
+        "source": "uspvdb",
+        "source_ids": [str(s["case_id"]) for s in sites],
+    }
+
+
+def usgs_labels(
+    chip: Chip, solar: list[dict], turbines: list[dict], outlines: dict | None = None
+) -> list[dict]:
+    """Solar and wind labels. `outlines` (case_id -> polygon) defaults to USPVDB's; without a
+    polygon a site is placed by its centroid."""
     labels = []
-    sites = [s for s in solar if chip.inside(s["xlong"], s["ylat"])]
-    if sites:
-        label = _point_label(
-            "solar_array",
-            [(chip.cell(s["xlong"], s["ylat"]), s) for s in sites],
-            "uspvdb",
-            [str(s["case_id"]) for s in sites],
-        )
+    if outlines is None:
+        outlines = uspvdb_outlines()[1] if solar else {}
+    label = _solar_label(chip, solar, outlines)
+    if label:
+        sites = [s for s in solar if str(s["case_id"]) in label["source_ids"]]
         largest = max(sites, key=lambda s: s.get("p_area") or 0)
         if largest.get("p_area"):
             label["attributes"]["size"] = solar_size(largest["p_area"])
@@ -147,7 +226,11 @@ def osm_object(tags: dict) -> str | None:
         return "railroad"
     if tags.get("amenity") == "parking":
         return "parking_lot"
-    if tags.get("natural") == "water" or "waterway" in tags:
+    # Only water that is there all year: in the desert OSM maps dry washes as intermittent
+    # streams, and a ditch or drain is usually dry from above.
+    if tags.get("intermittent") != "yes" and (
+        tags.get("natural") == "water" or tags.get("waterway") in {"river", "canal"}
+    ):
         return "water"
     if tags.get("landuse") in {"farmland", "meadow", "orchard", "vineyard"}:
         return "field"
@@ -183,6 +266,22 @@ def _cell_boxes(size: int):
         yield cell, box(c * third, r * third, (c + 1) * third, (r + 1) * third)
 
 
+# Areas under this many square pixels (about 36 m²) are slivers along a cell's edge.
+SLIVER_PX = 100
+
+
+def _cell_measure(geom, size: int = 512, min_area: float = SLIVER_PX) -> Counter:
+    """How much of a pixel-space geometry falls in each cell: area for polygons, length for
+    lines, ignoring slivers along cell edges (under `min_area` square pixels)."""
+    measure: Counter = Counter()
+    for cell, cbox in _cell_boxes(size):
+        part = geom.intersection(cbox)
+        m = part.area if part.area else part.length
+        if m > (min_area if part.area else 10):
+            measure[cell] += m
+    return measure
+
+
 def osm_labels(chip: Chip, elements: list[dict]) -> list[dict]:
     frame = box(0, 0, chip.size, chip.size)
     by_object: dict[str, list] = defaultdict(list)
@@ -201,12 +300,7 @@ def osm_labels(chip: Chip, elements: list[dict]) -> list[dict]:
     for obj, feats in by_object.items():
         measure: Counter = Counter()
         for _, geom in feats:
-            for cell, cbox in _cell_boxes(chip.size):
-                part = geom.intersection(cbox)
-                # Length for lines, area for polygons; ignore slivers along cell edges.
-                m = part.area if part.area else part.length
-                if m > (100 if part.area else 10):
-                    measure[cell] += m
+            measure += _cell_measure(geom, chip.size)
         if not measure:
             continue
         label = {

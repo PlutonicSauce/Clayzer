@@ -115,8 +115,8 @@ const FLOW = [
     key: "gate", phase: "improve", title: "Regression gate", sub: "keep or reject the change", area: "Evaluation",
     what: `The candidate Batch against the accepted ${term("Baseline")}. A Case regresses when its correctness, coverage, or fidelity drops more than max(0.05, the Baseline's Spread). Exit 0 pass, 1 fail, 2 inconclusive. Next, saved for later: a Proposer that reads a failure digest, proposes one change to the prompt, model, or tools, and lets the gate decide.`,
     why: "This is the improvement loop the pitch rests on: every change to the captioner is measured and kept only if nothing got worse.",
-    code: ["uv run clayzer baseline accept <id>", "uv run clayzer gate <id>", "src/clayzer/gate.py"],
-    docs: [{ href: "/docs/docs/caption-plan.md#6-approach", label: "Plan §6: the improvement loop" }, { href: "/docs/docs/caption-plan.md#8-risks", label: "Plan §8: the gate's rules and their risks" }, { href: "/docs/docs/caption-plan.md#10-decisions-behind-this-plan", label: "Plan §10: decisions" }],
+    code: ["uv run clayzer baseline accept <id>", "uv run clayzer gate <id>", 'uv run clayzer experiment <id> --hypothesis "Expected improvement" [--accept]', "src/clayzer/gate.py", "src/clayzer/experiments.py"],
+    docs: [{ href: "/docs/docs/regression-gate.md", label: "Run and record a prompt experiment" }, { href: "/docs/docs/caption-plan.md#6-approach", label: "Plan §6: the improvement loop" }, { href: "/docs/docs/caption-plan.md#8-risks", label: "Plan §8: the gate's rules and their risks" }, { href: "/docs/docs/caption-plan.md#10-decisions-behind-this-plan", label: "Plan §10: decisions" }],
   },
   {
     key: "ship", phase: "ship", title: "Ship", sub: "AWS, demo, readiness", area: "Demo and delivery",
@@ -554,13 +554,119 @@ async function casesPage() {
     <p>The development ${term("Case")} set in the store (${cases.length}). Each Chip's ${term("Reference Label", "Reference Labels")}
     are what grounding checks Claims against; the Harness never sees them (ADR-0006).</p>
     ${cases.length ? "" : '<p class="empty">No Cases yet: <code>uv run clayzer case uspvdb &lt;site-id&gt;</code></p>'}
+    ${cases.length ? '<p class="sub">Click a Chip to open it large, with its labels on the grid and zoom.</p>' : ""}
     <div class="case-grid">${cases.map((c) => `<div class="case-card">
-      <img src="/api/chips/${encodeURIComponent(c.chip.id)}.png" alt="Chip ${esc(c.chip.id)}" loading="lazy">
-      <div class="body"><b>${esc(c.id)}</b><br><small class="mono">${esc(c.chip.id)} · NAIP ${esc(c.chip.date)} · ${esc(c.chip.source)}</small>
+      <a href="#/cases/${encodeURIComponent(c.id)}"><img src="/api/chips/${encodeURIComponent(c.chip.id)}.png" alt="Chip ${esc(c.chip.id)}" loading="lazy"></a>
+      <div class="body"><b><a href="#/cases/${encodeURIComponent(c.id)}">${esc(c.id)}</a></b><br><small class="mono">${c.kind === "change" ? `Chip Pair: NAIP ${esc(c.chips[0].date)} → ` : `${esc(c.chip.id)} · NAIP `}${esc(c.chip.date)} · ${esc(c.chip.source)}</small>
       <ul>${c.labels.map((l) => `<li>${l.count !== null ? `${esc(l.count)} × ` : ""}${esc(l.object.replace(/_/g, " "))}
-        at ${esc(l.position)} <small>(${esc(l.source)})</small></li>`).join("") || "<li>no labels</li>"}</ul>
+        at ${esc(l.position)}${l.change ? ` <small>(${esc(l.change)})</small>` : ""} <small>(${esc(l.source)})</small></li>`).join("") || "<li>no labels</li>"}</ul>
       <small>Built in ${f2(c.prep_seconds)} s</small></div></div>`).join("")}</div>`;
 }
+
+// ── One Case, large: for checking its Reference Labels by eye ────────────────────────
+
+const VIEW = { zoom: 1, grid: true, labels: true };
+
+function caseFigure(c) {
+  const C = 512 / 3;
+  const per = {};
+  const pills = VIEW.labels ? c.labels.map((l) => {
+    const i = CELLS.indexOf(l.position);
+    if (i < 0) return "";
+    const n = (per[l.position] = (per[l.position] || 0) + 1) - 1;
+    const x = (i % 3) * C + 8, y = Math.floor(i / 3) * C + 10 + n * 26;
+    const text = `${l.count !== null ? `${l.count} × ` : ""}${l.object.replace(/_/g, " ")}`;
+    return `<g class="pill ${l.source === "osm" ? "near" : "good"}"><rect x="${x}" y="${y}" width="${C - 16}" height="22" rx="11"/>
+      <text x="${x + (C - 16) / 2}" y="${y + 15}" text-anchor="middle">${esc(text)}</text></g>`;
+  }).join("") : "";
+  const covered = VIEW.labels ? new Set(c.labels.flatMap((l) => l.cells || [])) : new Set();
+  const refs = [...covered].map((cell) => {
+    const i = CELLS.indexOf(cell);
+    return i < 0 ? "" : `<rect class="ref" x="${(i % 3) * C + 3}" y="${Math.floor(i / 3) * C + 3}" width="${C - 6}" height="${C - 6}" rx="4"/>`;
+  }).join("");
+  const grid = VIEW.grid ? [1, 2].map((k) => `<line x1="${k * C}" y1="0" x2="${k * C}" y2="512"/><line x1="0" y1="${k * C}" x2="512" y2="${k * C}"/>`).join("") : "";
+  return `<div class="chip-fig${VIEW.zoom > 1 ? " zoomed" : ""}" style="width:${VIEW.zoom * 100}%">
+    <img src="/api/chips/${encodeURIComponent(c.chip.id)}.png" alt="Aerial image ${esc(c.chip.id)}">
+    <svg viewBox="0 0 512 512" aria-hidden="true"><g class="grid">${grid}</g><g>${refs}</g>${pills}</svg></div>`;
+}
+
+async function casePage(id) {
+  const me = SEQ;
+  const cases = await api("/api/cases");
+  if (stale(me)) return;
+  const i = cases.findIndex((c) => c.id === id);
+  if (i < 0) {
+    $view.innerHTML = `<p><a href="#/cases">← Cases</a></p><p class="empty">No Case ${esc(id)} in the store.</p>`;
+    return;
+  }
+  const c = cases[i];
+  const prev = cases[(i - 1 + cases.length) % cases.length].id, next = cases[(i + 1) % cases.length].id;
+  const [w, s, e, n] = c.chip.bbox;
+  const lat = ((s + n) / 2).toFixed(5), lon = ((w + e) / 2).toFixed(5);
+  const draw = () => {
+    document.getElementById("case-fig").innerHTML = caseFigure(c);
+    document.querySelectorAll("[data-zoom]").forEach((b) => b.setAttribute("aria-pressed", String(+b.dataset.zoom === VIEW.zoom)));
+    document.getElementById("t-grid").checked = VIEW.grid;
+    document.getElementById("t-labels").checked = VIEW.labels;
+  };
+  $view.innerHTML = `<p><a href="#/cases">← Cases</a> · ${i + 1} of ${cases.length} ·
+      <a href="#/cases/${encodeURIComponent(prev)}">← previous</a> · <a href="#/cases/${encodeURIComponent(next)}">next →</a></p>
+    <h1>${esc(c.id)}</h1>
+    <div class="case-view">
+      <div>
+        <div class="case-tools">
+          <span>Zoom ${[1, 2, 4].map((z) => `<button type="button" class="btn secondary" data-zoom="${z}">${z}×</button>`).join("")}</span>
+          <label><input type="checkbox" id="t-grid"> grid</label>
+          <label><input type="checkbox" id="t-labels"> labels</label>
+          <small>Keys: ← → Case · + − zoom · g grid · l labels</small>
+        </div>
+        <div class="case-zoom" id="case-zoom"><div id="case-fig"></div></div>
+        <p class="legend-row"><span><i class="dot good"></i>USGS label</span> <span><i class="dot near"></i>OpenStreetMap label</span>
+          <span><i class="sq"></i>cells the label covers</span></p>
+      </div>
+      <div>
+        <h3>Reference Labels</h3>
+        <ul>${c.labels.map((l) => `<li>${l.count !== null ? `${esc(l.count)} × ` : ""}${esc(l.object.replace(/_/g, " "))}
+          at ${esc(l.position)}${(l.cells || []).length > 1 ? ` <small>(covers ${l.cells.map((x) => esc(x.replace(/_/g, " "))).join(", ")})</small>` : ""}
+          ${l.change ? ` <small>(${esc(l.change)})</small>` : ""} <small>· ${esc(l.source)}</small></li>`).join("") || "<li>no labels: nothing mapped here</li>"}</ul>
+        <h3>${c.kind === "change" ? "Chip Pair" : "Chip"}</h3>
+        ${c.kind === "change" ? `<p class="sub">A ${term("Change Case")}: the labels are drawn on the later Chip (above); the earlier one is below.</p>
+        <img class="chip-earlier" src="/api/chips/${encodeURIComponent(c.chips[0].id)}.png" alt="Earlier aerial image ${esc(c.chips[0].id)}" style="width:100%">
+        <p class="mono">Earlier: ${esc(c.chips[0].id)}<br>NAIP ${esc(c.chips[0].date)} · ${esc(c.chips[0].source)}</p>` : ""}
+        <p class="mono">${c.kind === "change" ? "Later: " : ""}${esc(c.chip.id)}<br>NAIP ${esc(c.chip.date)} · ${esc(c.chip.source)}<br>${lat}, ${lon}</p>
+        <h3>Check it elsewhere</h3>
+        <p>Current imagery and maps at the Chip's centre (they may be newer than ${esc(c.chip.date.slice(0, 4))}):<br>
+          <a href="https://www.google.com/maps/@${lat},${lon},400m/data=!3m1!1e3" target="_blank" rel="noopener">Google satellite</a> ·
+          <a href="https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=17/${lat}/${lon}" target="_blank" rel="noopener">OpenStreetMap</a></p>
+        <h3>What to look for</h3>
+        <ul class="sub"><li>Is each label really there, in the cell it names?</li>
+          <li>Solar and wind counts: are the panels built and the turbines still standing?</li>
+          <li>Water: is there water, or a dry wash or lake bed?</li>
+          <li>Negatives: any small or rooftop solar USGS doesn't list?</li>
+          <li>Anything obvious with no label (buildings, roads, fields)?</li></ul>
+      </div>
+    </div>`;
+  draw();
+  document.querySelectorAll("[data-zoom]").forEach((b) => b.addEventListener("click", () => { VIEW.zoom = +b.dataset.zoom; draw(); }));
+  document.getElementById("t-grid").addEventListener("change", (ev) => { VIEW.grid = ev.target.checked; draw(); });
+  document.getElementById("t-labels").addEventListener("change", (ev) => { VIEW.labels = ev.target.checked; draw(); });
+  CASE_KEYS = { prev, next, draw };
+}
+
+let CASE_KEYS = null;
+document.addEventListener("keydown", (ev) => {
+  if (!CASE_KEYS || !location.hash.startsWith("#/cases/") || ev.target.matches("input, textarea, select")) return;
+  const zooms = [1, 2, 4];
+  if (ev.key === "ArrowLeft") location.hash = `#/cases/${encodeURIComponent(CASE_KEYS.prev)}`;
+  else if (ev.key === "ArrowRight") location.hash = `#/cases/${encodeURIComponent(CASE_KEYS.next)}`;
+  else if (ev.key === "+" || ev.key === "=") VIEW.zoom = zooms[Math.min(zooms.indexOf(VIEW.zoom) + 1, 2)];
+  else if (ev.key === "-") VIEW.zoom = zooms[Math.max(zooms.indexOf(VIEW.zoom) - 1, 0)];
+  else if (ev.key === "g") VIEW.grid = !VIEW.grid;
+  else if (ev.key === "l") VIEW.labels = !VIEW.labels;
+  else return;
+  ev.preventDefault();
+  if (document.getElementById("case-fig")) CASE_KEYS.draw();
+});
 
 async function batchesPage() {
   const me = SEQ;
@@ -704,12 +810,25 @@ async function batchPage(id, section) {
   } catch (e) {
     gateHtml = `<p class="sub">Regression gate: ${esc(e.message)}</p>`;
   }
+  let listenHtml = "";
+  try {
+    const l = await api(`/api/batches/${encodeURIComponent(id)}/listen`);
+    const by = l.source === "model" ? `written by ${esc(l.model)} from the facts` : "written by code from the facts";
+    listenHtml = `<h2>Listen</h2>
+      <audio controls preload="none" src="/api/batches/${encodeURIComponent(id)}/listen.mp3"></audio>
+      <p class="sub">A spoken summary of this result, ${by}, read by Amazon Polly (${esc(l.voice)}).
+        Made ${esc(l.created)} against Baseline ${esc(l.baseline_id || "none")}.</p>
+      <details><summary>Transcript</summary><p>${esc(l.text)}</p></details>`;
+  } catch (e) {
+    listenHtml = `<p class="sub">No spoken summary yet: <code>uv run clayzer listen ${esc(id)}</code></p>`;
+  }
   if (stale(me)) return;
   const c = b.config;
   $view.innerHTML = `<p><a href="#/batches">← Batches</a></p><h1>${esc(c.batch_id)}</h1>
     <p class="sub">${c.case_ids.length} Cases × ${c.repeats} Repeats · ${esc(c.caption_model)} · prompt
     <code>${esc(c.prompt_sha)}</code> (${esc(c.prompt_source)}) · Judge ${esc(c.judge_model || "off")} · Cases
     <code>${esc(c.cases_sha)}</code> · <a href="#/batches/${esc(id)}/provenance">full provenance</a></p>
+    ${listenHtml}
     ${gateHtml}
     ${provenancePanel(prov)}
     <h2>Report</h2>
@@ -735,9 +854,9 @@ async function runPage(batchId, caseId, repeat) {
       <table class="prov-settings">
         <tr><td>Case</td><td><code>${esc(k.id)}</code>, frozen in the Batch as <code>${esc(k.sha)}</code>
           with ${k.reference_labels} Reference Labels</td></tr>
-        <tr><td>Chip</td><td><code>${esc(k.chip_uri)}</code>
-          ${k.chip_sha256 ? `· SHA-256 <code title="${esc(k.chip_sha256)}">${esc(k.chip_sha256.slice(0, 12))}</code>, checked before the Run`
-            : '<span class="badge b-na">hash not recorded</span>'}</td></tr>
+        ${(k.chips || [{ uri: k.chip_uri, sha256: k.chip_sha256 }]).map((ch, i, all) => `<tr><td>${all.length > 1 ? (i ? "Later Chip" : "Earlier Chip") : "Chip"}</td><td><code>${esc(ch.uri)}</code>
+          ${ch.sha256 ? `· SHA-256 <code title="${esc(ch.sha256)}">${esc(ch.sha256.slice(0, 12))}</code>, checked before the Run`
+            : '<span class="badge b-na">hash not recorded</span>'}</td></tr>`).join("")}
         <tr><td>Settings</td><td>the Batch's: <a href="#/batches/${esc(batchId)}/provenance">models, prompts, Judge rubric, ontology, commit</a></td></tr>
       </table>
       ${provFiles(p.files)}
@@ -1247,6 +1366,7 @@ async function route() {
     else if (page === "how") await howPage(parts[1]);
     else if (page === "ontology") await ontologyPage(parts[1]);
     else if (page === "tasks") await tasksPage(parts[1]);
+    else if (page === "cases" && parts[1]) await casePage(parts[1]);
     else if (page === "cases") await casesPage();
     else if (page === "batches" && parts[1]) await batchPage(parts[1], parts[2]);
     else if (page === "batches") await batchesPage();

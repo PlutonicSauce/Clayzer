@@ -20,8 +20,9 @@ def reasoning_imagery_check(claim: str, kind: str, nodes: list[str]) -> str:
     return json.dumps({
         "verdict": "supported" if ok else "not supported",
         "supported_at": nodes if ok else [],
-        "places": [{"node": nodes[0], "answer": "yes" if ok else "no",
-                    "reason": "panels in rows" if ok else "no such thing here"}],
+        "places": {"columns": ["node", "answer", "reason"],
+                   "rows": [[nodes[0], "yes" if ok else "no",
+                             "panels in rows" if ok else "no such thing here"]]},
     })  # fmt: skip
 
 

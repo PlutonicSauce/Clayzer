@@ -29,7 +29,8 @@ CLAYZER_STORE=s3://clayzer-<account-id>-us-west-2/caption
 CLAYZER_NAIP_SOURCE=aws
 ```
 
-`uv run clayzer push --from <dir>` copies a local `chips/` + `cases/` folder into your bucket.
+`uv run clayzer push --from <dir>` copies a local `chips/` + `cases/` folder into your store;
+`--from fixtures/caption` loads the team's committed development Cases.
 
 ## Build Cases
 
@@ -42,9 +43,57 @@ uv run clayzer case uswtdb 3025453             # wind: USWTDB turbine id
 uv run clayzer case neg -119.20 35.45 --n 1    # negative: lon lat; refused if USGS is nearby
 ```
 
+A **Change Case** is a Chip Pair of one place before and after a USGS site was built:
+
+```sh
+uv run clayzer case uspvdb 401501 --change     # Kingbird B Solar, built 2016: NAIP 2014 → 2022
+```
+
+Both Chips share one footprint: the latest NAIP image before the install year and the latest
+after it. Each USGS label says whether its object `appeared`, `disappeared`, or was `unchanged`;
+OSM is today's map with no history, so its labels carry `change: unknown` and aren't scored for
+change. The Harness gets both images (earlier first) and `harness.CHANGE_PROMPT`, whose hash the
+Batch records as `change_prompt_sha`. Change Cases aren't verified with LGND Geo: its images
+aren't dated to the pair.
+
+The site is dated by USGS's install year, or by Global Renewables Watch's construction quarter
+when USGS has none (`src/clayzer/grw.py`; the two GeoPackages, 450 MB, download once into
+`~/.cache/clayzer/grw/`). GRW also cross-checks every USGS year. When they're more than a year
+apart, `clayzer case` refuses to build: on the dev sites, each source was wrong at times. Look at
+the site's NAIP images, then choose:
+
+```sh
+uv run clayzer case uspvdb 400117 --change                 # refused: USGS 2013, GRW 2018Q1
+uv run clayzer case uspvdb 400117 --change --dated-by usgs  # panels are in NAIP 2016: USGS is right
+```
+
+GRW's first quarter, 2017 Q4, means "already there when GRW started", not a date, so it can't
+bracket a pair (it can still contradict a USGS year of 2019 or later). Each Change Case records
+how it was dated in `dating`, and GRW's release under `answer_keys`.
+
 Positives use the latest NAIP image taken after the site was built. Site and turbine ids come
 from the USGS APIs (`https://energy.usgs.gov/api/uspvdb/v1/projects`,
 `https://energy.usgs.gov/api/uswtdb/v1/turbines`).
+
+Where a Chip clearly contradicts its labels (houses OSM never mapped, a dry wash mapped as
+water), record the fix in `fixtures/caption/cases/label-corrections.toml`. Every build applies
+it, so the fix survives a rebuild; hand-added labels have `source = "manual"` and no count unless
+the correction gives one.
+
+`uv run clayzer corroborate <cases.jsonl> ... --json out.json` checks the Cases' USGS solar and
+wind labels against OSM's own power mapping and lists each disagreement to check by eye; it also
+counts OSM features of the ontology's candidate classes in each Chip. Reruns resume from `--json`.
+
+**Setting spread.** A gate can only see what its Cases show. `clayzer spread` labels each
+Case's surroundings (one cell of its Chip without its subject) with an LGND settings classifier
+and reports, for solar, wind and negative Cases, how many sit in each setting, an evenness from
+0 (all one) to 1 (even), and the settings with none. `--suggest` searches LGND for each gap and
+prints `clayzer case` commands for the nearest USGS sites, at least 1 km from every Case.
+
+```sh
+uv run clayzer spread              # about one LGND call per Case the first time
+uv run clayzer spread --suggest    # plus one search per gap
+```
 
 ## The evaluation loop
 
@@ -59,9 +108,15 @@ uv run clayzer baseline accept <batch-id>              # writes baselines/defaul
 uv run clayzer batch --repeats 3 --label terse --prompt my-prompt.txt
 uv run clayzer compare <baseline-batch-id> <candidate-batch-id>
 uv run clayzer gate <candidate-batch-id>               # exit 0 pass, 1 fail, 2 inconclusive
+uv run clayzer experiment <candidate-batch-id> --hypothesis "Expected improvement"
+# Add --accept to promote a passing, comparable development Batch and record it as kept.
 ```
 
-Other options: `--caption-model`, `--only <case-id> ...`, `--no-judge`, `--no-narrate`.
+Other options: `--caption-model`, `--only <case-id> ...`, `--no-judge`, `--no-narrate`,
+`--no-listen`.
+
+See [the regression-gate guide](regression-gate.md) for the one-change prompt workflow,
+saved JSON and Markdown experiment logs, and an untested coverage prompt to evaluate.
 
 | Command | What it does |
 |---|---|
@@ -70,6 +125,7 @@ Other options: `--caption-model`, `--only <case-id> ...`, `--no-judge`, `--no-na
 | `clayzer rescore <batch-id>` | score its stored Captions again with the current scorer, no model calls |
 | `clayzer trace <batch-id> <case-id> --repeat 1` | one Run, Step by Step (`--json` for the raw Trace) |
 | `clayzer summarize <batch-id>` | rebuild every Run's summary offline (`--narrate` writes missing narratives) |
+| `clayzer listen <batch-id>` | a spoken summary of the result, saved as an MP3 (`--play` plays it, `--no-model` skips Bedrock) |
 
 Each Run ends `ok`, `harness_fault` (no usable Caption: scored 0), or `sandbox_failure` (Bedrock,
 network, or credentials: no valid score, excluded). Results are saved after every Run. Expired
@@ -90,6 +146,7 @@ A Batch writes `batches/<batch-id>/` in the store:
   Claims and Reference Labels on the 3×3 grid, mean ± Spread per Case, and every Repeat's Caption
 - `traces/`: one Trace per Run (`<case-id>--r<repeat>.jsonl`), with its summary and narrative
 - `runs/`: one report per Run (`<case-id>--r<repeat>.html` and `.json`)
+- `listen.mp3`, `listen.json`: the spoken summary and its script, once `clayzer listen` has run
 
 A **Trace** records every model and tool call as a Step: the full prompt and response, the image
 by key and hash, wall time and Bedrock's latency, tokens, retries, and the error code of anything
@@ -100,6 +157,22 @@ request, a missing `submit_caption` call, anything unrecognized), an Environment
 Every Run gets a **summary** of its Trace: code writes the facts (`summarize.py`), and a model
 writes a readable narrative from the Trace alone (`narrate.py`, `CLAYZER_SUMMARY_MODEL`). The
 narrative is saved with a hash of its Trace, so replays never call a model.
+
+### Listening to a result
+
+Every finished Batch gets a spoken summary for people who'd rather hear the result than read
+the report (`listen.py`); `--no-listen` skips it, and `clayzer listen <batch-id>` makes or remakes
+one for any Batch. Code works out the facts: how many places were
+captioned, the scores out of 100 and how they moved against the Baseline, the regression gate's
+verdict, and which places dropped. Nova Pro (`CLAYZER_SUMMARY_MODEL`) turns the facts into a short
+script, and Amazon Polly reads it aloud. If the script states a number the facts don't contain,
+or Bedrock isn't reachable, the code-written script is used instead.
+
+The MP3 and its script are saved in the Batch, with a hash of the facts. The web app's Batch
+page plays the saved file and shows the transcript, so the hosted, read-only app never calls
+Bedrock or Polly. Running `listen` again rewrites them only when the facts changed, for example
+after a `rescore` or a new Baseline (`--force` rewrites anyway). It needs `polly:SynthesizeSpeech`
+in addition to Bedrock.
 
 ### How it's scored
 
@@ -114,10 +187,22 @@ narrative is saved with a hash of its Trace, so replays never call a model.
 
 **The regression gate.** A Case's score regresses when its mean drops by more than max(0.05, the
 Baseline's Spread). Any regression, or a Baseline Case missing from the candidate, fails the gate;
-Sandbox Failures make it inconclusive. It warns when a measurement setting differs (Judge, Judge
-rubric, embedding model, Cases, Chips, ontology, scorer version), when there are fewer than 3
-Repeats, and when tokens per Caption rise more than 25% (`--max-token-increase 0.5` makes that
-fail instead).
+Sandbox Failures make it inconclusive. Changed or missing measurement provenance (Judge, Judge
+rubric, embedding model, Cases, Chips, ontology, scorer version), changed region, different
+Repeats, and unknown changed pipeline settings also prevent a pass. It warns when there are
+fewer than 3 Repeats and when tokens per Caption rise more than 25%
+(`--max-token-increase 0.5` makes that fail instead). A requested token cap with missing usage
+is inconclusive. Invalid numbers or stale summaries are rejected with an input error.
+
+An unfinished Batch is also inconclusive if its completed Run count or per-Case Repeats are
+short, even without a stop marker. A known regression still fails an incomplete Batch. Drops
+exactly at the allowed threshold pass. Tolerance and token caps must be finite and non-negative.
+
+Baseline replacement stages complete files, locks local readers and writers, and checks that
+the Baseline used by an experiment has not changed before promotion. A kept experiment's
+receipt is saved with the Baseline. If its store log fails after promotion, restore the store
+and run `clayzer experiment-recover --baseline <name>` to reconstruct the JSON and Markdown log.
+See the [adversarial audit](regression-gate-audit.md) for tested failure paths and remaining limits.
 
 ## Tools
 
@@ -154,6 +239,96 @@ check catches wrong objects far better than a Claim one cell off.
 uv run clayzer batch --repeats 3 --verify --label verify
 ```
 
+**A verifier per class.** `ontology/verifiers.toml` routes each object class's Claims to the
+verifier that works for it: `imagery_check` (above, the default), `classifier` (the cell's image
+is labelled by an LGND classifier built from the file's text examples, one call for all such
+Claims; built once per LGND account, the first time a Batch needs it), or `none` (not checked,
+kept as skipped). Calibration measures both verifiers on the development Cases and chooses:
+
+```sh
+uv run clayzer verifier calibrate            # report only; about 50 LGND calls the first time
+uv run clayzer verifier calibrate --write    # also rewrite the routes; commit the file
+uv run clayzer verifier routes               # what each class uses now, and why
+```
+
+It writes Claims of its own (one per Case per class, at cells the Reference Labels settle) and
+reports, per class, the share of true Claims each verifier keeps and false Claims it removes.
+A verifier gets the route only if it beats keeping every Claim. Probes where the verifier and
+the label disagree are listed for a look by eye: a label is often what's wrong. Image lookups
+are cached in the store (`lgnd/lookups.json`), and every command that spends LGND calls says
+how many first and stops above `--max-calls` (default 100; the free tier allows 150 a day).
+Reports go to `calibration/verifiers/<time>/`. Batches record the routes' hash
+(`verifiers_sha`), so Compare shows when they changed.
+
+## Importing a Caption Set
+
+A Caption Set from any source (Clay's, a benchmark's, another pipeline's) becomes Cases, one per
+caption, in the format of [caption-design.md §3.6](caption-design.md#36-evaluating-caption-data-from-any-source):
+JSON Lines, or GeoParquet with `uv sync --extra import`. Answer Keys attach by each row's
+footprint and date, as for our own Chips; a USGS site built after the acquisition year doesn't
+count. Rows without a location become Cases without Reference Labels. Claims about objects too
+small for the row's `gsd_m` are flagged.
+
+```sh
+uv run clayzer import captions.jsonl --name clay-v2         # → cases/import-clay-v2.jsonl
+uv run clayzer import --from-batch <batch-id> --export set.jsonl   # our own Captions, as a check
+```
+
+`--from-batch` turns a Batch's Captions into a Caption Set and imports it: the labels should
+match that Batch's Cases, since the footprints and dates are the same.
+
+RSICD's human captions convert to a Caption Set too. RSICD has no locations, dates, or published
+ground sample distance, so its rows are unlocated (`geometry`, `datetime`, and `gsd_m` null):
+its Cases can be judged and searched but not grounded, and the too-small check can't be made.
+
+```sh
+uv run clayzer rsicd --split test                  # 5,465 captions of 1,093 images → data/rsicd-test.jsonl
+uv run clayzer import data/rsicd-test.jsonl --name rsicd-test
+```
+
+The captions file is downloaded once into `~/.cache/clayzer/rsicd/`. RSICD states no license:
+never commit its captions or images, and cite Lu et al. 2017.
+
+## Embeddings for the Chips
+
+LGND's Clay v1.5 embeddings (256 numbers per 1,280 m Sentinel-2 cell per month, from 2017) are
+open data on Source Cooperative, read anonymously: no LGND sign-in or quota, no AWS charge.
+`clayzer embeddings` joins each of the region's Chips to the cell holding its centre, in the
+month of its NAIP date (or the nearest within two months), and saves one row per Chip to
+`embeddings/caption-<region>.jsonl` in the store:
+
+```sh
+uv sync --extra embeddings
+uv run clayzer embeddings                 # the dev Chips
+uv run clayzer --region test embeddings   # the Texas Chips
+```
+
+It reads only the row groups around the Chips, never whole files (a geohash-month is one file
+of several GB). One cell covers several Chips, so nearby Chips can share an embedding. A Chip
+from before 2017 has none.
+
+**Attribution (CC BY 4.0):** LGND embeddings (Clay v1.5), https://source.coop/clay/lgnd-embeddings.
+Every row carries it; anything built on them must credit it too.
+
+## Claims from free text
+
+Grounding scores structured Claims, but most caption sets are text only. `clayzer extract` has a
+model (CLAYZER_EXTRACT_MODEL, default the Judge's) read a caption's text, never the image, and
+write the Claims it makes. A count or position the text doesn't give stays `null`, and grounding
+skips it rather than scoring a guess. Hedged things ("likely", "may be") go in `uncertain`.
+
+```sh
+uv run clayzer extract "A solar farm in the centre, with a dirt road along its west edge."
+uv run clayzer extract --check <batch-id>                         # against the Harness's own Claims
+uv run clayzer extract --labels labels/extraction/sample.jsonl    # against hand-made Claims
+```
+
+The extraction is calibrated like the Judge. `--check` compares it with the Claims the Harness
+wrote with the same text; `--labels` with Claims people made, labelled on the web app's
+`/label` page (`uv run clayzer ui --calibrate`; see
+[labels/extraction/README.md](../labels/extraction/README.md)). Each extraction is a `judge` Step
+(`role: scoring`); the Traces and `agreement.json` go to the store.
+
 ## The team web app
 
 ```sh
@@ -174,6 +349,7 @@ Put these in `.env` at the repo root (gitignored), or export them.
 | `CLAYZER_JUDGE_MODEL` | `us.anthropic.claude-opus-5-5` |
 | `CLAYZER_EMBED_MODEL` | `amazon.titan-embed-text-v2:0` |
 | `CLAYZER_SUMMARY_MODEL` | `us.amazon.nova-pro-v1:0` (writes Run narratives) |
+| `CLAYZER_VOICE`, `CLAYZER_VOICE_ENGINE` | `Emma`, `neural` (the Polly voice for `clayzer listen`; a generative voice such as `Amy` or `Ruth` needs `generative`) |
 | `CLAYZER_TOKEN_BUDGET` | unset (the Workflow Score's cost part is left out) |
 | `CLAYZER_BEDROCK_ENDPOINT_URL` | unset (a private Bedrock endpoint, if your network needs one) |
 | `CLAYZER_OVERPASS_URL` | `https://overpass-api.de/api/interpreter` |
@@ -205,3 +381,8 @@ Leave out `-c store=...` to have the stack create a new bucket. With Podman, set
 `CDK_DOCKER=podman`. The hosted app never starts Batches, and its role can only read the store
 prefix. `npx aws-cdk@2 destroy` removes everything except the bucket. To build the image on its
 own: `docker build -t clayzer .` (see the [Dockerfile](../Dockerfile)).
+
+CI ([.github/workflows/ci.yml](../.github/workflows/ci.yml)) can deploy the same stack on every
+push to main, assuming a role through GitHub's OIDC so no AWS keys are stored in GitHub.
+[deploy.md](deploy.md) walks through the manual deploy, what each step becomes in CI, and the
+one-time setup the CI deploy needs.

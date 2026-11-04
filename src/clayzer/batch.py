@@ -35,12 +35,15 @@ import statistics
 from contextlib import nullcontext
 from dataclasses import asdict, dataclass, field, fields
 from datetime import UTC, datetime
+from uuid import uuid4
 
 from botocore.exceptions import BotoCoreError, ClientError
 
-from clayzer import harness, provenance
+from clayzer import harness, lgnd, provenance, verifiers
 from clayzer.cases import parse_jsonl, to_jsonl
 from clayzer.config import Settings, bedrock
+from clayzer.cost import per, run_cost, verified_claims
+from clayzer.faults import HARNESS_CODES
 from clayzer.grounding import grounding
 from clayzer.judge import fidelity
 from clayzer.retrieval import retrieval
@@ -50,7 +53,7 @@ from clayzer.workflow import score as workflow_score
 
 # Bump when grounding or summary logic changes, so the regression gate warns that scores from
 # before and after aren't comparable.
-SCORER_VERSION = "grounding-3+workflow-1"  # correctness and coverage; the Workflow Score
+SCORER_VERSION = "grounding-4+workflow-1"  # exact-cell position; the Workflow Score
 
 OK, HARNESS_FAULT, SANDBOX_FAILURE = "ok", "harness_fault", "sandbox_failure"
 EXPIRED = {
@@ -90,12 +93,19 @@ class BatchConfig:
     ontology_context: bool = False
     # Provenance (provenance.py). None means the Batch predates recording it.
     judge_prompt_sha: str | None = None
+    # The change prompt's hash, set only when the Batch has a Change Case (harness.CHANGE_PROMPT).
+    change_prompt_sha: str | None = None
     ontology_version: str | None = None
     ontology_sha: str | None = None
     chips_sha: str | None = None
     code_commit: str | None = None
     code_dirty: bool | None = None
     summary_model: str | None = None
+    # A hash of ontology/verifiers.toml, the route each class's Claims are verified by; None
+    # without verification.
+    verifiers_sha: str | None = None
+    # A replayed Batch: the recorded Batch whose Captions it rescored (replay), else None.
+    replayed_from: str | None = None
     # Settings this version doesn't know, from a Batch another branch wrote to the shared store.
     extra: dict = field(default_factory=dict)
 
@@ -182,6 +192,27 @@ def _ontology_context(cfg: BatchConfig, chip: dict) -> str | None:
     return context or None
 
 
+def _harness_fault(base: dict, case: dict, cfg: BatchConfig, tracer, error: str, step: dict):
+    """A Run whose Harness produced no usable Caption: scored 0, since it's the fault of the
+    system under test (module docstring)."""
+    empty = {"text": "", "objects": [], "relations": [], "uncertain": []}
+    result = {
+        **base, "status": HARNESS_FAULT, "error": error,
+        "grounding": {
+            **grounding(empty, case["reference_labels"]),
+            "correctness": 0.0,
+            "coverage": 0.0 if case["reference_labels"] else None,
+        },
+        "fidelity": {"score": 0.0, "issues": ["no Caption"]} if cfg.judge_model else None,
+        "seconds_to_caption": step.get("seconds"),
+        "caption_tokens": (step.get("usage") or {}).get("totalTokens"),
+    }  # fmt: skip
+    result["faults"] = tracer.finish(HARNESS_FAULT, None, error)
+    result["workflow"] = workflow_score(tracer.run, tracer.steps)
+    result["cost"], result["verified_claims"] = run_cost(tracer.steps), 0
+    return result, {**base, **empty}
+
+
 def _run_one(
     client, cfg: BatchConfig, prompt: str, case: dict, repeat: int, store, toolbox=None,
     verifier=None, chip_shas: dict[str, str] | None = None,
@@ -193,52 +224,59 @@ def _run_one(
     matches the one hashed when the Batch started is a Sandbox Failure: scoring it would score
     a different input under the same name.
     """
-    chip = case["chips"][0]
+    chips = case["chips"]
+    chip = chips[0]
+    # A Change Case's Chip Pair (earlier first) goes to the Harness and the Judge as a list.
+    pair = case.get("kind") == "change"
     run_id = f"{case['id']}#{repeat}"
     base = {"run_id": run_id, "case_id": case["id"], "repeat": repeat}
     # The Harness gets the Chip id and image only, read from chips/ and never from cases/
     # (ADR-0006).
-    if not chip["uri"].startswith("chips/"):
-        raise ValueError(f"Chip uri must be a chips/ key: {chip['uri']}")
-    png = store.get(chip["uri"])
-    expected = (chip_shas or {}).get(chip["uri"])
-    if expected and hashlib.sha256(png).hexdigest() != expected:
-        error = f"{chip['uri']} changed since the Batch started (SHA-256 no longer matches)"
-        return {**base, "status": SANDBOX_FAILURE, "error": error}, None
+    pngs, shas = [], []
+    for c in chips:
+        if not c["uri"].startswith("chips/"):
+            raise ValueError(f"Chip uri must be a chips/ key: {c['uri']}")
+        pngs.append(store.get(c["uri"]))
+        shas.append((chip_shas or {}).get(c["uri"]))
+        if shas[-1] and hashlib.sha256(pngs[-1]).hexdigest() != shas[-1]:
+            error = f"{c['uri']} changed since the Batch started (SHA-256 no longer matches)"
+            return {**base, "status": SANDBOX_FAILURE, "error": error}, None
+    png = pngs if pair else pngs[0]
+    uri = [c["uri"] for c in chips] if pair else chip["uri"]
+    prompt_sha = cfg.prompt_sha
+    if pair:
+        # The Batch's prompt is for one Chip; a Chip Pair gets the change prompt, and its Trace
+        # records that prompt's hash, not the Batch's.
+        prompt, prompt_sha = harness.CHANGE_PROMPT, cfg.change_prompt_sha
     tracer = Tracer(
         RunInfo(run_id=run_id, task="caption", case_id=case["id"], repeat=repeat,
-                batch_id=cfg.batch_id, model_id=cfg.caption_model, prompt_sha=cfg.prompt_sha,
-                tools=[], metadata={"chip_id": chip["id"], "chip_sha256": expected,
+                batch_id=cfg.batch_id, model_id=cfg.caption_model, prompt_sha=prompt_sha,
+                tools=[], metadata={"chip_id": [c["id"] for c in chips] if pair else chip["id"],
+                          "chip_sha256": shas if pair else shas[0],
                           "judge_model": cfg.judge_model}),
         [StoreSink(store), SummarySink(store)],
     )  # fmt: skip
     try:
         try:
-            # The verifier, not the model, gets the Chip's footprint (ADR-0009).
+            # The verifier, not the model, gets the Chip's footprint (ADR-0009). LGND's images
+            # aren't dated to a Chip Pair's two dates, so Change Cases aren't verified.
+            if pair:
+                verifier = None
             footprint = {"bbox": chip["bbox"], "date": chip.get("date")} if verifier else None
             onto_ctx = _ontology_context(cfg, chip) if cfg.ontology_context else None
             cap, step = harness.caption(
-                client, cfg.caption_model, chip["id"], png, prompt, tracer, chip["uri"],
+                client, cfg.caption_model, chip["id"], png, prompt, tracer, uri,
                 toolbox, cfg.max_turns, verifier, footprint, onto_ctx,
             )  # fmt: skip
         except harness.HarnessFault as e:
-            empty = {"text": "", "objects": [], "relations": [], "uncertain": []}
-            result = {
-                **base, "status": HARNESS_FAULT, "error": str(e),
-                "grounding": {
-                    **grounding(empty, case["reference_labels"]),
-                    "correctness": 0.0,
-                    "coverage": 0.0 if case["reference_labels"] else None,
-                },
-                "fidelity": {"score": 0.0, "issues": ["no Caption"]} if cfg.judge_model else None,
-                "seconds_to_caption": e.step["seconds"],
-                "caption_tokens": e.step["usage"].get("totalTokens"),
-            }  # fmt: skip
-            result["faults"] = tracer.finish(HARNESS_FAULT, None, str(e))
-            result["workflow"] = workflow_score(tracer.run, tracer.steps)
-            return result, {**base, **empty}
+            return _harness_fault(base, case, cfg, tracer, str(e), e.step)
         except (ClientError, BotoCoreError) as e:
             status = _classify(e)
+            # A request the captioner's model rejected or answered malformed is the system under
+            # test failing, as faults.py attributes it (ADR-0003): scored 0, not retried.
+            code = e.response["Error"]["Code"] if isinstance(e, ClientError) else None
+            if code in HARNESS_CODES:
+                return _harness_fault(base, case, cfg, tracer, str(e)[:500], {})
             faults = tracer.finish(status, None, str(e)[:500])
             return {**base, "status": status, "error": str(e)[:500], "faults": faults}, None
 
@@ -253,7 +291,7 @@ def _run_one(
         }  # fmt: skip
         if cfg.judge_model:
             try:
-                verdict, _ = fidelity(client, cfg.judge_model, cap, png, tracer, chip["uri"])
+                verdict, _ = fidelity(client, cfg.judge_model, cap, png, tracer, uri)
                 result["fidelity"] = verdict
             except (ClientError, BotoCoreError, RuntimeError) as e:
                 if isinstance(e, ClientError | BotoCoreError):
@@ -264,6 +302,8 @@ def _run_one(
                 return {**failed, "faults": faults}, cap
         result["faults"] = tracer.finish(OK, cap["text"])
         result["workflow"] = workflow_score(tracer.run, tracer.steps)
+        result["cost"] = run_cost(tracer.steps)
+        result["verified_claims"] = verified_claims(result["grounding"])
         return result, cap
     except CredentialsExpired as e:
         tracer.finish("stopped", None, f"credentials expired: {e}"[:500])
@@ -312,7 +352,11 @@ def create(
     """Write a new Batch's configuration, prompt, and frozen Cases. Returns the Batch id."""
     # Labels become part of store keys, so only letters, digits, dashes and underscores.
     label = re.sub(r"[^A-Za-z0-9_-]+", "-", label).strip("-")[:40]
-    batch_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ") + (f"-{label}" if label else "")
+    batch_id = (
+        datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
+        + f"-{uuid4().hex}"
+        + (f"-{label}" if label else "")
+    )
     frozen = to_jsonl(cases)
     judge_prompt = provenance.judge_prompt().encode()
     chips = (json.dumps(provenance.chip_manifest(store, cases), indent=2) + "\n").encode()
@@ -337,12 +381,16 @@ def create(
         verify=verify,
         ontology_context=ontology_context,
         judge_prompt_sha=_sha(judge_prompt) if judge else None,
+        change_prompt_sha=_sha(harness.CHANGE_PROMPT.encode())
+        if any(c.get("kind") == "change" for c in cases)
+        else None,
         ontology_version=onto_version,
         ontology_sha=onto_sha,
         chips_sha=_sha(chips),
         code_commit=commit,
         code_dirty=dirty,
         summary_model=summary_model(),
+        verifiers_sha=_sha(verifiers.DEFAULT.read_bytes()) if verify else None,
     )
     store.put(
         _key(batch_id, "batch.json"), (json.dumps(asdict(cfg), indent=2) + "\n").encode(), JSON
@@ -366,6 +414,8 @@ def resume(batch_id: str, settings: Settings, store, progress=print, narrate: bo
     if cfg.judge_prompt_sha and _sha(provenance.judge_prompt().encode()) != cfg.judge_prompt_sha:
         # Finishing with a different rubric would mix two Judges in one Batch.
         raise ValueError(f"the Judge's rubric changed since {batch_id} started; start a new Batch")
+    if cfg.change_prompt_sha and _sha(harness.CHANGE_PROMPT.encode()) != cfg.change_prompt_sha:
+        raise ValueError(f"the change prompt changed since {batch_id} started; start a new Batch")
     client = bedrock(settings)  # models come from the Batch's own config, not the settings
     watch_retries(client)
     done = {(r["case_id"], r["repeat"]) for r in b["results"] if r["status"] != SANDBOX_FAILURE}
@@ -386,6 +436,13 @@ def resume(batch_id: str, settings: Settings, store, progress=print, narrate: bo
     with tools as box:
         model_tools = box.view(cfg.tools) if box is not None and cfg.tools else None
         verifier = box.view([cfg.verify]) if box is not None and cfg.verify else None
+        routes = verifiers.load()
+        if verifier is not None and routes.uses_classifier():
+            # Classifiers are saved per LGND account: build it once, before the first Run.
+            # If that fails, classifier-routed Claims stay, unverified (verify.py).
+            error = lgnd.ensure_classifier(verifier.call, routes.classifier, routes.examples)
+            if error:
+                progress(f"  the LGND classifier {routes.classifier} isn't available: {error}")
         for i, (case, repeat) in enumerate(todo, 1):
             try:
                 result, cap = _run_one(
@@ -450,6 +507,29 @@ def _retrieval(client, cfg: BatchConfig, cases: list[dict], captions: list[dict]
 COMPONENTS = ("precision", "recall", "count", "position", "attributes", "relations")
 
 
+def _lookalikes(cases: list[dict], results: list[dict]) -> dict | None:
+    """Per look-alike kind (fixtures/caption-lookalike): in how many Runs a Caption claimed the
+    thing the Case imitates, which grounding already marks a false positive. None without any."""
+    by_id = {c["id"]: c for c in cases if c.get("lookalike")}
+    if not by_id:
+        return None
+    kinds: dict[str, dict] = {}
+    for r in results:
+        case = by_id.get(r["case_id"])
+        if case is None or r["status"] == SANDBOX_FAILURE:
+            continue
+        of = case["lookalike"]["of"]
+        rows = (r.get("grounding") or {}).get("rows", [])
+        fooled = any(x["verdict"] == "false positive" and x["claim"]["object"] == of for x in rows)
+        k = kinds.setdefault(
+            case["lookalike"]["kind"], {"of": of, "cases": set(), "runs": 0, "fooled": 0}
+        )
+        k["cases"].add(case["id"])
+        k["runs"] += 1
+        k["fooled"] += fooled
+    return {name: {**k, "cases": len(k["cases"])} for name, k in sorted(kinds.items())}
+
+
 def summarize(cfg: BatchConfig, cases: list[dict], results: list[dict], retr: list[dict]) -> dict:
     by_case: dict[str, list[dict]] = {c["id"]: [] for c in cases}
     for r in results:
@@ -481,6 +561,10 @@ def summarize(cfg: BatchConfig, cases: list[dict], results: list[dict], retr: li
     # The rubric's measure: how often the right Caption is the top result for a query.
     top1 = [row["recall@1"] for row in retr if row.get("recall@1") is not None]
     prep = [c.get("prep_seconds") for c in cases if c.get("prep_seconds") is not None]
+    # Verified Claims per dollar and per GPU-second, over the Runs whose cost is known: Runs
+    # from before Traces, or with an unpriced model, are left out of both sums (CAP-12).
+    priced = [r for r in scored if (r.get("cost") or {}).get("usd") is not None]
+    gpu = [r for r in scored if (r.get("cost") or {}).get("gpu_seconds")]
     return {
         "batch_id": cfg.batch_id,
         "cases": per_case,
@@ -497,12 +581,22 @@ def summarize(cfg: BatchConfig, cases: list[dict], results: list[dict], retr: li
             # Cost is partial on Bedrock: time to output and tokens, no GPU time (CAP-12).
             "seconds_per_caption": _mean(r.get("seconds_to_caption") for r in scored),
             "tokens_per_caption": _mean(r.get("caption_tokens") for r in scored),
+            "usd_per_caption": _mean(r["cost"]["usd"] for r in priced),
+            "verified_claims_per_caption": _mean(r.get("verified_claims") for r in scored),
+            "verified_claims_per_dollar": per(
+                sum(r["verified_claims"] for r in priced), sum(r["cost"]["usd"] for r in priced)
+            ),
+            "verified_claims_per_gpu_second": per(
+                sum(r["verified_claims"] for r in gpu), sum(r["cost"]["gpu_seconds"] for r in gpu)
+            ),
             "runs": {
                 "planned": len(cases) * cfg.repeats,
                 "ok": sum(r["status"] == OK for r in results),
                 "harness_faults": sum(r["status"] == HARNESS_FAULT for r in results),
                 "sandbox_failures": sum(r["status"] == SANDBOX_FAILURE for r in results),
             },
+            # Look-alike negatives a Caption mistook for what they imitate; not a gated metric.
+            "lookalikes": _lookalikes(cases, results),
             # Failed Steps by who's to blame (ADR-0003), over every Run including failed ones.
             "step_faults": {
                 k: sum((r.get("faults") or {}).get(k, 0) for r in results)
@@ -512,34 +606,47 @@ def summarize(cfg: BatchConfig, cases: list[dict], results: list[dict], retr: li
     }
 
 
+def _regrade(r: dict, cap: dict | None, labels: list[dict], trace: bytes | None) -> None:
+    """Ground one scored Run again against labels, and take its Workflow Score and cost from its
+    Trace (Runs from before Traces get none). Harness Faults stay scored as 0."""
+    from clayzer.trace import loads
+
+    if r["status"] == OK and cap is not None:
+        r["grounding"] = grounding(cap, labels)
+    elif r["status"] == HARNESS_FAULT:
+        empty = {"text": "", "objects": [], "relations": [], "uncertain": []}
+        r["grounding"] = {
+            **grounding(empty, labels),
+            "correctness": 0.0,
+            "coverage": 0.0 if labels else None,
+        }
+    if r["status"] in (OK, HARNESS_FAULT):
+        r["verified_claims"] = verified_claims(r["grounding"])
+        if trace is not None:
+            run, steps = loads(trace)
+            r["workflow"] = workflow_score(run, steps)
+            r["cost"] = run_cost(steps)
+
+
 def rescore(batch_id: str, store) -> dict:
     """Score a Batch's stored Captions again with the current scorer, without calling any model.
 
-    Grounding is recomputed against the Batch's frozen Cases, and the Workflow Score from each
-    Run's stored Trace (Runs from before Traces get none); fidelity and retrieval are kept (they
-    don't depend on the scorers). Harness Faults stay scored as 0.
+    Grounding and verified Claims are recomputed against the Batch's frozen Cases, and the
+    Workflow Score and cost from each Run's stored Trace (Runs from before Traces get none);
+    fidelity and retrieval are kept (they don't depend on the scorers), so the Judge's saved
+    verdicts are reused, never requested again. Harness Faults stay scored as 0.
     """
     from dataclasses import replace
 
-    from clayzer.trace import loads, trace_key
+    from clayzer.trace import trace_key
 
     b = load(store, batch_id)
     labels = {c["id"]: c["reference_labels"] for c in b["cases"]}
     captions = {(c["case_id"], c["repeat"]): c for c in b["captions"]}
     for r in b["results"]:
-        cap = captions.get((r["case_id"], r["repeat"]))
-        if r["status"] == OK and cap is not None:
-            r["grounding"] = grounding(cap, labels[r["case_id"]])
-        elif r["status"] == HARNESS_FAULT:
-            empty = {"text": "", "objects": [], "relations": [], "uncertain": []}
-            r["grounding"] = {
-                **grounding(empty, labels[r["case_id"]]),
-                "correctness": 0.0,
-                "coverage": 0.0 if labels[r["case_id"]] else None,
-            }
         tkey = trace_key(batch_id, r["case_id"], r["repeat"])
-        if r["status"] in (OK, HARNESS_FAULT) and store.exists(tkey):
-            r["workflow"] = workflow_score(*loads(store.get(tkey)))
+        trace = store.get(tkey) if store.exists(tkey) else None
+        _regrade(r, captions.get((r["case_id"], r["repeat"])), labels[r["case_id"]], trace)
     cfg = replace(b["config"], scorer_version=SCORER_VERSION)
     store.put(
         _key(batch_id, "batch.json"), (json.dumps(asdict(cfg), indent=2) + "\n").encode(), JSON
@@ -551,6 +658,109 @@ def rescore(batch_id: str, store) -> dict:
     store.put(_key(batch_id, "summary.json"), (json.dumps(summary, indent=2) + "\n").encode(), JSON)
     write_reports(store, batch_id)
     return summary
+
+
+def _rerank(rows: list[dict], cases: list[dict]) -> tuple[list[dict], list[str]]:
+    """Retrieval rows rescored for new Reference Labels, offline. A stored row keeps each
+    query's full ranking, which depends only on Caption text, so only relevance changes. A query
+    that had nothing relevant before was never ranked; it's returned as not replayable."""
+    from clayzer.retrieval import QUERIES
+
+    labels = {c["id"]: {lb["object"] for lb in c["reference_labels"]} for c in cases}
+    out, missing = [], set()
+    for row in rows:
+        k = next((key for key in row if key.startswith("recall@")), "recall@1")
+        n = int(k.split("@")[1])
+        stored = {q["query"]: q for q in row["queries"]}
+        docs = stored[next(iter(stored))]["ranked"] if stored else []
+        queries = []
+        for query, target in QUERIES.items():
+            relevant = {cid for cid in docs if target in labels.get(cid, set())}
+            if not relevant:
+                continue
+            if query not in stored:
+                missing.add(query)
+                continue
+            ids = stored[query]["ranked"]
+            first = next(i for i, cid in enumerate(ids) if cid in relevant)
+            queries.append({"query": query, "relevant": sorted(relevant), "ranked": ids,
+                            "reciprocal_rank": 1 / (first + 1),
+                            k: len(relevant & set(ids[:n])) / len(relevant)})  # fmt: skip
+        m = len(queries)
+        out.append({"repeat": row["repeat"], "queries": queries,
+                    "mrr": sum(q["reciprocal_rank"] for q in queries) / m if m else None,
+                    k: sum(q[k] for q in queries) / m if m else None})  # fmt: skip
+    return out, sorted(missing)
+
+
+def replay(batch_id: str, store, cases: list[dict], label: str = "", reports: bool = True) -> str:
+    """A new Batch from a recorded one, scored against `cases`: the same Cases and Chips with
+    updated Reference Labels. No model, MCP server, credentials, or network beyond the store
+    (REQ-09). Returns the new Batch's id.
+
+    The Harness never sees Reference Labels (ADR-0006) and the Judge doesn't either, so the
+    recorded Captions, Traces, fidelity verdicts, summaries, and narratives all stand. Grounding
+    and the Workflow Score are recomputed, and retrieval is re-ranked from the stored rankings.
+    Raises if the Cases or their Chips differ, or a retrieval query can't be replayed.
+    """
+    from dataclasses import replace
+
+    from clayzer.narrate import narrative_key
+    from clayzer.summarize import summary_key
+    from clayzer.trace import trace_key
+
+    b = load(store, batch_id)
+    old = {c["id"]: c for c in b["cases"]}
+    new = {c["id"]: c for c in cases}
+    if set(old) != set(new):
+        raise ValueError(f"replay needs the same Cases: {sorted(set(old) ^ set(new))[:5]} differ")
+    for cid, c in new.items():
+        if [x["uri"] for x in c["chips"]] != [x["uri"] for x in old[cid]["chips"]]:
+            raise ValueError(f"{cid}'s Chips differ from the recorded Batch's")
+    retr, missing = _rerank(b["retrieval"], cases)
+    if missing:
+        raise ValueError(f"can't replay retrieval for {missing}: nothing was relevant before")
+
+    label = re.sub(r"[^A-Za-z0-9_-]+", "-", label).strip("-")[:40]
+    new_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ") + (f"-{label}" if label else "")
+    frozen = to_jsonl(cases)
+    cfg = replace(b["config"], batch_id=new_id, label=label, scorer_version=SCORER_VERSION,
+                  created=datetime.now(UTC).isoformat(timespec="seconds"),
+                  cases_sha=_sha(frozen), replayed_from=batch_id)  # fmt: skip
+    captions = {(c["case_id"], c["repeat"]): c for c in b["captions"]}
+    results = []
+    for r in b["results"]:
+        r = dict(r)
+        labels, cap = (
+            new[r["case_id"]]["reference_labels"],
+            captions.get((r["case_id"], r["repeat"])),
+        )
+        tkey = trace_key(batch_id, r["case_id"], r["repeat"])
+        trace = store.get(tkey) if store.exists(tkey) else None
+        if trace is not None:
+            store.put(trace_key(new_id, r["case_id"], r["repeat"]), trace, NDJSON)
+        _regrade(r, cap, labels, trace)
+        for key in (summary_key, narrative_key):
+            src = key(batch_id, r["case_id"], r["repeat"])
+            if store.exists(src):
+                store.put(key(new_id, r["case_id"], r["repeat"]), store.get(src), JSON)
+        results.append(r)
+
+    store.put(_key(new_id, "batch.json"), (json.dumps(asdict(cfg), indent=2) + "\n").encode(), JSON)
+    store.put(_key(new_id, "cases.jsonl"), frozen, NDJSON)
+    for name in ("prompt.txt", "judge-prompt.txt", "chips.json"):
+        if store.exists(_key(batch_id, name)):
+            store.put(_key(new_id, name), store.get(_key(batch_id, name)))
+    store.put(_key(new_id, "results.jsonl"), to_jsonl(results), NDJSON)
+    store.put(_key(new_id, "captions.jsonl"), to_jsonl(b["captions"]), NDJSON)
+    store.put(_key(new_id, "retrieval.jsonl"), to_jsonl(retr), NDJSON)
+    summary = summarize(cfg, cases, results, retr)
+    summary["stopped"] = (b["summary"] or {}).get("stopped")
+    summary["replayed_from"] = batch_id
+    store.put(_key(new_id, "summary.json"), (json.dumps(summary, indent=2) + "\n").encode(), JSON)
+    if reports:
+        write_reports(store, new_id)
+    return new_id
 
 
 def load_summaries(store, batch_id: str, results: list[dict]) -> dict:
