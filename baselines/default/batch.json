@@ -1,7 +1,7 @@
 {
-  "batch_id": "20261104T211847Z-dev74-base",
+  "batch_id": "20261104T230624Z-dev74-base",
   "label": "dev74-base",
-  "created": "2026-11-04T21:18:47+00:00",
+  "created": "2026-11-04T23:06:24+00:00",
   "region": "dev-staging",
   "repeats": 3,
   "case_ids": [
@@ -99,6 +99,6 @@
   "code_dirty": false,
   "summary_model": "us.amazon.nova-pro-v1:0",
   "verifiers_sha": null,
-  "replayed_from": "20261104T193330Z-dev74-base",
+  "replayed_from": "20261104T211847Z-dev74-base",
   "extra": {}
 }

@@ -1,5 +1,5 @@
 {
-  "batch_id": "20261104T211847Z-dev74-base",
+  "batch_id": "20261104T230624Z-dev74-base",
   "cases": {
     "fixed-dev-neg-1": {
       "runs": 3,
@@ -2240,6 +2240,10 @@
     "label_prep_seconds_per_case": 53.704054054054055,
     "seconds_per_caption": 3.1084234234234236,
     "tokens_per_caption": 2634.8153153153153,
+    "usd_per_caption": 0.0026929441441441446,
+    "verified_claims_per_caption": 1.2567567567567568,
+    "verified_claims_per_dollar": 466.6850441326817,
+    "verified_claims_per_gpu_second": null,
     "runs": {
       "planned": 222,
       "ok": 222,
@@ -2274,5 +2278,5 @@
     }
   },
   "stopped": null,
-  "replayed_from": "20261104T193330Z-dev74-base"
+  "replayed_from": "20261104T211847Z-dev74-base"
 }
