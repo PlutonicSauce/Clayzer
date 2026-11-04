@@ -144,6 +144,24 @@ partway.
 
 ## AgentCore captioner (#23)
 
+The integrated package supports two deployment contracts:
+
+| Mode | Entry point | Request and Trace owner |
+|---|---|---|
+| Scored Batch Harness | `clayzer batch --harness agentcore`; container runs `clayzer.agentcore.runtime` | Batch sends image bytes and validated Run settings; Runtime returns Steps; Batch scores and writes the Trace. Identity, inbound OAuth and OTEL support are preserved from the remote implementation. See [CLI guide](cli.md#running-the-harness-on-agentcore). |
+| Standalone Gateway captioner | `python -m clayzer.agentcore`; ZIP runs `clayzer.agentcore.gateway_runtime` | Caller sends only a Chip id; Runtime reads that PNG and checkpoints standalone output under `runs/agentcore/`. |
+
+Their Runtime ARNs are not interchangeable: the request contracts and IAM policies differ.
+The CDK container path remains in `infra/agentcore_app.py` and `infra/agentcore/`; the reviewed
+Gateway updater below manages the separately validated ZIP deployment. Both share the same
+caption Harness, Trace format, fault attribution and MCP client. Change Case Chip Pairs now
+round-trip through the Batch Runtime contract with both image hashes and ordered image keys.
+Fixed Cases retain contract v1 compatibility; Chip Pairs use v2 and require the integrated
+container Runtime, so an older Runtime refuses them instead of silently misreading an image.
+Integration validation: 508 application and infrastructure tests passed, two skipped, with
+84.29% coverage. Ruff, formatting, dead-code and deck smoke checks passed. These local checks
+cover both contracts; the hosted validation below exercises the standalone Gateway deployment.
+
 **Validation (2026-11-04):** the reviewed runtime completed both an LGND tool call and a Nova
 Pro caption inside AgentCore in `us-west-2`. The S3 Trace contains a successful
 `lgnd___toolbox_classifier_list` Step (`role: setup`) and an `llm` Step. The same runtime role
@@ -152,7 +170,7 @@ was denied a HEAD request against a provisioned, harmless Cases canary
 The readiness call validates authentication before paying for inference; the model still
 chooses whether to call additional tools. Keep #23 open until the PR and CI are complete.
 
-The separate HTTP adapter in `src/clayzer/agentcore.py` runs the existing agentic Harness on
+The separate HTTP adapter in `src/clayzer/agentcore/gateway_runtime.py` runs the existing agentic Harness on
 AgentCore Runtime. Its request is only `{"chip_id": "..."}`. Deployment fixes the model, S3
 store, and Gateway; callers cannot supply prompts, Case labels, tool servers, or store paths.
 The runtime role reads Chip PNGs and writes under `runs/agentcore/`; its reviewed policy
@@ -182,7 +200,9 @@ uv run --extra ui --extra tools python -m clayzer.agentcore invoke \
 
 The response contains the Caption, call summary, and `trace_key`. The complete JSONL Trace is
 written to `runs/agentcore/agentcore-<uuid>/trace.jsonl` in the configured S3 store.
-`caption.json` next to it contains the successful response. These standalone Runs do not run
+`caption.json` next to it contains the candidate Caption and Trace locator. The Trace's
+`run_end` is the sole completion authority: S3 cannot atomically update both objects.
+The artifact itself does not claim a successful status. These standalone Runs do not run
 the Judge or feed the regression gate. `batch_id` remains in the response/Trace for format
 compatibility; it is not a scored Batch. Batch discovery ignores legacy directories lacking
 `batch.json`, including the initial validation's old `batches/agentcore-*` output.
@@ -209,11 +229,13 @@ uv run python infra/package_agentcore.py /tmp/clayzer-agentcore.zip
 ```
 
 The builder installs the hashed `infra/agentcore-requirements.lock` for Linux ARM64 Python 3.12 and
-packages the Python source and an HTTP bootstrap. It excludes `.env`, local sign-ins, images,
+packages Git-tracked first-party source files and an HTTP bootstrap. Ignored local files cannot
+enter the archive; every packaged first-party file is hashed. It excludes `.env`, local sign-ins, images,
 Cases, the UI, and installer-local metadata. ZIP ordering, timestamps and permissions are
 fixed. The embedded build record and sibling `.manifest.json` contain the source commit,
 dirty flag, source hashes, lock hash, and ZIP hash. CI tests against this lock on ARM64,
-extracts the built ZIP, and imports the actual deployed entry point.
+extracts the built ZIP, and imports the deployed entry point and request-time dependencies
+under Python 3.12 with `-I -S`, isolated from development site-packages.
 
 Regenerate the lock deliberately when upgrading dependencies:
 
@@ -312,8 +334,11 @@ the account and ownership tags before modifying the two roles. It rejects dirty 
 The updater enables `CLAYZER_AGENTCORE_VALIDATE_IAM=1` and provisions a harmless object at
 `cases/agentcore-access-canary.json`. The runtime checks denial with HEAD, which requires the
 same S3 GetObject permission without reading any labels. Unexpected access stops the Run.
-The receipt records runtime version, artifact URI, commit, source hashes and policy; retain
-it with validation results. Initial Cognito/Identity registration and human consent remain
+The receipt records runtime version, artifact URI, commit, source hashes, both permissions
+and trust policies, and the non-secret environment. It is marked READY only after the runtime
+and DEFAULT endpoint become READY. Artifact read permission covers only this deployment's
+content-addressed ZIP prefix, preserving rollback and earlier-version cold starts.
+Retain the receipt with validation results. Initial Cognito/Identity registration and human consent remain
 the setup steps above; updating code does not recreate or revoke those identities.
 
 The account validation created resources tagged `project=clayzer`, `issue=23` separately from

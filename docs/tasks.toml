@@ -658,9 +658,10 @@ step = "harness"
 title = "Opus 5.5 as a second captioning VLM (self-graded verdicts flagged)"
 area = "Captioning"
 tier = "Must"
-status = "todo"
+status = "done"
 closes = ["REQ-10", "REQ-19"]
 start = "uv run clayzer batch --caption-model us.anthropic.claude-opus-5-5"
+notes = "Done 2026-11-04, and run live. It did not work at first: all 9 Runs failed because Opus 5.5 rejects a forced tool choice (`tool_choice: type \"tool\" and \"any\" are not supported for this model`), which the single-call captioner and the rewrite sent. The tests missed it because the fake Bedrock accepted anything; the test fake now refuses what Opus refuses. Fixed by asking for the tool in the prompt instead of forcing it, for models on NO_FORCED_TOOL, as the Judge already did. Live, 3 dev Cases × 3 Repeats, Opus vs Nova Pro: coverage 0.87 vs 0.47, correctness 0.68 vs 0.82, retrieval 0.93 vs 0.96, 6.4 s vs 2.1 s per Caption. Fidelity 0.85 vs 0.56 is Opus grading itself, so it is flagged, not read as better."
 context = "REQ-10 asks that changing models is configuration, shown by the same Case on two models. Run the same Cases with Opus 5.5 as the captioner (`--caption-model`). Opus also judges, so those fidelity verdicts are self-graded and every report must say so (REQ-19)."
 done_when = [
   "A Batch with `--caption-model us.anthropic.claude-opus-5-5`",
@@ -671,6 +672,18 @@ refs = [
   "docs/caption-design.md §2.3 (REQ-10, REQ-19)",
   "src/clayzer/cli.py",
   "src/clayzer/judge.py",
+]
+see_it = "CLI: `clayzer batch --caption-model us.anthropic.claude-opus-5-5 --repeats 3`, then `clayzer compare <nova batch> <opus batch>`. The Opus Batch's report, Run pages, and its row on #/batches say \"self-graded\", and `clayzer gate` warns when only one side is."
+changes = [
+  "src/clayzer/provenance.py: same_model() and self_graded() (ignoring the inference-profile prefix), and the note every report shows",
+  "src/clayzer/report.py: the self-graded note on the Markdown report",
+  "src/clayzer/report_html.py: the self-graded note on the HTML report",
+  "src/clayzer/run_report.py: the self-graded note on each Run page",
+  "src/clayzer/gate.py: Compare returns and prints which side is self-graded; the gate warns when only one side is",
+  "src/clayzer/ui/app.py: the API says whether a Batch is self-graded",
+  "src/clayzer/ui/static/app.js: a self-graded badge on the Batch list, the Batch page, and the Overview Baseline line",
+  "src/clayzer/harness.py: models on NO_FORCED_TOOL are asked for submit_caption instead of forced to call it, for the caption and the rewrite; the Trace records `tool_choice: auto`",
+  "tests/test_self_graded.py: self-graded in every report, Compare and the gate; a fake Bedrock that refuses a forced choice like Opus does",
 ]
 
 [[task]]
@@ -737,10 +750,11 @@ step = "harness"
 title = "Enforce the ADR-0006 tool list in code: the Harness can't load a forbidden MCP server"
 area = "Captioning"
 tier = "Must"
-status = "todo"
+status = "done"
 closes = ["REQ-13"]
 start = "caption-plan.md §3 (allowed and forbidden MCP servers)"
 after = ["agentic-harness"]
+notes = "Done 2026-11-04: one function (src/clayzer/allowlist.py) is the list, and every route that can attach a tool asks it: the Toolbox, Batch creation, the AgentCore Run contract on both sides, and the Workflow Score (which still checks what a Run actually called). Words are matched whole, so `cosmos` is not mistaken for `osm`; file paths in a server's arguments are ignored, so a folder called `osm` is fine. Batches record each server's pin and what it reported on connecting; the LGND version was not recorded before. Note for #57 (open-data-first): the issue says to write from Overture, but Overture is on this list, so that conflict needs a team decision before #57 starts."
 context = "ADR-0006: no tool the Harness can call may read an Answer Key (USGS, GRW, OSM) for the region being scored, or grounding becomes circular. Plan §3 lists allowed and forbidden MCP servers. Enforce it in code, not by review: the Harness refuses to start with a forbidden server, and each Batch records which servers and versions it used."
 done_when = [
   "Configuring a forbidden server (e.g. openstreetmap-mcp-server) makes the Batch refuse to start",
@@ -750,6 +764,17 @@ done_when = [
 refs = [
   "docs/caption-plan.md §3 (Answer Keys are hidden from caption inputs)",
   "docs/adr/0006-answer-keys-are-hidden-from-caption-inputs.md",
+]
+see_it = "CLI: `clayzer batch --tools openstreetmap` prints `refused to start the Batch: MCP server 'openstreetmap' would let the Harness read ... the Answer Keys (ADR-0006)` and writes nothing. A Batch's provenance page (#/batches/<id>/provenance) lists \"MCP server pins\" and \"MCP server versions reported\"; Compare shows a change in either."
+changes = [
+  "src/clayzer/allowlist.py: the forbidden list and the checks (check_names, check_server, is_forbidden); ForbiddenServer is a ValueError",
+  "src/clayzer/tools.py: servers_named() refuses forbidden names first and unknown ones second; Toolbox checks every server it is given; McpServer.pin()",
+  "src/clayzer/batch.py: create() refuses before writing anything and records tool_servers; resume() records tool_versions once and notes a later difference",
+  "src/clayzer/workflow.py: the tool-plan check uses the same list, matching whole words",
+  "src/clayzer/cli.py: a refusal prints a message and exits 2",
+  "src/clayzer/provenance.py: the new settings are listed on the provenance page",
+  "src/clayzer/gate.py: Compare shows a change in the tool pins and versions",
+  "tests/test_allowlist.py: the list, the checks, the refusal, and what is recorded",
 ]
 
 [[task]]
@@ -802,7 +827,7 @@ status = "doing"
 notes = "Review remediation validated 2026-11-04: a hosted Run now contains a successful LGND readiness tool Step and a Nova Pro model Step, persisted outside scored Batches. The runtime role was denied access to the Cases canary. Traces checkpoint completed Steps; failures return locators; the ZIP uses a hashed lock and records provenance. Keep #23 open pending PR/CI and final review. See docs/deploy.md, AgentCore captioner."
 see_it = "uv run --extra ui --extra tools python -m clayzer.agentcore invoke <runtime-arn> <chip-id>; docs/deploy.md, AgentCore captioner"
 changes = [
-  "src/clayzer/agentcore.py: HTTP runtime adapter, Gateway JWT authentication, consent helpers, and S3 Trace persistence",
+  "src/clayzer/agentcore/gateway_runtime.py: HTTP runtime adapter, Gateway JWT authentication, consent helpers, and S3 Trace persistence",
   "src/clayzer/agentcore_trace.py: standalone checkpoints, bounded calls, deadlines, and failure locators",
   "src/clayzer/batch.py: ignore incomplete and legacy standalone directories when listing scored Batches",
   "src/clayzer/tools.py: HTTP authentication and MCP URL-elicitation support without exposing consent URLs to the model",
@@ -814,16 +839,153 @@ changes = [
   "docs/deploy.md: deployment settings, two consent flows, validation evidence, and resource lifecycle",
 ]
 closes = ["AWS-11"]
-start = "docs/caption-design.md §2.2 (AWS-11)"
+start = "docs/cli.md (Running the Harness on AgentCore); src/clayzer/agentcore/"
 after = ["agentic-harness", "aws-observability-check"]
-context = "AgentCore could host the agentic Harness as a managed agent that holds the LGND OAuth sign-in and reaches MCP tools through its gateway. Check that AgentCore works in a participant account before any work depends on it."
+remote_notes = "Done 2026-11-04 on branch feat/agentcore-harness, and run live in one participant account (us-west-2): real dev Cases, Nova Pro captioner, Opus 5.5 Judge, LGND verification inside the Runtime on the sign-in held by Identity. The built pieces are the tasks agentcore-identity-token and agentcore-runtime-harness; agentcore-cdk (deploying it by CDK into a teammate's account) is still to be run, since it needs the account bootstrapped. Parity with the local Harness: 3 Repeats can't tell them apart (the local Harness fails the gate against itself on 2 of 3 Cases); with 10 Repeats of 3 Cases (30 Runs per side) correctness was 0.75 on AgentCore vs 0.78 and 0.83 on two local runs, p=0.19, and coverage identical at 0.48; one Case (neg-1) read lower on AgentCore (0.59 vs 0.72, p=0.022), about as significant as the gap between the two local runs on another Case (p=0.016), and its Claims were the same kinds in the same cells. A real 63-Case gate run is the proper check. What we found on the way, 2026-11-04: (1) Runtime works: a throwaway ARM64 container reached READY in about 20 s and called Nova Pro from inside it; creating runtimes, ECR repos, and IAM roles is allowed; deleting a runtime takes about 5 minutes. (2) A Gateway can't hold the LGND sign-in on an IAM-authorized gateway: CreateGatewayTarget fails with \"3LO Auth is not supported when gateway authorizer type is AWS_IAM\", and AUTHENTICATE_ONLY is also SigV4, so a browser sign-in through a Gateway needs a CUSTOM_JWT gateway (for example a Cognito user pool). (3) AgentCore Identity can hold it without a Gateway: LGND's sign-in server (WorkOS AuthKit) accepted a dynamic client registration with Identity's callback URL; after one browser approval the token is stored under a shared team user id; a fresh process fetched it with no browser; and a runtime fetched it with its own role (0.13 s) and made a real search_chip_lat_lon call (Ivanpah, NAIP 2022-04-27). Not yet checked: token refresh over hours. LGND's free tier (150 calls a day, per docs/mcp.md, unconfirmed with LGND) is shared by everyone using the team identity."
+context = "AgentCore can host the agentic Harness as a managed agent that holds the LGND OAuth sign-in. The route, by script first and then CDK: prove each piece (Runtime and Identity done), move the Harness into a Runtime behind one Run contract, then codify it in CDK. The captioning model stays Nova Pro. The browser sign-in is a one-time step per account, so CDK can create everything except that approval. The Run contract: the Batch sends the Chip reference and hash, the footprint, the prompt, the model id, the tool list, and the turn budget, never Reference Labels (ADR-0006); the runtime returns the Caption and every Step in full, and the Batch writes the Trace (ADR-0001)."
 done_when = [
   "AgentCore confirmed available in one account",
+  "A Runtime fetches the LGND token from Identity with its own role and calls LGND (checked 2026-11-04)",
   "The agentic Harness runs there and its Traces land in the store",
+  "A Batch run through AgentCore is scored by the same scorers and compared with the Baseline by the gate",
+  "Reference Labels never reach the runtime (a test)",
 ]
 refs = [
   "docs/caption-design.md §2.2 (AWS-11)",
   "docs/caption-plan.md §8",
+  "src/clayzer/agentcore/",
+  "src/clayzer/mcp_auth.py",
+  "src/clayzer/verify.py",
+]
+remote_see_it = "CLI: `clayzer batch --harness agentcore --verify --repeats 3` (after `clayzer agentcore login lgnd`); the Batch's provenance page shows the Runtime, its build, and the tool versions, and each Run's Trace has Steps marked `harness: agentcore`. docs/cli.md, \"Running the Harness on AgentCore\"."
+remote_changes = [
+  "src/clayzer/agentcore/: identity.py (the LGND token from Identity, and the one-time setup), contract.py (the Run contract), runtime.py (the app in the container), remote.py (the Batch's side)",
+  "src/clayzer/batch.py: harness, runtime, runtime_build, tool_servers and tool_versions recorded; no local tools started on AgentCore",
+  "src/clayzer/cli.py: `--harness agentcore --runtime <arn>`",
+  "src/clayzer/gate.py: the new settings shown in Compare",
+  "src/clayzer/provenance.py: the new settings shown on the provenance page",
+  "infra/agentcore/Dockerfile: the Runtime image, ARM64, Harness code only",
+  "infra/agentcore/requirements.txt: the image's dependencies, hash-pinned",
+  "infra/agentcore_app.py: the CDK stack (see agentcore-cdk)",
+  "tests/test_agentcore_identity.py: the Identity token source and the one-time setup",
+  "tests/test_agentcore_harness.py: the Run contract, the Runtime, and a Batch through it",
+  "tests/test_agentcore_cdk.py: the CDK stack's template",
+]
+
+[[task]]
+id = "agentcore-identity-token"
+step = "harness"
+title = "Fetch the LGND token from AgentCore Identity, so a Batch needs no local sign-in"
+area = "Captioning"
+tier = "Could"
+status = "done"
+closes = ["AWS-11", "REQ-02"]
+start = "src/clayzer/agentcore/identity.py; src/clayzer/mcp_auth.py (sign_in_auth)"
+after = ["agentcore"]
+notes = "Done 2026-11-04. `clayzer agentcore login lgnd` registers an OAuth client at LGND's sign-in server (dynamic client registration), keeps it in Identity, and walks a person through the one browser approval; it is safe to run again. CLAYZER_TOKEN_SOURCE=agentcore makes the Toolbox take the token from Identity, with the same retry-after-401 as the local file. The file source stays the default. The `clayzer login lgnd --identity` form in done_when became `clayzer agentcore login lgnd`, which does more (the OAuth client and the workload identity too)."
+context = "Today the Harness reads the LGND token from ~/.clayzer/auth, signed in with `clayzer login lgnd`. Add a second token source that asks AgentCore Identity (get_workload_access_token_for_user_id, then get_resource_oauth2_token with the USER_FEDERATION flow) under the team identity, chosen by a setting, so the same code works on a laptop and in a Runtime. The existing source stays the default. Keep the 401-retry behaviour, and never log or store the token."
+done_when = [
+  "A setting selects the token source: local file (default) or AgentCore Identity",
+  "Tests with a fake Identity: token returned, no sign-in stored yet gives a clear error, 401 triggers one re-fetch",
+  "`clayzer login lgnd --identity` (or similar) runs the one-time browser approval and stores it in Identity",
+  "Existing tests in tests/test_mcp_auth.py still pass",
+]
+refs = [
+  "src/clayzer/mcp_auth.py",
+  "src/clayzer/tools.py",
+  "tests/test_mcp_auth.py",
+]
+see_it = "CLI: `clayzer agentcore login lgnd` (once per AWS account, in a browser); then `CLAYZER_TOKEN_SOURCE=agentcore clayzer tools lgnd` lists LGND's tools with no local sign-in."
+changes = [
+  "src/clayzer/agentcore/identity.py: IdentityTokens (token, begin, finish), identity_token_auth, ensure_oauth_client, ensure_workload_identity, login",
+  "src/clayzer/mcp_auth.py: token_source() and sign_in_auth() choose the source; the file source gained signed_in()",
+  "src/clayzer/tools.py: the Toolbox asks sign_in_auth, and names the right `login` command when nothing is signed in",
+  "src/clayzer/cli.py: `clayzer agentcore login <server>`",
+  "tests/test_agentcore_identity.py: 16 tests with fakes for AWS and for LGND's sign-in server",
+]
+
+[[task]]
+id = "agentcore-runtime-harness"
+step = "harness"
+title = "Host the Harness (draft, verify, rewrite) in an AgentCore Runtime and run a Batch through it"
+area = "Captioning"
+tier = "Could"
+status = "done"
+closes = ["AWS-11", "REQ-01", "REQ-02"]
+start = "src/clayzer/agentcore/ (contract.py, runtime.py, remote.py); src/clayzer/batch.py (_run_one)"
+after = ["agentcore-identity-token", "tool-allowlist"]
+notes = "Done 2026-11-04, run live: `clayzer batch --harness agentcore --verify` on 3 real dev Cases, with the Runtime fetching the LGND token from Identity and verifying inside AgentCore (4, 1, and 3 Claims checked; 2, 1, and 2 confirmed; correctness 0.92, coverage 0.40, the same trade-off as local verification). The Batch recorded the Runtime build, the pins, and LGND's reported version. Scores against the local Harness are in the agentcore task's notes: no overall difference found at 10 Repeats, and not distinguishable at 3. Seconds per Caption were 2.1 local and 2.6 on AgentCore at 3 Repeats. Not yet run live: `--tools roda` inside the Runtime (unit-tested with a fake tool server)."
+context = "Package caption(), verify, and the ontology into a Runtime container (Nova Pro). `clayzer batch --harness agentcore` invokes it once per Run. The Batch keeps the Chip hash check and all scoring; it sends the Chip reference, never Reference Labels; the runtime returns the Caption, the full Steps, token usage, and the verification report, and the Batch writes the Trace. Record the harness type, runtime id and version in batch.json, and add harness (and the missing verify setting) to the gate's CAPTIONER list so Compare warns when a Batch ran on a different Harness. Faults: timeouts and throttling from AgentCore are Environment Faults (ADR-0003)."
+done_when = [
+  "`clayzer batch --harness agentcore` produces a normal Batch with a Trace per Run",
+  "The same Cases on the local Harness and on AgentCore compared with Compare and the gate: score differences explained",
+  "Latency and cost per Caption reported for both",
+  "A test shows Reference Labels are not in the runtime request",
+  "Batches without --harness run unchanged",
+]
+refs = [
+  "docs/adr/0001-own-trace-format-otel-is-an-export.md",
+  "docs/adr/0002-reference-harness-is-a-plain-loop.md",
+  "docs/adr/0003-errors-are-attributed-to-harness-or-environment.md",
+  "docs/adr/0006-answer-keys-are-hidden-from-caption-inputs.md",
+  "docs/adr/0009-the-verifier-gets-the-chip-footprint-the-captioner-doesnt.md",
+  "src/clayzer/batch.py",
+  "src/clayzer/gate.py",
+]
+see_it = "CLI: `clayzer batch --harness agentcore --runtime <arn> --verify`, then `clayzer compare <local batch> <agentcore batch>`. A Run's page shows its Steps marked `harness: agentcore`."
+changes = [
+  "src/clayzer/agentcore/contract.py: RunRequest (a fixed set of fields, so an unknown one such as a Reference Label is refused; the allowlist, image hash, and footprint checked on both sides) and RunResponse (the Caption, every Step, and an error with a kind)",
+  "src/clayzer/agentcore/runtime.py: the app in the container: GET /ping, POST /invocations; runs harness.caption; keeps tool connections between Runs; always answers with a structured response",
+  "src/clayzer/agentcore/remote.py: RemoteHarness invokes the Runtime, adds its Steps to the Run's Trace, and re-raises faults as the same kinds a local Run has",
+  "src/clayzer/batch.py: `harness`, `runtime`, `runtime_build` in the configuration; _run_one dispatches to the Runtime; no local MCP servers on AgentCore",
+  "src/clayzer/cli.py: `--harness {local,agentcore}` and `--runtime`",
+  "infra/agentcore/Dockerfile: the ARM64 image with only the Harness",
+  "infra/agentcore/requirements.in: what the image installs; requirements.txt is its hash-pinned lock",
+]
+
+[[task]]
+id = "agentcore-cdk"
+step = "ship"
+title = "Create the AgentCore pieces (ECR, Runtime, roles, workload identity, OAuth client) with CDK"
+area = "Platform"
+tier = "Could"
+status = "doing"
+closes = ["AWS-07", "AWS-11"]
+start = "infra/agentcore_app.py"
+after = ["agentcore-runtime-harness", "cdk"]
+notes = "Written and tested, not yet deployed (2026-11-04). infra/agentcore_app.py is its own CDK app, so the web app's `cdk deploy` is unchanged and infra/app.py (the `cdk` task) is untouched. It creates the Runtime, its image, a least-privilege role, and the workload identity; the 8 template tests pass, and the real `cdk synth` produces the expected resources. Found: CloudFormation does have AWS::BedrockAgentCore::OAuth2CredentialProvider, but the OAuth client behind it needs the provider's own callback address at registration, so it stays a step of `clayzer agentcore login`. Order matters: deploy first, then `login`, or `login` creates the workload identity and the deploy then collides with it. Waiting on: the account being bootstrapped for CDK (it is not; bootstrapping creates an S3 bucket, an ECR repo and IAM roles), then one real `cdk deploy`, a Batch on that Runtime, and `cdk destroy`; a teammate then repeats it in their own account."
+context = "Turn the scripted experiment into CDK so a teammate deploys it into their own account and `cdk destroy` removes it. CloudFormation has AWS::BedrockAgentCore::Runtime, Gateway, and GatewayTarget, and aws-cdk-lib has an aws_bedrockagentcore module. Two things CDK can't do: the browser approval of the LGND sign-in (one per account, after deploy), and possibly the OAuth client registration at LGND's sign-in server (check whether CloudFormation has a resource for the Identity OAuth client; if not, a small script step stays). Coordinate with the `cdk` task, which is in progress in infra/app.py."
+done_when = [
+  "`cdk deploy` creates the AgentCore resources in one account and a teammate deploys the same app in theirs",
+  "`cdk destroy` removes them",
+  "The one manual step per account (LGND sign-in) is written in docs/cli.md",
+  "No account ids hard-coded; roles are least-privilege",
+]
+refs = [
+  "infra/app.py",
+  "infra/agentcore_app.py",
+  "docs/caption-design.md §2.2 (AWS-07, AWS-11)",
+  "docs/cli.md (Running the Harness on AgentCore)",
+]
+
+[[task]]
+id = "agentcore-gateway-allowlist"
+step = "harness"
+title = "Decide: put a Gateway (with a Cognito JWT sign-in) in front of the Harness's tools to enforce the ADR-0006 list"
+area = "Captioning"
+tier = "Could"
+status = "decide"
+closes = ["REQ-13", "AWS-11"]
+start = "docs/tasks.toml (agentcore task notes, finding 2); src/clayzer/allowlist.py"
+after = ["agentcore"]
+context = "A Gateway would be one place that decides which MCP servers the Harness can reach, which is where the ADR-0006 allowlist (tool-allowlist) could be enforced outside our code. The price: a Gateway only runs a browser sign-in for callers with a JWT, so it needs a Cognito user pool, an app client, and a user; stdio servers like RODA would also need hosting as remote servers. The in-code allowlist (tool-allowlist) covers the requirement without any of that. Decide whether the extra enforcement point is worth it for the demo."
+done_when = [
+  "The team decides yes or no, recorded here",
+  "If yes: a Gateway with CUSTOM_JWT inbound auth reaches LGND, and a forbidden server cannot be added as a target",
+]
+refs = [
+  "docs/adr/0006-answer-keys-are-hidden-from-caption-inputs.md",
+  "src/clayzer/allowlist.py",
 ]
 
 # ── Evaluation ──────────────────────────────────────────────────────────────────────────

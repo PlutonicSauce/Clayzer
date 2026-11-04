@@ -7,7 +7,7 @@ import boto3
 import httpx
 from botocore.exceptions import ClientError
 
-from clayzer.agentcore import _authorize_browser
+from clayzer.agentcore.gateway_runtime import _authorize_browser
 
 
 def test_callback_requires_cookie_redacts_errors_and_completes(monkeypatch, capsys):

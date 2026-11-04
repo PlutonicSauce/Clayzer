@@ -8,12 +8,32 @@ this command never reads the client secrets or changes those registrations.
 import argparse
 import hashlib
 import json
+import time
 from pathlib import Path
 
 import boto3
 from agentcore_policies import gateway_policy, runtime_policy, trust
 
 from clayzer.config import load_env
+
+
+def wait_ready(control, runtime_id: str, version: str) -> None:
+    """Wait for both the requested version and DEFAULT endpoint, with a bounded timeout."""
+    deadline = time.monotonic() + 300
+    while time.monotonic() < deadline:
+        runtime = control.get_agent_runtime(agentRuntimeId=runtime_id)
+        endpoint = control.get_agent_runtime_endpoint(
+            agentRuntimeId=runtime_id, endpointName="DEFAULT"
+        )
+        if runtime["status"] == "FAILED" or endpoint["status"] == "FAILED":
+            raise RuntimeError("AgentCore deployment failed; inspect runtime/endpoint status")
+        if (
+            runtime["status"] == endpoint["status"] == "READY"
+            and endpoint["liveVersion"] == version
+        ):
+            return
+        time.sleep(5)
+    raise TimeoutError("AgentCore did not become READY within five minutes")
 
 
 def main() -> None:
@@ -51,6 +71,10 @@ def main() -> None:
         if arn.split(":")[4] != account:
             raise ValueError("This updater only operates in the current participant account")
     bucket, _, prefix = state["storeUrl"].removeprefix("s3://").partition("/")
+    if runtime["environmentVariables"].get("CLAYZER_STORE") != state["storeUrl"]:
+        raise ValueError("State store does not match this runtime's configured store")
+    s3.head_bucket(Bucket=bucket, ExpectedBucketOwner=account)
+    s3.head_bucket(Bucket=state["assetBucket"], ExpectedBucketOwner=account)
     key = f"clayzer-agentcore/23/{digest}.zip"
     role = runtime["roleArn"].rsplit("/", 1)[-1]
     gateway_role = gateway["roleArn"].rsplit("/", 1)[-1]
@@ -64,38 +88,40 @@ def main() -> None:
         bucket,
         prefix,
         state["assetBucket"],
-        key,
+        "clayzer-agentcore/23",
         state["gatewaySecretArn"],
         state["logGroup"],
     )
-    iam.put_role_policy(
-        RoleName=role, PolicyName="CaptionRuntime", PolicyDocument=json.dumps(policy)
-    )
-    iam.update_assume_role_policy(
-        RoleName=role,
-        PolicyDocument=json.dumps(trust(account, runtime["agentRuntimeArn"] + "*")),
-    )
-    iam.put_role_policy(
-        RoleName=gateway_role,
-        PolicyName="LgndOAuth",
-        PolicyDocument=json.dumps(
-            gateway_policy(
-                gateway["workloadIdentityDetails"]["workloadIdentityArn"],
-                provider["credentialProviderArn"],
-                provider["clientSecretArn"]["secretArn"],
-            )
-        ),
-    )
-    iam.update_assume_role_policy(
-        RoleName=gateway_role,
-        PolicyDocument=json.dumps(trust(account, gateway["gatewayArn"])),
-    )
+    # Stage artifacts before changing permissions or the live runtime.
     s3.upload_file(str(args.package), state["assetBucket"], key)
     s3.put_object(
         Bucket=state["assetBucket"],
         Key=key + ".manifest.json",
         Body=json.dumps(manifest).encode(),
         ContentType="application/json",
+    )
+    runtime_trust = trust(account, runtime["agentRuntimeArn"] + "*")
+    gateway_trust = trust(account, gateway["gatewayArn"])
+    gateway_permissions = gateway_policy(
+        gateway["workloadIdentityDetails"]["workloadIdentityArn"],
+        provider["credentialProviderArn"],
+        provider["clientSecretArn"]["secretArn"],
+    )
+    iam.put_role_policy(
+        RoleName=role, PolicyName="CaptionRuntime", PolicyDocument=json.dumps(policy)
+    )
+    iam.update_assume_role_policy(
+        RoleName=role,
+        PolicyDocument=json.dumps(runtime_trust),
+    )
+    iam.put_role_policy(
+        RoleName=gateway_role,
+        PolicyName="LgndOAuth",
+        PolicyDocument=json.dumps(gateway_permissions),
+    )
+    iam.update_assume_role_policy(
+        RoleName=gateway_role,
+        PolicyDocument=json.dumps(gateway_trust),
     )
     # A harmless, existing object makes the hosted HEAD check distinguish denial from absence.
     canary = (
@@ -113,8 +139,10 @@ def main() -> None:
         },
         roleArn=runtime["roleArn"],
         networkConfiguration=runtime["networkConfiguration"],
-        protocolConfiguration=runtime["protocolConfiguration"],
-        lifecycleConfiguration=runtime["lifecycleConfiguration"],
+        protocolConfiguration=runtime.get("protocolConfiguration", {"serverProtocol": "HTTP"}),
+        lifecycleConfiguration=runtime.get(
+            "lifecycleConfiguration", {"idleRuntimeSessionTimeout": 60, "maxLifetime": 900}
+        ),
         environmentVariables=runtime["environmentVariables"]
         | {"CLAYZER_AGENTCORE_VALIDATE_IAM": "1"},
     )
@@ -124,11 +152,20 @@ def main() -> None:
         "runtime_version": updated["agentRuntimeVersion"],
         "artifact_uri": f"s3://{state['assetBucket']}/{key}",
         "runtime_policy": policy,
+        "gateway_policy": gateway_permissions,
+        "runtime_trust": runtime_trust,
+        "gateway_trust": gateway_trust,
+        "environment": runtime["environmentVariables"] | {"CLAYZER_AGENTCORE_VALIDATE_IAM": "1"},
+        "status": "UPDATING",
     }
     args.package.with_suffix(".deployment.json").write_text(json.dumps(receipt, indent=2) + "\n")
     state.update(assetKey=key, agentRuntimeVersion=updated["agentRuntimeVersion"])
     args.state.write_text(json.dumps(state, indent=2) + "\n")
     print(f"Updating runtime to version {updated['agentRuntimeVersion']}; ZIP SHA-256 {digest}")
+    wait_ready(control, state["agentRuntimeId"], updated["agentRuntimeVersion"])
+    receipt["status"] = "READY"
+    args.package.with_suffix(".deployment.json").write_text(json.dumps(receipt, indent=2) + "\n")
+    print("Runtime and DEFAULT endpoint are READY")
 
 
 if __name__ == "__main__":

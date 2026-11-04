@@ -56,22 +56,29 @@ def main() -> None:
             ],
             check=True,
         )
-        shutil.copytree(
-            ROOT / "src/clayzer",
-            package / "clayzer",
-            ignore=shutil.ignore_patterns("__pycache__", "ui"),
+        # Only version-controlled first-party files may enter the artifact. An ignored
+        # local cache or credential file must not silently ship in an otherwise clean build.
+        tracked = (
+            subprocess.check_output(["git", "ls-files", "-z", "--", "src/clayzer"], cwd=ROOT)
+            .decode()
+            .split("\0")
         )
+        source_hashes = {}
+        for name in sorted(filter(None, tracked)):
+            relative = Path(name).relative_to("src")
+            path = ROOT / name
+            if "ui" in relative.parts or not path.is_file():
+                continue
+            target = package / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(path, target)
+            source_hashes[name] = hashlib.sha256(path.read_bytes()).hexdigest()
         # AgentCore's code entryPoint accepts at most two elements.
         (package / "entrypoint.py").write_text(
-            "import uvicorn\nfrom clayzer.agentcore import create_app\n"
+            "import uvicorn\nfrom clayzer.agentcore.gateway_runtime import create_app\n"
             'if __name__ == "__main__":\n'
             '    uvicorn.run(create_app(), host="0.0.0.0", port=8080)\n'
         )
-        source_hashes = {
-            str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest()
-            for path in sorted((ROOT / "src/clayzer").rglob("*.py"))
-            if "ui" not in path.relative_to(ROOT / "src/clayzer").parts
-        }
         build = {
             "git_commit": subprocess.check_output(
                 ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
@@ -84,7 +91,7 @@ def main() -> None:
             "source_sha256": source_hashes,
             "lock_sha256": hashlib.sha256(LOCK.read_bytes()).hexdigest(),
         }
-        (package / "clayzer/agentcore_build.json").write_text(
+        (package / "clayzer/agentcore/agentcore_build.json").write_text(
             json.dumps(build, sort_keys=True, indent=2) + "\n"
         )
         write_archive(package, args.output)

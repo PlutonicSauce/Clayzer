@@ -1,4 +1,4 @@
-"""AgentCore HTTP adapter for the existing caption Harness (AWS-11).
+"""Standalone Gateway-backed AgentCore HTTP adapter for the caption Harness (AWS-11).
 
 Deployment fixes the store, model and MCP gateway. Requests contain only a Chip id;
 neither a Case nor an Answer Key is accepted. AgentCore authenticates inbound calls
@@ -192,7 +192,9 @@ def run_caption(
             "run_id": run.run_id,
             "batch_id": batch_id,
         }
-        store.put(f"{prefix}/caption.json", json.dumps(result).encode(), "application/json")
+        # The Trace's run_end is the completion authority: S3 has no atomic multi-object write.
+        artifact = {k: v for k, v in result.items() if k != "status"}
+        store.put(f"{prefix}/caption.json", json.dumps(artifact).encode(), "application/json")
         tracer.finish("ok", final_answer=cap["text"])
     except Exception as exc:
         status = "harness_fault" if isinstance(exc, harness.HarnessFault) else "stopped"

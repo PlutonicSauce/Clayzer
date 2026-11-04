@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from test_agentic import CAPTION, Scripted, turn, use
 from test_agentic import FakeToolbox as BaseToolbox
 
-from clayzer import agentcore
+from clayzer.agentcore import gateway_runtime as agentcore
 from clayzer.agentcore_trace import RunFailure
 from clayzer.store import LocalStore
 from clayzer.tools import ToolResult
@@ -60,7 +60,9 @@ def test_runtime_records_tool_and_model_steps_in_store(store):
     assert [s.kind for s in steps] == ["tool", "llm", "tool", "llm"]
     assert steps[0].attributes["role"] == "setup"
     assert result["caption"] == CAPTION
-    assert json.loads(store.get(f"runs/agentcore/{result['batch_id']}/caption.json")) == result
+    assert json.loads(store.get(f"runs/agentcore/{result['batch_id']}/caption.json")) == {
+        k: v for k, v in result.items() if k != "status"
+    }
     assert not store.list_dirs("batches/")
     assert "cases/" not in json.dumps(model.requests)
 
@@ -270,7 +272,7 @@ def test_agentcore_runs_and_legacy_runs_do_not_break_batch_listing(store):
     settings = replace(
         Settings.from_env(), store_url=None, data_dir=store.data_dir, batches_dir=store.batches_dir
     )
-    client = TestClient(create_app(settings, store))
+    client = TestClient(create_app(settings))
     assert client.get("/api/batches").json() == []
 
 

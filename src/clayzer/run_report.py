@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 from html import escape
 
+from clayzer import provenance
 from clayzer.report_html import (
     SCRIPT,
     STYLE,
@@ -187,6 +188,7 @@ def build(store, b: dict, result: dict) -> tuple[str, dict]:
         "config": {
             "caption_model": cfg.caption_model,
             "judge_model": cfg.judge_model,
+            "self_graded": provenance.self_graded(cfg.caption_model, cfg.judge_model),
             # A Change Case's Run used the change prompt; its Trace records which.
             "prompt_sha": info.prompt_sha if info is not None else cfg.prompt_sha,
             "cases_sha": cfg.cases_sha,
@@ -225,7 +227,10 @@ def build(store, b: dict, result: dict) -> tuple[str, dict]:
         (f"<p class='sub'>Batch {escape(cfg.batch_id)} · Repeat {repeat} · {escape(cfg.caption_model)}"
         f" · prompt <code>{escape(record['config']['prompt_sha'])}</code></p>"),
         (f"<p class='status-row'><span class='badge {status_cls}'>{escape(result['status'].replace('_', ' '))}</span>"
-        f"<b>{escape(verdict)}</b></p></header><main>"),
+        f"<b>{escape(verdict)}</b></p>"
+        + (f"<p class='badge b-warn'>{escape(provenance.SELF_GRADED_NOTE)}</p>"
+           if provenance.self_graded(cfg.caption_model, cfg.judge_model) else "")
+        + "</header><main>"),
         "<div class='scores'>" + "".join(
             f"<div class='card'><small>{escape(t)}</small><div class='big'>{_f(v)}</div><small>{escape(n)}</small></div>"
             for t, v, n in cards) + "</div>",

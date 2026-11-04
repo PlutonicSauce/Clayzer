@@ -306,7 +306,7 @@ async function overview() {
     <section class="home-score" aria-labelledby="score-title">
       <div>
         <h2 id="score-title">How good are the captions?</h2>
-        <p class="sub">${B ? `Scored on Clay's five criteria, from the accepted ${term("Baseline")}: ${plural(B.cases, "Case")} × ${plural(B.repeats, "Repeat")}, captioned by ${esc(B.caption_model.replace(/^us\./, ""))}. Weights aren't set yet, so each criterion stands on its own.` : "No Baseline accepted yet."}</p>
+        <p class="sub">${B ? `Scored on Clay's five criteria, from the accepted ${term("Baseline")}: ${plural(B.cases, "Case")} × ${plural(B.repeats, "Repeat")}, captioned by ${esc(B.caption_model.replace(/^us\./, ""))}${B.self_graded ? " (self-graded: it is also the Judge)" : ""}. Weights aren't set yet, so each criterion stands on its own.` : "No Baseline accepted yet."}</p>
         ${B ? scorecard(B) : ""}
       </div>
       <div id="showcase">${showcaseCard(o.showcase, 0, B ? B.batch_id : "")}</div>
@@ -692,7 +692,7 @@ async function batchesPage() {
       <td>${b.cases} × ${b.repeats}</td><td class="num">${badge(b.correctness)}</td><td class="num">${badge(b.coverage)}</td><td class="num">${badge(b.fidelity)}</td>
       <td class="num">${badge(b.retrieval?.mean)}</td>
       <td><small>${b.runs ? `${b.runs.ok} ok · ${b.runs.harness_faults} HF · ${b.runs.sandbox_failures} SF` : "running"}</small></td>
-      <td><small class="mono">${esc(b.caption_model)} · prompt ${esc(b.prompt_sha)}</small></td></tr>`).join("")}
+      <td><small class="mono">${esc(b.caption_model)} · prompt ${esc(b.prompt_sha)}</small>${b.self_graded ? ' <span class="badge b-warn" title="The captioner is also the Judge, so Fidelity is a model rating its own work">self-graded</span>' : ""}</td></tr>`).join("")}
     </table>${list.length ? "" : '<p class="empty">No Batches yet.</p>'}`;
 
   const picks = () => [...document.querySelectorAll(".pick:checked")].map((x) => x.value);
@@ -736,9 +736,15 @@ async function pollJobs() {
 // ── Provenance: what a Batch ran and was judged with, and where its files are ──────────
 
 function provValue(key, v) {
-  if (v === null || v === undefined) return key === "judge_model" || key === "judge_prompt_sha" ? "off" : "—";
+  if (v === null || v === undefined) {
+    return key === "judge_model" || key === "judge_prompt_sha" ? "off" : key === "verify" ? "none" : "—";
+  }
   if (typeof v === "boolean") return v ? "yes" : "no";
   if (Array.isArray(v)) return v.length ? v.join(", ") : key === "tools" ? "none (single-call Harness)" : "—";
+  if (typeof v === "object") {
+    const parts = Object.entries(v).map(([k, x]) => `${esc(k)}: <code>${esc(x)}</code>`);
+    return parts.length ? parts.join("<br>") : "—";
+  }
   const text = String(v);
   if (/^[0-9a-f]{40}$/.test(text)) return `<code title="${esc(text)}">${esc(text.slice(0, 12))}</code>`;
   if (/^[0-9a-f]{12}$/.test(text)) return `<code>${esc(text)}</code>`;
@@ -814,7 +820,7 @@ async function batchPage(id, section) {
   const c = b.config;
   $view.innerHTML = `<p><a href="#/batches">← Batches</a></p><h1>${esc(c.batch_id)}</h1>
     <p class="sub">${c.case_ids.length} Cases × ${c.repeats} Repeats · ${esc(c.caption_model)} · prompt
-    <code>${esc(c.prompt_sha)}</code> (${esc(c.prompt_source)}) · Judge ${esc(c.judge_model || "off")} · Cases
+    <code>${esc(c.prompt_sha)}</code> (${esc(c.prompt_source)}) · Judge ${esc(c.judge_model || "off")}${b.self_graded ? ' <span class="badge b-warn" title="The captioner is also the Judge, so Fidelity is a model rating its own work">self-graded</span>' : ""} · Cases
     <code>${esc(c.cases_sha)}</code> · <a href="#/batches/${esc(id)}/provenance">full provenance</a></p>
     ${gateHtml}
     ${provenancePanel(prov)}

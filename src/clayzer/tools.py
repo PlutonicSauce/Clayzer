@@ -21,6 +21,8 @@ from contextlib import AsyncExitStack
 from dataclasses import dataclass, field
 from typing import Self
 
+from clayzer import allowlist
+
 # Bedrock tool names: letters, digits, underscores and dashes, at most 64 characters.
 _NAME_LIMIT = 64
 
@@ -37,6 +39,11 @@ class McpServer:
     # Remote servers: the streamable-HTTP endpoint, and whether it needs an OAuth sign-in.
     url: str | None = None
     oauth: bool = False
+
+    def pin(self) -> str:
+        """What identifies this server for the record: its pinned package, or its URL (remote
+        servers can't be pinned, so what they report on connecting is recorded as well)."""
+        return self.package or self.url or " ".join([self.command, *self.args])
 
     def launch(self) -> tuple[str, list[str]]:
         """Command and args to start the server.
@@ -78,6 +85,21 @@ SERVERS: dict[str, McpServer] = {
     # Remote, so it can't be pinned by version; Batches record what it reported (initialize).
     "lgnd": McpServer("lgnd", url="https://geo.lgnd.ai/mcp", oauth=True),
 }
+
+
+def servers_named(names: list[str]) -> list[McpServer]:
+    """The registered servers with these names, or an error saying why not.
+
+    Forbidden servers are refused first and by name, so the message says why (ADR-0006) and not
+    just that the name is unknown. Used by Toolbox and by Batches before they write anything."""
+    allowlist.check_names(names)
+    unknown = [n for n in names if n not in SERVERS]
+    if unknown:
+        raise ValueError(f"unknown MCP server(s) {unknown}; known: {sorted(SERVERS)}")
+    servers = [SERVERS[n] for n in names]
+    for server in servers:
+        allowlist.check_server(server)
+    return servers
 
 
 @dataclass(frozen=True)
@@ -131,6 +153,8 @@ class Toolbox:
         allowed_tools: frozenset[str] | None = None,
         connect_timeout: float | None = None,
     ):
+        for server in servers:  # whatever route got us here, a forbidden server never connects
+            allowlist.check_server(server)
         self.servers = servers
         self.call_timeout = call_timeout
         # Only `clayzer login` may open a browser to sign in; Batches use the saved sign-in.
@@ -148,10 +172,7 @@ class Toolbox:
 
     @classmethod
     def named(cls, names: list[str], **kwargs) -> Toolbox:
-        unknown = [n for n in names if n not in SERVERS]
-        if unknown:
-            raise ValueError(f"unknown MCP server(s) {unknown}; known: {sorted(SERVERS)}")
-        return cls([SERVERS[n] for n in names], **kwargs)
+        return cls(servers_named(names), **kwargs)
 
     def __enter__(self) -> Self:
         self._thread.start()
@@ -203,19 +224,24 @@ class Toolbox:
                     NotSignedIn,
                     http_client,
                     oauth_provider,
-                    stored_token_auth,
+                    sign_in_auth,
+                    token_source,
                 )
 
                 auth = self.http_auth
                 if server.oauth and self.interactive:
                     auth = oauth_provider(server.name, server.url, True, blocked)
                 elif server.oauth:
-                    # Batches and `clayzer tools`: the saved sign-in, refreshed as it expires.
-                    auth = stored_token_auth(server.name, server.url)
-                    if not auth.storage.signed_in():
-                        raise NotSignedIn(
-                            f"{server.name} needs a sign-in: run `clayzer login {server.name}` first"
+                    # Batches and `clayzer tools`: the saved sign-in, refreshed as it expires,
+                    # from this machine or from AgentCore Identity (CLAYZER_TOKEN_SOURCE).
+                    auth = sign_in_auth(server.name, server.url)
+                    if not auth.signed_in():
+                        how = (
+                            f"clayzer agentcore login {server.name}"
+                            if token_source() == "agentcore"
+                            else f"clayzer login {server.name}"
                         )
+                        raise NotSignedIn(f"{server.name} needs a sign-in: run `{how}` first")
                 client = await self._stack.enter_async_context(http_client(auth))
                 read, write = await self._stack.enter_async_context(
                     streamable_http_client(server.url, http_client=client)

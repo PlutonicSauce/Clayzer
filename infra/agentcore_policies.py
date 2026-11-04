@@ -24,7 +24,7 @@ def runtime_policy(
     bucket: str,
     prefix: str,
     artifact_bucket: str,
-    artifact_key: str,
+    artifact_prefix: str,
     credential_arn: str,
     log_group: str,
 ) -> dict:
@@ -38,7 +38,8 @@ def runtime_policy(
                 "Action": "s3:GetObject",
                 "Resource": [
                     root + "chips/*.png",
-                    f"arn:aws:s3:::{artifact_bucket}/{artifact_key}",
+                    # Retain access to earlier content-addressed ZIPs for rollback/cold starts.
+                    f"arn:aws:s3:::{artifact_bucket}/{artifact_prefix.strip('/')}/*.zip",
                 ],
             },
             {

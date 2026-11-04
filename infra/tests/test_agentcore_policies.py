@@ -17,14 +17,14 @@ def test_runtime_access_is_scoped_to_images_and_standalone_outputs():
         "store",
         "caption",
         "assets",
-        "sha.zip",
+        "clayzer-agentcore/23",
         "arn:secret",
         "/aws/bedrock-agentcore/runtimes/example-DEFAULT",
     )
     statements = {s["Sid"]: s for s in policy["Statement"]}
     assert statements["ChipImagesAndCode"]["Resource"] == [
         "arn:aws:s3:::store/caption/chips/*.png",
-        "arn:aws:s3:::assets/sha.zip",
+        "arn:aws:s3:::assets/clayzer-agentcore/23/*.zip",
     ]
     assert (
         statements["StandaloneTraces"]["Resource"] == "arn:aws:s3:::store/caption/runs/agentcore/*"

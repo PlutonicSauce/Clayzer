@@ -75,7 +75,7 @@ jobs:
           uv run python infra/package_agentcore.py /tmp/agentcore.zip
           uv run python -m zipfile -e /tmp/agentcore.zip /tmp/agentcore-package
           cd /tmp/agentcore-package
-          python -c "import clayzer.agentcore, entrypoint; assert clayzer.agentcore.create_app()"
+          uv run --no-project --python 3.12 python -I -S -c "import sys; sys.path.insert(0, '/tmp/agentcore-package'); import entrypoint, clayzer.mcp_auth, clayzer.store, clayzer.config, mcp.client.streamable_http, botocore.config; from clayzer.agentcore.gateway_runtime import create_app; assert create_app()"
       - uses: actions/upload-artifact@v7
         with:
           name: agentcore-runtime
@@ -94,7 +94,7 @@ jobs:
         with:
           node-version-file: .nvmrc
       - name: OIDC trust policy regression tests
-        run: uv run --group infra pytest infra/tests -q
+        run: uv run --group infra pytest infra/tests tests/test_agentcore_cdk.py -q
       - name: CDK synth (no account needed)
         working-directory: infra
         run: |

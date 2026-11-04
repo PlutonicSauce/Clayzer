@@ -33,7 +33,7 @@ import json
 import re
 import statistics
 from contextlib import nullcontext
-from dataclasses import asdict, dataclass, field, fields
+from dataclasses import asdict, dataclass, field, fields, replace
 from datetime import UTC, datetime
 from uuid import uuid4
 
@@ -43,9 +43,11 @@ from clayzer import harness, lgnd, provenance, verifiers
 from clayzer.cases import parse_jsonl, to_jsonl
 from clayzer.config import Settings, bedrock
 from clayzer.grounding import grounding
+from clayzer.harness import CHANGE_PROMPT
 from clayzer.judge import fidelity
 from clayzer.retrieval import retrieval
 from clayzer.summarize import SummarySink
+from clayzer.tools import servers_named
 from clayzer.trace import RunInfo, StoreSink, Tracer, watch_retries
 from clayzer.workflow import score as workflow_score
 
@@ -53,6 +55,7 @@ from clayzer.workflow import score as workflow_score
 # before and after aren't comparable.
 SCORER_VERSION = "grounding-4+workflow-1"  # exact-cell position; the Workflow Score
 
+HARNESSES = ("local", "agentcore")
 OK, HARNESS_FAULT, SANDBOX_FAILURE = "ok", "harness_fault", "sandbox_failure"
 EXPIRED = {
     "ExpiredToken", "ExpiredTokenException", "UnrecognizedClientException",
@@ -85,6 +88,15 @@ class BatchConfig:
     max_turns: int = harness.MAX_TURNS
     # The MCP server that verifies drafted Claims (verify.py), or None for no verification.
     verify: str | None = None
+    # Where the Harness runs: "local" (this process) or "agentcore" (an AgentCore Runtime, whose
+    # ARN is `runtime`). Tools and verification then run inside the runtime.
+    harness: str = "local"
+    runtime: str | None = None
+    runtime_build: str | None = None  # which build of the Runtime image answered (first Run)
+    # The MCP servers used (ADR-0006): each one's pin when the Batch was created, and what each
+    # reported on connecting (remote servers can't be pinned). None: not recorded yet.
+    tool_servers: dict = field(default_factory=dict)
+    tool_versions: dict | None = None
     # Provenance (provenance.py). None means the Batch predates recording it.
     judge_prompt_sha: str | None = None
     # The change prompt's hash, set only when the Batch has a Change Case (harness.CHANGE_PROMPT).
@@ -164,7 +176,7 @@ def _classify(e: Exception) -> str:
 
 def _run_one(
     client, cfg: BatchConfig, prompt: str, case: dict, repeat: int, store, toolbox=None,
-    verifier=None, chip_shas: dict[str, str] | None = None,
+    verifier=None, chip_shas: dict[str, str] | None = None, remote=None,
 ):  # fmt: skip
     """One Run: caption the Case's Chip, then score it. Returns (result, caption).
 
@@ -207,15 +219,28 @@ def _run_one(
     )  # fmt: skip
     try:
         try:
-            # The verifier, not the model, gets the Chip's footprint (ADR-0009). LGND's images
-            # aren't dated to a Chip Pair's two dates, so Change Cases aren't verified.
+            # Only verification code gets the footprint; Change Cases are not verified.
             if pair:
                 verifier = None
-            footprint = {"bbox": chip["bbox"], "date": chip.get("date")} if verifier else None
-            cap, step = harness.caption(
-                client, cfg.caption_model, chip["id"], png, prompt, tracer, uri,
-                toolbox, cfg.max_turns, verifier, footprint,
-            )  # fmt: skip
+            verifies = not pair and (verifier is not None or (remote is not None and cfg.verify))
+            footprint = {"bbox": chip["bbox"], "date": chip.get("date")} if verifies else None
+            if remote is not None:
+                remote_chip = {**chip, "uri": uri}
+                cap, step = remote.caption(cfg, remote_chip, png, prompt, tracer, footprint)
+            else:
+                cap, step = harness.caption(
+                    client,
+                    cfg.caption_model,
+                    chip["id"],
+                    png,
+                    prompt,
+                    tracer,
+                    uri,
+                    toolbox,
+                    cfg.max_turns,
+                    verifier,
+                    footprint,
+                )
         except harness.HarnessFault as e:
             empty = {"text": "", "objects": [], "relations": [], "uncertain": []}
             result = {
@@ -279,11 +304,13 @@ def start(
     narrate: bool = True,
     tools: list[str] | None = None,
     verify: str | None = None,
+    harness: str = "local",
+    runtime: str | None = None,
 ) -> str:
     """Create a Batch and run it. Returns the Batch id."""
     batch_id = create(
         cases, settings, store, repeats, label, region, prompt, prompt_source, judge, tools,
-        verify,
+        verify, harness, runtime,
     )  # fmt: skip
     resume(batch_id, settings, store, progress, narrate)
     return batch_id
@@ -301,8 +328,19 @@ def create(
     judge: bool = True,
     tools: list[str] | None = None,
     verify: str | None = None,
+    harness: str = "local",
+    runtime: str | None = None,
 ) -> str:
-    """Write a new Batch's configuration, prompt, and frozen Cases. Returns the Batch id."""
+    """Write a new Batch's configuration, prompt, and frozen Cases. Returns the Batch id.
+
+    Refuses, before writing anything, a server the Harness may not use (ADR-0006): a forbidden
+    one, or one that isn't registered. Records each server's pin in the configuration."""
+    if harness not in HARNESSES:
+        raise ValueError(f"unknown Harness {harness!r}; known: {', '.join(HARNESSES)}")
+    if harness == "agentcore" and not runtime:
+        raise ValueError("the agentcore Harness needs a Runtime ARN (CLAYZER_AGENTCORE_RUNTIME)")
+    names = list(dict.fromkeys([*(tools or []), *([verify] if verify else [])]))
+    servers = servers_named(names)
     # Labels become part of store keys, so only letters, digits, dashes and underscores.
     label = re.sub(r"[^A-Za-z0-9_-]+", "-", label).strip("-")[:40]
     batch_id = (
@@ -332,8 +370,11 @@ def create(
         prompt_source=prompt_source,
         tools=list(tools or []),
         verify=verify,
+        harness=harness,
+        runtime=runtime if harness == "agentcore" else None,
+        tool_servers={s.name: s.pin() for s in servers},
         judge_prompt_sha=_sha(judge_prompt) if judge else None,
-        change_prompt_sha=_sha(harness.CHANGE_PROMPT.encode())
+        change_prompt_sha=_sha(CHANGE_PROMPT.encode())
         if any(c.get("kind") == "change" for c in cases)
         else None,
         ontology_version=onto_version,
@@ -379,6 +420,13 @@ def resume(batch_id: str, settings: Settings, store, progress=print, narrate: bo
     # MCP servers start once per Batch, and only if a Run is left to do. The model is offered
     # only its own servers' tools; the verifier's stay out of its prompt.
     servers = list(dict.fromkeys(cfg.tools + ([cfg.verify] if cfg.verify else [])))
+    # On AgentCore the tools run inside the Runtime, so nothing is started here.
+    remote = None
+    if cfg.harness == "agentcore":
+        from clayzer.agentcore.remote import RemoteHarness
+
+        remote = RemoteHarness(cfg.runtime) if todo else None
+        servers = []
     if servers and todo:
         from clayzer.tools import Toolbox
 
@@ -386,6 +434,8 @@ def resume(batch_id: str, settings: Settings, store, progress=print, narrate: bo
     else:
         tools = nullcontext()
     with tools as box:
+        if box is not None:
+            cfg = _record_tool_versions(store, cfg, dict(box.versions), progress)
         model_tools = box.view(cfg.tools) if box is not None and cfg.tools else None
         verifier = box.view([cfg.verify]) if box is not None and cfg.verify else None
         routes = verifiers.load()
@@ -399,11 +449,13 @@ def resume(batch_id: str, settings: Settings, store, progress=print, narrate: bo
             try:
                 result, cap = _run_one(
                     client, cfg, prompt, case, repeat, store,
-                    toolbox=model_tools, verifier=verifier, chip_shas=chip_shas,
+                    toolbox=model_tools, verifier=verifier, chip_shas=chip_shas, remote=remote,
                 )  # fmt: skip
             except CredentialsExpired as e:
                 stopped = f"credentials expired after {i - 1} of {len(todo)} Runs: {e}"[:300]
                 break
+            if remote is not None:
+                cfg = _record_tool_versions(store, cfg, remote.versions, progress, remote.build)
             results.append(result)
             if cap is not None and result["status"] != SANDBOX_FAILURE:
                 captions.append(cap)
@@ -422,6 +474,32 @@ def resume(batch_id: str, settings: Settings, store, progress=print, narrate: bo
     store.put(_key(batch_id, "summary.json"), (json.dumps(summary, indent=2) + "\n").encode(), JSON)
     write_reports(store, batch_id)
     return summary
+
+
+def _record_tool_versions(
+    store, cfg: BatchConfig, versions: dict, progress, runtime_build: str | None = None
+) -> BatchConfig:
+    """Save what each MCP server reported on connecting (and which build of the AgentCore
+    Runtime image answered), the first time the Batch sees them.
+
+    Remote servers like LGND Geo can't be pinned, so a change on their side would otherwise go
+    unseen. If a resumed Batch finds a different one, say so and keep the first record."""
+    changes = {}
+    if versions and cfg.tool_versions is None:
+        changes["tool_versions"] = versions
+    elif versions and cfg.tool_versions != versions:
+        progress(f"  note: MCP servers report {versions}, not {cfg.tool_versions} as at the start")
+    if runtime_build and cfg.runtime_build is None:
+        changes["runtime_build"] = runtime_build
+    elif runtime_build and cfg.runtime_build != runtime_build:
+        progress(f"  note: the Runtime is build {runtime_build}, not {cfg.runtime_build}")
+    if not changes:
+        return cfg
+    cfg = replace(cfg, **changes)
+    store.put(
+        _key(cfg.batch_id, "batch.json"), (json.dumps(asdict(cfg), indent=2) + "\n").encode(), JSON
+    )
+    return cfg
 
 
 def _one_line(r: dict) -> str:
@@ -619,6 +697,9 @@ def write_reports(store, batch_id: str) -> None:
 
 def list_batches(store) -> list[str]:
     # Interrupted creation and older standalone AgentCore Runs are not scored Batches.
-    return sorted(
-        name for name in store.list_dirs("batches/") if store.exists(_key(name, "batch.json"))
-    )
+    from concurrent.futures import ThreadPoolExecutor
+
+    names = sorted(store.list_dirs("batches/"))
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        present = pool.map(lambda name: store.exists(_key(name, "batch.json")), names)
+        return [name for name, exists in zip(names, present, strict=True) if exists]
