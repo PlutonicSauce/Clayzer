@@ -72,7 +72,7 @@ class Chip:
     def to_pixels(self, geom: BaseGeometry) -> BaseGeometry:
         """A lon/lat geometry in Chip pixel coordinates."""
 
-        def f(lons, lats, z=None):
+        def f(lons, lats, _z=None):
             xs, ys = self.to_crs(lons, lats)
             return (
                 [(x - self.left) / self.res for x in xs],

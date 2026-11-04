@@ -60,6 +60,10 @@ Positives use the latest NAIP image taken after the site was built. Site and tur
 from the USGS APIs (`https://energy.usgs.gov/api/uspvdb/v1/projects`,
 `https://energy.usgs.gov/api/uswtdb/v1/turbines`).
 
+Where a Chip clearly contradicts its labels (houses OSM never mapped, a dry wash mapped as
+water), record the fix in `fixtures/caption/cases/label-corrections.toml`. Every build applies
+it, so the fix survives a rebuild; hand-added labels have `source = "manual"` and no count.
+
 ## The evaluation loop
 
 A **Run** is one Harness execution on one Case; a **Batch** runs every Case several times
@@ -255,3 +259,8 @@ Leave out `-c store=...` to have the stack create a new bucket. With Podman, set
 `CDK_DOCKER=podman`. The hosted app never starts Batches, and its role can only read the store
 prefix. `npx aws-cdk@2 destroy` removes everything except the bucket. To build the image on its
 own: `docker build -t clayzer .` (see the [Dockerfile](../Dockerfile)).
+
+CI ([.github/workflows/ci.yml](../.github/workflows/ci.yml)) can deploy the same stack on every
+push to main, assuming a role through GitHub's OIDC so no AWS keys are stored in GitHub.
+[deploy.md](deploy.md) walks through the manual deploy, what each step becomes in CI, and the
+one-time setup the CI deploy needs.

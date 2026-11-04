@@ -58,10 +58,21 @@ step = "case"
 title = "Build the ~60 development Cases (40 positive, 20 negative) in Mojave/Tehachapi"
 area = "Data and Cases"
 tier = "Must"
-status = "doing"
+status = "done"
 closes = ["CAP-01", "CAP-16"]
 start = "uv run clayzer case uspvdb <id>  ·  src/clayzer/cases.py"
-notes = "63 built 2026-11-04: 30 solar (9 under 5 MW, 11 at 5 to 50 MW, 10 over 50 MW), 13 wind turbines from 13 projects, and 20 negatives (5 farmland, 4 residential, 2 industrial, 2 parking, 1 retail, 1 commercial, 4 open desert, and the first one, near Bakersfield), every Chip at least 1 km from the others; picked with a fixed seed from USGS and OSM. Left: the by-eye check of each Case's Reference Labels, and a new Baseline on the full set."
+notes = "63 Cases, done 2026-11-04: 30 solar (9 under 5 MW, 11 at 5 to 50 MW, 10 over 50 MW), 13 wind turbines from 13 projects, and 20 negatives (farmland, towns, industry, parking, open desert), every Chip at least 1 km from the others. Every Case checked by eye: uspvdb-404545 showed no panels in its 2022 image and was replaced by Adobe Solar (uspvdb-400222); 12 Cases got hand corrections for OSM gaps (houses OSM never mapped, dry washes mapped as water). Baseline dev63-base accepted: 189 Runs, all ok; correctness 0.79, coverage 0.73, fidelity 0.57. Still worth a person's look: possible edge turbines on uswtdb-3036765 and uswtdb-3044325."
+see_it = "The Cases page (#/cases): 63 Cases; hand-corrected labels show source manual"
+changes = [
+  "fixtures/caption/cases/caption-dev.jsonl: uspvdb-404545 replaced by uspvdb-400222, and 12 Cases hand-corrected",
+  "fixtures/caption/cases/label-corrections.toml: the hand corrections, each with what the image shows",
+  "src/clayzer/cases.py: every build applies the corrections, and a failed build deletes its Chip",
+  "tests/test_fixtures.py: the committed Cases carry every correction, and applying them twice changes nothing",
+  "tests/test_cases.py: a failed or refused build leaves no orphaned Chip",
+  "baselines/default/: dev63-base, the first Baseline on all 63 Cases",
+  "docs/caption-plan.md: the hand-correction rule in §10",
+  "docs/cli.md: how to record a hand correction",
+]
 context = "The regression gate is only as good as the Case set: with 4 Cases it can't see drops smaller than about 0.1 to 0.2. Build about 60 development Cases in Mojave/Tehachapi: about 40 positives (solar arrays and wind turbines of mixed sizes and surroundings) and about 20 negatives (farmland, towns, desert, look-alikes). Positives start from a USGS record; `clayzer case` offsets the Chip automatically so the site can land in any grid cell, and uses a NAIP image taken after the site was built."
 done_when = [
   "About 40 positive and 20 negative Cases in `cases/caption-dev.jsonl`",
@@ -145,7 +156,14 @@ step = "case"
 title = "Build the ~60 Texas test Cases, held out: scored once at the end, never tuned on"
 area = "Data and Cases"
 tier = "Must"
-status = "todo"
+status = "doing"
+notes = "61 Cases built and checked 2026-11-04, held out: no Batch has run on them. Left: score them once, at the end, next to the development results. Texas solar doesn't cluster like Mojave/Tehachapi (large sites in West Texas, small ones around San Antonio), so the region is the whole state, picked with seed 2026: 28 solar (8 under 5 MW, 10 at 5 to 50 MW, 10 over 50 MW; at most 2 per county), 13 turbines from 13 projects in 13 counties, and 20 negatives (6 near towns, 7 High Plains farmland, 7 open rangeland), every Chip at least 1 km from the others. Checked by eye: Samson Solar III (no panels yet in 2022) and a Brazos Wind turbine being repowered were replaced by the next picks; 18 Cases got hand corrections (unmapped houses, farmland, ponds, and dirt tracks)."
+see_it = "fixtures/caption/cases/caption-test.jsonl, or the Cases page after `uv run clayzer push --from fixtures/caption`"
+changes = [
+  "fixtures/caption/cases/caption-test.jsonl: the 61 Texas Cases, region test",
+  "fixtures/caption/cases/label-corrections.toml: hand corrections for 18 Texas Cases",
+  "tests/test_fixtures.py: the Texas set is in Texas, region test, the planned mix, and checked like the dev set",
+]
 closes = ["CAP-16"]
 start = "uv run clayzer --region test case ..."
 context = "Development Cases get tuned on; the test region shows whether improvements generalize. Build about 60 Cases in Texas the same way, as a separate region (`--region test`), and score them once at the end. Nobody tunes prompts on them, and the Proposer never sees them. LEVIR covers Texas too but has academic-only imagery: benchmark only, never tuning."
@@ -1588,7 +1606,7 @@ step = "ship"
 title = "GitHub Actions CI: lint, format, tests, and the deck smoke test on every push and PR"
 area = "Platform"
 tier = "Should"
-status = "todo"
+status = "doing"
 start = ".github/workflows/ci.yml (new)"
 context = "Six people push to one public repo, and today nothing checks a PR before it merges. A GitHub Actions workflow runs on every push and pull request: `uv run ruff check src tests`, `uv run ruff format --check src tests`, `uv run pytest` with the `ui` and `tools` extras, and `node tests/deck_smoke.mjs`. The tests already run offline (fake Bedrock, local MCP servers), so CI needs no AWS credentials and gets none. uv.lock is gitignored because a local one records a private package index, so CI resolves from public PyPI; decide whether to commit a lock generated against public PyPI so CI and laptops install the same versions. Once the readiness check exists, run its leak scan here too."
 done_when = [
