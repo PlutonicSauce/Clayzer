@@ -569,7 +569,7 @@ caption set, not only our own ([caption-design.md §3.6](caption-design.md#36-ev
 
 ### Object Ontology tasks
 
-v0.1 of [`ontology/objects.toml`](../ontology/objects.toml) matches the code's lists today, and
+v0.2 of [`ontology/objects.toml`](../ontology/objects.toml) (reviewed 2026-11-04) matches the code's lists today, and
 `tests/test_ontology.py` fails if they drift ([caption-design.md §3.5](caption-design.md#35-object-ontology)).
 
 | Task | Area | Tier | When |
