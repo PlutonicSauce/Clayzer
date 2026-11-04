@@ -15,6 +15,10 @@
 #   refs    files and sections to read first
 #   step    the How it works step the task belongs to: case, harness, capture, summarize,
 #           workflow, output, report, batch, gate, or ship
+#
+# Done tasks also say what was delivered:
+#   see_it   where to see it working: the web app page (with its #/ route), or the CLI command
+#   changes  the high-level code changes, one per file: "<path>: what changed"
 
 # ── Data and Cases ──────────────────────────────────────────────────────────────────────
 
@@ -38,6 +42,14 @@ refs = [
   "README.md (Set up, Storage)",
   "docs/sources.toml",
 ]
+see_it = "Data sources page (#/sources): each source with its access, license, status, and the code that reads it."
+changes = [
+  "src/clayzer/answer_keys.py: USGS solar and wind sites from the energy.usgs.gov APIs; OSM labels through Overpass, with a User-Agent and retries on 429 and 50x",
+  "src/clayzer/chips.py: find_naip and cut_chip read NAIP from Planetary Computer or AWS (CLAYZER_NAIP_SOURCE)",
+  "src/clayzer/config.py: one Bedrock client; AWS keys in .env win over the shell's",
+  "docs/sources.toml: every data source with its access, license, and status",
+]
+
 
 [[task]]
 id = "dev-cases"
@@ -276,6 +288,16 @@ refs = [
   "src/clayzer/harness.py",
   "README.md",
 ]
+see_it = "Cases page (#/cases): every Chip with its Reference Labels. A Batch's report (#/batches/<id>) shows each Caption with its Claims and scores. CLI: `clayzer case`, `clayzer batch`."
+changes = [
+  "src/clayzer/harness.py: caption() makes one Nova Pro call with a forced submit_caption tool, returning text plus structured Claims",
+  "src/clayzer/cases.py: build_positive and build_negative make Cases from USGS sites or places with nothing near",
+  "src/clayzer/grounding.py: compares Claims with Reference Labels",
+  "src/clayzer/judge.py: fidelity(), with Opus 5.5 rating the Caption against the Chip",
+  "src/clayzer/retrieval.py: Titan embeddings and retrieval over Captions",
+  "src/clayzer/report_html.py: the HTML report (report.py writes the Markdown one)",
+]
+
 
 [[task]]
 id = "lgnd-client"
@@ -413,6 +435,14 @@ refs = [
   "src/clayzer/trace.py (Tracer.tool)",
   "docs/caption-design.md §2.3 (REQ-01)",
 ]
+see_it = "A Run's page (#/runs/<batch>/<case>/<repeat>): each tool call is a Step with its arguments, result, and latency. CLI: `clayzer batch --tools roda`; `clayzer trace <batch> <case>`."
+changes = [
+  "src/clayzer/tools.py: Toolbox starts pinned stdio MCP servers once per Batch and calls their tools from synchronous code; only RODA is listed",
+  "src/clayzer/harness.py: _with_tools, a tool-use loop until submit_caption, with an 8-turn budget",
+  "src/clayzer/batch.py: BatchConfig records tools and max_turns; resume() opens the Toolbox around the Runs",
+  "src/clayzer/cli.py: `clayzer batch --tools`",
+]
+
 
 [[task]]
 id = "tool-allowlist"
@@ -516,6 +546,13 @@ refs = [
   "src/clayzer/gate.py",
   "README.md (The evaluation loop)",
 ]
+see_it = "Batches page (#/batches): every Batch with its scores; tick two to compare them (#/compare/<a>/<b>). A Batch's page shows its regression gate against the Baseline, and the home page's scorecard sets the latest Batch beside the Baseline. CLI: `clayzer batch`, `batches`, `compare`, `baseline accept`, `gate`."
+changes = [
+  "src/clayzer/batch.py: Batches of Repeats, saved after every Run, resumed after expired credentials, with per-Case means and Spread",
+  "src/clayzer/gate.py: compare, accept_baseline, and gate (exit 0 pass, 1 fail, 2 inconclusive)",
+  "baselines/: committed Baselines (results only)",
+]
+
 
 [[task]]
 id = "grounding-fix"
@@ -535,6 +572,13 @@ refs = [
   "src/clayzer/grounding.py",
   "docs/caption-plan.md §8",
 ]
+see_it = "The Correctness and Coverage columns on the Batches page (#/batches) and in each Batch report."
+changes = [
+  "src/clayzer/chips.py: offset_for moves the site off-centre, so it can land in any grid cell",
+  "src/clayzer/grounding.py: correctness (are the Caption's Claims right) and coverage (how many Reference Labels it covers), scored separately",
+  "src/clayzer/batch.py: SCORER_VERSION grounding-3, so the gate warns when comparing across the change",
+]
+
 
 [[task]]
 id = "gate-rule"
@@ -554,6 +598,11 @@ refs = [
   "src/clayzer/gate.py",
   "docs/caption-plan.md §8",
 ]
+see_it = "A Batch's page (#/batches/<id>): the gate table's Allowed drop column and its warnings. CLI: `clayzer gate <batch>`."
+changes = [
+  "src/clayzer/gate.py: a regression is a drop of more than max(tolerance, the Baseline's Spread), never the candidate's; a warning when a Case's Spread grows sharply (SPREAD_WARNING)",
+]
+
 
 [[task]]
 id = "centre-credit"
@@ -604,8 +653,19 @@ step = "workflow"
 title = "Workflow Score for caption Runs: verification calls per Claim, failures, steps"
 area = "Evaluation"
 tier = "Must"
-status = "todo"
+status = "done"
 closes = ["REQ-06"]
+notes = "Done 2026-11-04: src/clayzer/workflow.py, the Sandbox's components and weights defined for caption Runs: completion, tool plan (finished through submit_caption, no forbidden MCP server), tool success, recovery after Harness Faults, efficiency (turns against the budget), cost (tokens against CLAYZER_TOKEN_BUDGET). Parts that don't apply are left out; Environment Faults never lower it. In every Run result, Batch summary, Compare, the regression gate, and the reports; rescore recomputes it from stored Traces. Until the Harness calls tools, most Runs score on completion alone."
+see_it = "A Run's page (#/runs/<batch>/<case>/<repeat>): How the Harness worked, with each part's score and reason. A Batch's report has a Workflow column per Case; the home page shows the Baseline's under \"And how it worked\". CLI: `clayzer compare`, `clayzer gate` check it."
+changes = [
+  "src/clayzer/workflow.py: the Workflow Score from a Run's Trace alone: completion, tool plan, tool success, recovery, efficiency, cost; parts that don't apply left out",
+  "src/clayzer/batch.py: every Run result gets its Workflow Score; Batch summaries carry it per Case; rescore recomputes it from stored Traces",
+  "src/clayzer/gate.py: the regression gate and Compare check the Workflow Score like the other scores",
+  "src/clayzer/run_report.py: How the Harness worked, with each part's score and reason",
+  "src/clayzer/report_html.py: a Workflow column per Case and a badge per Repeat",
+  "src/clayzer/ui/static/app.js: the home page shows the Baseline's Workflow Score under And how it worked",
+  "tests/test_workflow.py: each part, Environment Faults excluded, forbidden servers, and the score through results, summaries, reports, rescore, and the gate",
+]
 start = "caption-plan.md §1.3"
 after = ["agentic-harness", "trace-capture", "fault-attribution"]
 context = "The brief's first score: how well the Harness worked, from its Trace alone, with no model call. Tool-call correctness and sequencing against the Case's expectations, call success, recovery after Harness Faults, and steps and cost against a budget. Environment Faults don't count. Port the Sandbox's `scoring/workflow.py`; caption Cases need expectations, such as one verification call per Claim. Judge Steps (`role: scoring`) are left out."
@@ -876,6 +936,12 @@ refs = [
   "src/clayzer/store.py",
   "README.md (Storage)",
 ]
+see_it = "The store the app reads is shown at the top right of every page. CLI: `clayzer push` copies a local chips/ and cases/ folder into the store."
+changes = [
+  "src/clayzer/store.py: LocalStore and S3Store behind one interface, chosen by CLAYZER_STORE",
+  "src/clayzer/chips.py: aws_key reads NAIP from naip-visualization (Requester-Pays, us-west-2) when CLAYZER_NAIP_SOURCE=aws",
+]
+
 
 [[task]]
 id = "web-app"
@@ -895,6 +961,12 @@ refs = [
   "src/clayzer/ui/static/app.js",
   "README.md (The team web app)",
 ]
+see_it = "`uv run clayzer ui` (http://127.0.0.1:8770), or the hosted copy: Overview, How it works, Tasks, Cases, Batches with Compare and the gate, Data sources, Concepts, and the pitch deck at /deck."
+changes = [
+  "src/clayzer/ui/app.py: create_app, a JSON API over the store; starting Batches only with --allow-launch",
+  "src/clayzer/ui/static/: index.html, app.js, and style.css, a single-page app with no build step",
+]
+
 
 [[task]]
 id = "trace-summaries"
@@ -917,6 +989,13 @@ refs = [
   "src/clayzer/trace.py",
   "README.md (The evaluation loop)",
 ]
+see_it = "A Run's page (#/runs/<batch>/<case>/<repeat>): the verdict, the summary written in code, and the model-written narrative. CLI: `clayzer summarize <batch>` (`--narrate` writes missing narratives)."
+changes = [
+  "src/clayzer/summarize.py: summarize() builds the summary from the Trace alone; SummarySink saves it with every Run",
+  "src/clayzer/narrate.py: narrate_batch has a model write a narrative from the Trace, saved with the Trace's hash so replays never call a model",
+  "src/clayzer/batch.py: each Batch writes summaries and, unless --no-narrate, narratives",
+]
+
 
 [[task]]
 id = "replay"
@@ -1026,6 +1105,13 @@ refs = [
   "docs/caption-plan.md §7 (AWS service tasks)",
   "src/clayzer/ui/app.py",
 ]
+see_it = "The hosted site: the CDK stack's Url output (README \"Hosting it on AWS\")."
+changes = [
+  "infra/app.py: CloudFront to a load balancer to one ARM64 Fargate task; the task role only reads the store prefix",
+  "Dockerfile: the web app image, read-only by default, built from requirements.lock with optional mirror and CA secrets",
+  "src/clayzer/ui/app.py: also serves the pitch deck at /deck",
+]
+
 
 [[task]]
 id = "gpu-quota"
@@ -1065,6 +1151,12 @@ refs = [
   "README.md (The evaluation loop)",
   "docs/adr/0001-own-trace-format-otel-is-an-export.md",
 ]
+see_it = "A Run's page (#/runs/<batch>/<case>/<repeat>) lists every Step: request, response, timing, tokens, and retries. CLI: `clayzer trace <batch> <case>` (`--json` for the raw Trace)."
+changes = [
+  "src/clayzer/trace.py: Tracer records each Step; StoreSink writes batches/<id>/traces/<case>--r<repeat>.jsonl; watch_retries logs each failed attempt",
+  "src/clayzer/harness.py: model calls go through Tracer.converse (judge.py does the same for the Judge)",
+]
+
 
 [[task]]
 id = "fault-attribution"
@@ -1089,6 +1181,14 @@ refs = [
   "src/clayzer/trace.py",
   "docs/caption-design.md §2.3 (REQ-04)",
 ]
+see_it = "A Run's page tags each failed Step as a Harness Fault, an Environment Fault, or a Sandbox Failure, marking soft ones; the Batches page counts Harness Faults and Sandbox Failures per Batch. CLI: `clayzer trace`."
+changes = [
+  "src/clayzer/faults.py: classify and attribute, from each Step's error code, HTTP status, and output",
+  "src/clayzer/trace.py: Tracer.finish attributes faults and stores the counts on the Run",
+  "src/clayzer/batch.py: step_faults in the Batch summary",
+  "src/clayzer/run_report.py: a badge on every failed Step",
+]
+
 
 [[task]]
 id = "tracing-swap"
@@ -1133,6 +1233,11 @@ refs = [
   "docs/caption-plan.md §7 (AWS service tasks)",
   "docs/caption-design.md §2.2 (AWS-05, AWS-06)",
 ]
+see_it = "No UI: a one-off check of the participant role. Its findings are this task's notes and caption-plan.md §7."
+changes = [
+  "docs/caption-plan.md: what the participant role allows, recorded in §7 (no code)",
+]
+
 
 [[task]]
 id = "cloudwatch-metrics"
@@ -1220,6 +1325,13 @@ refs = [
   "src/clayzer/report_html.py",
   "src/clayzer/ui/app.py",
 ]
+see_it = "A Run's page (#/runs/<batch>/<case>/<repeat>), linked from the Batch report and the home page. The HTML and JSON are in the store at batches/<id>/runs/<case>--r<repeat>."
+changes = [
+  "src/clayzer/run_report.py: build and write_run_reports, from stored files only, so they rebuild offline",
+  "src/clayzer/ui/app.py: serves each Run's HTML and JSON",
+  "src/clayzer/ui/static/app.js: runPage shows them",
+]
+
 
 [[task]]
 id = "ontology-in-code"

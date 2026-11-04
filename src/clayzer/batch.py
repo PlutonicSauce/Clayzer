@@ -43,10 +43,11 @@ from clayzer.judge import fidelity
 from clayzer.retrieval import retrieval
 from clayzer.summarize import SummarySink
 from clayzer.trace import RunInfo, StoreSink, Tracer, watch_retries
+from clayzer.workflow import score as workflow_score
 
 # Bump when grounding or summary logic changes, so the regression gate warns that scores from
 # before and after aren't comparable.
-SCORER_VERSION = "grounding-3"  # grounding-3: correctness and coverage
+SCORER_VERSION = "grounding-3+workflow-1"  # correctness and coverage; the Workflow Score
 
 OK, HARNESS_FAULT, SANDBOX_FAILURE = "ok", "harness_fault", "sandbox_failure"
 EXPIRED = {
@@ -174,6 +175,7 @@ def _run_one(client, cfg: BatchConfig, prompt: str, case: dict, repeat: int, sto
                 "caption_tokens": e.step["usage"].get("totalTokens"),
             }  # fmt: skip
             result["faults"] = tracer.finish(HARNESS_FAULT, None, str(e))
+            result["workflow"] = workflow_score(tracer.run, tracer.steps)
             return result, {**base, **empty}
         except (ClientError, BotoCoreError) as e:
             status = _classify(e)
@@ -200,6 +202,7 @@ def _run_one(client, cfg: BatchConfig, prompt: str, case: dict, repeat: int, sto
                 failed = {**base, "status": SANDBOX_FAILURE, "error": f"judge: {e}"[:500]}
                 return {**failed, "faults": faults}, cap
         result["faults"] = tracer.finish(OK, cap["text"])
+        result["workflow"] = workflow_score(tracer.run, tracer.steps)
         return result, cap
     except CredentialsExpired as e:
         tracer.finish("stopped", None, f"credentials expired: {e}"[:500])
@@ -361,6 +364,7 @@ def summarize(cfg: BatchConfig, cases: list[dict], results: list[dict], retr: li
         rows = by_case[case["id"]]
         scored = [r for r in rows if r["status"] != SANDBOX_FAILURE]
         corr = [r["grounding"]["correctness"] for r in scored]
+        wf = [(r.get("workflow") or {}).get("score") for r in scored]
         cov = [r["grounding"]["coverage"] for r in scored]
         f = [(r.get("fidelity") or {}).get("score") for r in scored]
         per_case[case["id"]] = {
@@ -368,6 +372,8 @@ def summarize(cfg: BatchConfig, cases: list[dict], results: list[dict], retr: li
             "harness_faults": sum(r["status"] == HARNESS_FAULT for r in rows),
             "sandbox_failures": sum(r["status"] == SANDBOX_FAILURE for r in rows),
             "correctness": {"mean": _mean(corr), "spread": _spread(corr)},
+            # How the Harness worked, from its Traces (REQ-06); None for Runs from before Traces.
+            "workflow": {"mean": _mean(wf), "spread": _spread(wf)},
             "coverage": {"mean": _mean(cov), "spread": _spread(cov)},
             "fidelity": {"mean": _mean(f), "spread": _spread(f)},
             "components": {k: _mean(r["grounding"][k] for r in scored) for k in COMPONENTS},
@@ -384,6 +390,7 @@ def summarize(cfg: BatchConfig, cases: list[dict], results: list[dict], retr: li
         "cases": per_case,
         "batch": {
             "correctness": _mean(c["correctness"]["mean"] for c in per_case.values()),
+            "workflow": _mean(c["workflow"]["mean"] for c in per_case.values()),
             "coverage": _mean(c["coverage"]["mean"] for c in per_case.values()),
             "fidelity": _mean(c["fidelity"]["mean"] for c in per_case.values()),
             "retrieval_mrr": {"mean": _mean(mrr), "spread": _spread(mrr)},
@@ -412,10 +419,13 @@ def summarize(cfg: BatchConfig, cases: list[dict], results: list[dict], retr: li
 def rescore(batch_id: str, store) -> dict:
     """Score a Batch's stored Captions again with the current scorer, without calling any model.
 
-    Grounding is recomputed against the Batch's frozen Cases; fidelity and retrieval are kept
-    (they don't depend on the grounding scorer). Harness Faults stay scored as 0.
+    Grounding is recomputed against the Batch's frozen Cases, and the Workflow Score from each
+    Run's stored Trace (Runs from before Traces get none); fidelity and retrieval are kept (they
+    don't depend on the scorers). Harness Faults stay scored as 0.
     """
     from dataclasses import replace
+
+    from clayzer.trace import loads, trace_key
 
     b = load(store, batch_id)
     labels = {c["id"]: c["reference_labels"] for c in b["cases"]}
@@ -431,6 +441,9 @@ def rescore(batch_id: str, store) -> dict:
                 "correctness": 0.0,
                 "coverage": 0.0 if labels[r["case_id"]] else None,
             }
+        tkey = trace_key(batch_id, r["case_id"], r["repeat"])
+        if r["status"] in (OK, HARNESS_FAULT) and store.exists(tkey):
+            r["workflow"] = workflow_score(*loads(store.get(tkey)))
     cfg = replace(b["config"], scorer_version=SCORER_VERSION)
     store.put(
         _key(batch_id, "batch.json"), (json.dumps(asdict(cfg), indent=2) + "\n").encode(), JSON

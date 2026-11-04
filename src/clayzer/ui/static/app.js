@@ -82,8 +82,8 @@ const FLOW = [
   {
     key: "workflow", phase: "score", title: "Workflow Score", sub: "how it worked, from the Trace", area: "Evaluation",
     what: `The first of the brief's two scores: how well the Harness worked, judged from its Trace alone and without a model call. Were the right tools called in a sensible order, were failed calls recovered, and how many Steps and how much cost did it take against the Case's budget? ${term("Environment Fault", "Environment Faults")} (network, access) don't count against it; ${term("Harness Fault", "Harness Faults")} do.`,
-    why: "A Caption can come out right by luck or by a wasteful path. The Workflow Score tells them apart, and it only exists once the Harness calls tools.",
-    code: ["the Sandbox's scoring/workflow.py (to port)", "ADR-0003"],
+    why: "A Caption can come out right by luck or by a wasteful path. The Workflow Score tells them apart. Parts that don't apply are left out: until the Harness calls tools, a Run scores on finishing alone.",
+    code: ["src/clayzer/workflow.py", "ADR-0003 (fault attribution)", "the Sandbox's scoring/workflow.py (same parts and weights)"],
   },
   {
     key: "output", phase: "score", title: "Output Score", sub: "what it produced, on five criteria", area: "Evaluation",
@@ -169,7 +169,14 @@ function scorecard(B) {
        <span class="sub">(${secs(B.label_prep_seconds)} for ${plural(B.cases, "Case")})</span></div>
      <p class="crit-note">Time to build each Case's Reference Labels. Whether Clay means this or the time to
      write the Captions is a question for Clay.</p>`);
-  return grounding + fidelity + retrieval + cost + prep;
+  const how = `<div class="crit how-worked">
+    <div class="crit-head"><span class="crit-n">+</span><span class="crit-name">And how it worked</span></div>
+    <div class="crit-q">Did the Harness work well, judged from its Trace?</div>
+    ${B.workflow === null || B.workflow === undefined
+      ? `<p class="crit-note">No Workflow Score yet: the Baseline was run before Traces were recorded.</p>`
+      : meter("", B.workflow, `Workflow Score: finished, tool calls right and recovered, within budget${(B.tools || []).length ? "" : ". With no tools, only completion counts"}`)}
+    <p class="crit-note">The brief's second score dimension, beside Clay's five criteria (REQ-06).</p></div>`;
+  return grounding + fidelity + retrieval + cost + prep + how;
 }
 
 // A Chip with its Claims drawn on the 3×3 grid, like the Batch report.
@@ -426,6 +433,9 @@ async function howPage(stepKey) {
 }
 
 // A task as a self-contained brief a teammate can paste into their coding agent.
+// Escaped text with `backticks` shown as code.
+const inlineCode = (s) => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>");
+
 function taskBrief(t, byId, reqs) {
   const lines = [`# ${t.title}`, "",
     `Task \`${t.id}\` · ${t.tier} · ${STATUS[t.status]?.[1] || t.status} · area: ${t.area} · How it works step: ${t.step}`, ""];
@@ -443,6 +453,8 @@ function taskBrief(t, byId, reqs) {
     lines.push("## Waits on", "", ...after.map((id) => `- ${byId[id].title} (\`${id}\`, ${STATUS[byId[id].status]?.[1] || byId[id].status})`), "");
   }
   if (t.notes) lines.push("## Notes", "", t.notes, "");
+  if (t.see_it) lines.push("## Where to see it", "", t.see_it, "");
+  if ((t.changes || []).length) lines.push("## What changed", "", ...t.changes.map((c) => `- ${c}`), "");
   lines.push("## Repo rules", "",
     "- Capitalized terms (Case, Chip, Claim, Run, Trace, Batch, ...) mean exactly what GLOSSARY.md says.",
     "- The plan is docs/caption-plan.md; requirements are docs/caption-design.md §2; decisions are docs/adr/.",
@@ -479,6 +491,11 @@ async function tasksPage(focusId) {
             ${wait.length ? `<div class="sub">After: ${wait.map((id) => esc(byId[id].title)).join("; ")}</div>` : ""}
             <details class="brief" ${t.id === focusId ? "open" : ""}><summary>Brief</summary>
               ${t.context ? `<p>${esc(t.context)}</p>` : ""}
+              ${t.see_it ? `<h4>Where to see it</h4><p>${inlineCode(t.see_it)}</p>` : ""}
+              ${(t.changes || []).length ? `<h4>What changed</h4><ul class="refs">${t.changes.map((c) => {
+                const [path, ...rest] = c.split(": ");
+                return `<li><code>${esc(path)}</code>${rest.length ? `: ${inlineCode(rest.join(": "))}` : ""}</li>`;
+              }).join("")}</ul>` : ""}
               ${(t.done_when || []).length ? `<h4>Done when</h4><ul>${t.done_when.map((d) => `<li>${esc(d)}</li>`).join("")}</ul>` : ""}
               ${(t.refs || []).length ? `<h4>Read first</h4><ul class="refs">${t.refs.map((r) => `<li><code>${esc(r)}</code></li>`).join("")}</ul>` : ""}
               <button type="button" class="btn copy" data-id="${esc(t.id)}">Copy brief for your agent</button>

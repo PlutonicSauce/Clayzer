@@ -133,6 +133,13 @@ never call a model, and one that names a fault the Trace doesn't have is rejecte
 `--no-narrate` skips it; `clayzer summarize <batch-id>` rebuilds the facts offline, and
 `--narrate` writes any missing narratives.
 
+Every Run also gets a **Workflow Score** (`workflow.py`, REQ-06): how well the Harness worked,
+from its Trace alone, with no model call. It's the weighted mean of the parts that apply:
+finishing with a Caption, the tool plan (finishing through `submit_caption`, no forbidden MCP
+server), tool-call success, recovery after Harness Faults, turns against the budget, and tokens
+against `CLAYZER_TOKEN_BUDGET` if set. Environment Faults never lower it. It's in Batch
+summaries, Compare, the regression gate, and the reports.
+
 Every Run also gets its own **report**, `batches/<batch-id>/runs/<case-id>--r<repeat>.html` (and
 `.json` for machines): the verdict, both scores with their reasons, the Chip with its Claims, the
 Caption, the summary, and every Step with its prompt and response. It's built from stored files

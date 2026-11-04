@@ -259,6 +259,8 @@ def create_app(settings: Settings, region: str = "dev", allow_launch: bool = Fal
                 "retrieval": bb["retrieval_mrr"],
                 "retrieval_top1": (bb.get("retrieval_recall_at_1") or {}).get("mean"),
                 "label_prep_seconds": bb.get("label_prep_seconds"),
+                "workflow": bb.get("workflow"),
+                "tools": base["config"].tools if hasattr(base["config"], "tools") else [],
                 "label_prep_seconds_per_case": bb.get("label_prep_seconds_per_case"),
                 "seconds_per_caption": bb.get("seconds_per_caption"),
                 "tokens_per_caption": bb.get("tokens_per_caption"),

@@ -328,7 +328,8 @@ def _repeat_row(
         (
             f"<details><summary>Repeat {r['repeat']} · correctness {_badge(g['correctness'])} · "
             f"coverage {_badge(g['coverage'])} · "
-            f"fidelity {_badge(fid.get('score'))}{fault}</summary>"
+            f"fidelity {_badge(fid.get('score'))} · "
+            f"workflow {_badge((r.get('workflow') or {}).get('score'))}{fault}</summary>"
         ),
         _trace_summary(summary, narrative),
         f"<blockquote>{escape(cap['text'] if cap and cap['text'] else '(no Caption)')}</blockquote>",
@@ -431,6 +432,7 @@ def render_html(b: dict, store) -> str:
         cols = [
             ("Correctness", _ms(summ["correctness"])), ("Coverage", _ms(summ["coverage"])),
             ("Fidelity", _ms(summ["fidelity"])),
+            ("Workflow", _ms(summ.get("workflow"))),
             ("Precision", _badge(comp["precision"])), ("Recall", _badge(comp["recall"])),
             ("Count", _badge(comp["count"])), ("Position", _badge(comp["position"])),
             ("Attributes", _badge(comp["attributes"])), ("Relations", _badge(comp["relations"])),

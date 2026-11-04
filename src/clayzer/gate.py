@@ -30,7 +30,7 @@ EXIT_CODES: dict[Verdict, int] = {"pass": 0, "fail": 1, "inconclusive": 2}
 DEFAULT_TOLERANCE = 0.05
 TOKEN_WARNING = 0.25  # warn when mean tokens per Caption rise more than this
 SPREAD_WARNING = 3.0  # warn when a Case's Spread grows this many times (and by over 0.1)
-METRICS = ("correctness", "coverage", "fidelity")
+METRICS = ("correctness", "coverage", "fidelity", "workflow")
 
 # Settings that change the measuring stick itself: a difference makes scores less comparable.
 MEASUREMENT = ("judge_model", "embed_model", "cases_sha", "scorer_version")
@@ -113,6 +113,7 @@ def compare(a: dict, b: dict) -> dict:
     for key, label in (
         ("correctness", "Grounding correctness"), ("coverage", "Grounding coverage"),
         ("fidelity", "Fidelity"),
+        ("workflow", "Workflow Score"),
         ("unscored_share", "Unscored share of Claims"),
         ("seconds_per_caption", "Seconds per Caption"),
         ("tokens_per_caption", "Tokens per Caption"),

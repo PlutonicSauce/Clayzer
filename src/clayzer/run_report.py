@@ -101,6 +101,27 @@ def _steps_html(steps) -> str:
     return "".join(out)
 
 
+def _workflow_html(wf: dict | None) -> str:
+    """The Workflow Score's components, each with its reason (workflow.py)."""
+    if not wf:
+        return ("<section class='block'><h2>How the Harness worked</h2><p class='sub'>No Workflow "
+                "Score: this Run has no valid score, or no Trace.</p></section>")  # fmt: skip
+    rows = "".join(
+        f"<tr><td>{escape(name.replace('_', ' '))}</td><td class='num'>{_f(c['score'])}</td>"
+        f"<td>{escape(c['reason'])}</td></tr>"
+        for name, c in wf["components"].items()
+    )
+    env = wf.get("environment_faults") or 0
+    note = f" {env} Environment Faults didn't count against it." if env else ""
+    return (
+        "<section class='block'><h2>How the Harness worked</h2>"
+        f"<p class='sub'>The Workflow Score, {_f(wf['score'])}, is the weighted mean of the parts "
+        f"that apply, from the Trace alone.{note} A part that doesn't apply is left out.</p>"
+        "<table><tr><th>Part</th><th class='num'>Score</th><th>Why</th></tr>"
+        f"{rows}</table></section>"
+    )
+
+
 def build(store, b: dict, result: dict) -> tuple[str, dict]:
     """The HTML page and the JSON record for one Run of a loaded Batch."""
     cfg = b["config"]
@@ -153,6 +174,7 @@ def build(store, b: dict, result: dict) -> tuple[str, dict]:
             "fidelity": {"score": fid.get("score"), "issues": fid.get("issues", [])},
         },
         "faults": result.get("faults"),
+        "workflow": result.get("workflow"),
         "seconds_to_caption": result.get("seconds_to_caption"),
         "caption_tokens": result.get("caption_tokens"),
         "summary": summary,
@@ -175,6 +197,11 @@ def build(store, b: dict, result: dict) -> tuple[str, dict]:
         ("Grounding: right", g.get("correctness"), "of what was claimed checks out"),
         ("Grounding: enough", g.get("coverage"), "of what the map shows was mentioned"),
         ("Fidelity", fid.get("score"), "the Judge's rating against the image"),
+        (
+            "Workflow Score",
+            (result.get("workflow") or {}).get("score"),
+            "how well the Harness worked, from its Trace",
+        ),
     ]
     png = store.get(chip["uri"]) if store.exists(chip["uri"]) else None
     html = [
@@ -207,11 +234,14 @@ def build(store, b: dict, result: dict) -> tuple[str, dict]:
         html += [f"<li>{escape(i)}</li>" for i in fid["issues"]] + ["</ul>"]
     html += [
         "</div></section>",
+        _workflow_html(result.get("workflow")),
         "<section class='block'><h2>What happened</h2>",
         _trace_summary(summary, narrative) or "<p class='sub'>No summary for this Run.</p>",
         "</section>",
-        (f"<section class='block'><h2>Steps</h2><p class='sub'>Every model call in order, from the "
-        f"Trace ({escape(tkey) if steps else 'none'}).</p>"),
+        (
+            f"<section class='block'><h2>Steps</h2><p class='sub'>Every model call in order, from the "
+            f"Trace ({escape(tkey) if steps else 'none'}).</p>"
+        ),
         _steps_html(steps),
         "</section>",
         f"</main><script>{SCRIPT}</script></body></html>",
