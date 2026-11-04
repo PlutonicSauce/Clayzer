@@ -16,7 +16,7 @@ function Title() {
     <h1>Clayzer</h1>
     <p class="lede">Give us your caption set, and we tell you how much of it you can trust, where
       it fails, and what it costs to make better.</p>
-    <p class="team">Team Clayzer · Clay Earth Dataset Foundry hackathon · November 2026</p>
+    <p class="team">Team Clayzer · Clay Earth Dataset Foundry hackathon · November 4th, 2026</p>
   </div>`;
 }
 
