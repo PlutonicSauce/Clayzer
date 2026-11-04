@@ -8,8 +8,14 @@ Deploy it once per account, from a laptop with that account's credentials, after
 Only workflow jobs that run in this repo's `aws` environment can assume the role (set that
 environment's branch and reviewer rules in the repo settings), and the role can do nothing but
 assume the CDK bootstrap roles, the same ones a teammate's `cdk deploy` uses. Copy the RoleArn
-output into the `aws` environment's AWS_DEPLOY_ROLE_ARN secret. Use `-c repo=<owner>/<name>` for
-a fork.
+output into the `aws` environment's AWS_DEPLOY_ROLE_ARN secret.
+
+GitHub names the repo in the token's `sub` claim in one of two ways: by name
+(`repo:<owner>/<name>`) or, with immutable subjects, by name and numeric id
+(`repo:<owner>@<id>/<name>@<id>`). This repo uses the second. The role accepts both, so it keeps
+working if the setting changes. For a fork, pass `-c repo=<owner>/<name>` and `-c
+sub_prefix=<prefix>`, where the prefix is `sub_claim_prefix` from
+`gh api repos/<owner>/<name>/actions/oidc/customization/sub`.
 """
 
 import os
@@ -19,10 +25,12 @@ from aws_cdk import aws_iam as iam
 from constructs import Construct
 
 GITHUB = "token.actions.githubusercontent.com"
+# The ids are public: they are in the repo's OIDC settings and in every token it issues.
+SUB_PREFIX = "repo:PlutonicSauce@127466756/Clayzer@1444863531"
 
 
 class GitHubDeployStack(cdk.Stack):
-    def __init__(self, scope: Construct, id: str, repo: str, **kwargs) -> None:
+    def __init__(self, scope: Construct, id: str, repo: str, sub_prefix: str, **kwargs) -> None:
         super().__init__(scope, id, **kwargs)
 
         provider = iam.OidcProviderNative(
@@ -36,7 +44,10 @@ class GitHubDeployStack(cdk.Stack):
                 conditions={
                     "StringEquals": {
                         f"{GITHUB}:aud": "sts.amazonaws.com",
-                        f"{GITHUB}:sub": f"repo:{repo}:environment:aws",
+                        f"{GITHUB}:sub": [
+                            f"repo:{repo}:environment:aws",
+                            f"{sub_prefix}:environment:aws",
+                        ],
                     }
                 },
             ),
@@ -58,6 +69,7 @@ GitHubDeployStack(
     app,
     "ClayzerGitHubDeploy",
     repo=app.node.try_get_context("repo") or "PlutonicSauce/Clayzer",
+    sub_prefix=app.node.try_get_context("sub_prefix") or SUB_PREFIX,
     env=cdk.Environment(
         account=os.environ.get("CDK_DEFAULT_ACCOUNT"),
         region=os.environ.get("CDK_DEFAULT_REGION", "us-west-2"),
