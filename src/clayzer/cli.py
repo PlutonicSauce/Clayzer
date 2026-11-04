@@ -199,6 +199,9 @@ def main(argv: list[str] | None = None) -> int:
         "--out", type=Path, help="JSON Lines to write (default data/rsicd-<split>.jsonl)"
     )
 
+    sub.add_parser("embeddings",
+                   help="LGND's Clay embeddings for the region's Chips (anonymous; CC BY 4.0)")  # fmt: skip
+
     ex = sub.add_parser("extract", help="the Claims a caption's text makes; or calibrate that")
     ex.add_argument("text", nargs="?", help="a caption")
     ex.add_argument("--check", metavar="BATCH_ID",
@@ -531,6 +534,21 @@ def main(argv: list[str] | None = None) -> int:
         print(f"{len(rows)} captions of {images} RSICD {a.split} images → {out}")
         print("  never commit it (no license stated; cite Lu et al. 2017). Next:")
         print(f"  uv run clayzer import {out} --name rsicd-{a.split}")
+        return 0
+
+    if a.cmd == "embeddings":
+        from clayzer import embeddings as emb
+
+        points = emb.chip_points(load_cases(store, cases_key(a.region)))
+        print(f"{len(points)} Chips in {cases_key(a.region)}; reading {emb.ROOT} anonymously")
+        rows = emb.for_chips(points)
+        store.put(emb.embeddings_key(a.region), to_jsonl(rows), "application/x-ndjson")
+        missing = [r for r in rows if "missing" in r]
+        print(f"  {len(rows) - len(missing)} joined to a cell, {len(missing)} without one; "
+              f"saved in {store.url(emb.embeddings_key(a.region))}")  # fmt: skip
+        for r in missing:
+            print(f"  {r['chip_id']}: {r['missing']}")
+        print(f"  {emb.ATTRIBUTION}")
         return 0
 
     if a.cmd == "extract":

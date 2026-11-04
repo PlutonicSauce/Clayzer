@@ -1964,9 +1964,19 @@ step = "case"
 title = "Read LGND embeddings for the dev and Texas regions, and join them to Chips"
 area = "Data and Cases"
 tier = "Could"
-status = "todo"
+status = "done"
 closes = ["CAP-18"]
 start = "docs/caption-plan.md §3 (LGND embeddings row)"
+notes = "Done 2026-11-04, read anonymously from Source Cooperative with DuckDB (the embeddings extra). Dev: 62 of 64 Chips joined to a cell; the other 2 are from 2014 and 2016, before the embeddings start. Texas: all 61. 5 Chips had no row in their NAIP month and took the month before. The Sentinel-2 scene is a median of 7 days from the NAIP date in dev and 11 in Texas (at most 55). Each Chip has its own cell, since they're at least 1 km apart. A geohash-month is one file of several GB in ~240 MB row groups; the bbox filter reads only the row groups around the Chips: about 4.5 minutes for dev and 17 for Texas through the laptop's proxy."
+see_it = "`uv sync --extra embeddings`, then `uv run clayzer embeddings` (and `--region test`): embeddings/caption-<region>.jsonl in the store, one row per Chip with its cell, date, and the CC BY 4.0 attribution."
+changes = [
+  "src/clayzer/embeddings.py: one bbox-filtered query per geohash-month, each Chip joined to the cell holding its centre, the nearest month within two when its own has none",
+  "src/clayzer/cli.py: `clayzer embeddings`, writing embeddings/caption-<region>.jsonl",
+  "pyproject.toml: the embeddings extra (duckdb); the web app's image doesn't need it",
+  "docs/cli.md: how to run it, what it costs, and the attribution",
+  "docs/sources.toml: LGND embeddings now used, by embeddings.py",
+  "tests/test_embeddings.py: geohashes, partitions, the cell a Chip joins, the month fallback, and Chips from before 2017",
+]
 context = "Caption reuse and Claims from embeddings (design §8, ideas 13 and 14) both need embeddings for the Chips we score. LGND's are on Source Cooperative: anonymous, GeoParquet by geohash and month, CC BY 4.0. Query rows with DuckDB instead of downloading whole files (~340 MB each). They're Sentinel-2 based (10 m pixels, 1,280 m cells), so one cell covers several 307 m Chips."
 done_when = [
   "Embedding rows for every dev and Texas Chip's cell, queried without downloading whole files",
