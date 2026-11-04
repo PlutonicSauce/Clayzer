@@ -1809,7 +1809,13 @@ step = "ship"
 title = "Readiness check: no disallowed services, licenses, nothing secret committed"
 area = "Demo and delivery"
 tier = "Must"
-status = "todo"
+status = "done"
+notes = "Done 2026-11-04. Scanned main, every file in its history, and every branch's history: no long-lived keys, tokens, or .env ever committed (.env is gitignored), no account ids, ARNs, deployment hostnames, or employer references in any file, no benchmark data (RSICD, LEVIR, VRSBench, SkyScript, MegaEarth appear only as code), the ODbL notice beside every OSM-derived Case file, and no disallowed service in src/ or infra/. Added the Apache-2.0 LICENSE (the official text). tests/test_repo_readiness.py keeps the repo half passing in every test run, and each check was shown to catch a planted violation. Credentials and public buckets are `clayzer readiness` (AWS-13, on feat/offline-replay-and-proxy-paths). Left as is by decision: 82 early commits carry work-domain author emails; no file content does."
+see_it = "uv run pytest tests/test_repo_readiness.py"
+changes = [
+  "LICENSE: Apache License 2.0, the official text",
+  "tests/test_repo_readiness.py: the license, no account ids, ARNs, hostnames, or employer references, no benchmark data, ODbL notices, and no disallowed services",
+]
 closes = ["AWS-12", "REQ-13", "REQ-17"]
 start = "caption-plan.md §7"
 
