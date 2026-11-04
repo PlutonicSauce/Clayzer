@@ -681,6 +681,38 @@ function provenancePanel(p) {
     </div>`;
 }
 
+// The Caption dataset card (CAP-22): the Batch's Captions judged as one Caption Set.
+function datasetCard(card) {
+  const pct = (x) => (x === null || x === undefined ? "—" : `${Math.round(x * 100)}%`);
+  const n1 = (x) => (x === null || x === undefined ? "—" : Number(x).toFixed(1));
+  const { size: s, duplication: d, vocabulary: v, coverage: cov } = card;
+  const near = d.near_checked ? `${d.near_across_chips} near (${pct(d.near_rate)})` : "near-duplicates not searched";
+  const regions = Object.entries(cov.regions).map(([k, r]) => `${esc(k)}: ${r.captions} ${term("Caption", "Captions")}, ${r.chips} Chips`).join(" · ") || "—";
+  const errors = Object.values(card.errors).filter((e) => e.keyed);
+  return `<h2 id="dataset-card">Caption dataset card</h2>
+    <p class="sub">This Batch's Captions as one ${term("Caption Set")} · Object Ontology ${esc(card.ontology_version)} · no model calls</p>
+    <div class="cards">
+      <div class="card"><small>Size</small><div class="big">${s.captions}</div><small>Captions of ${s.chips} Chips · ${n1(s.claims_per_caption)} Claims each</small></div>
+      <div class="card"><small>Duplicates across Chips</small><div class="big">${pct(d.exact_rate)}</div><small>exact · ${esc(near)}</small></div>
+      <div class="card"><small>Vocabulary</small><div class="big">${v.distinct_words}</div><small>distinct words · type-token ratio ${f2(v.type_token_ratio)} · ${v.distinct_openings} openings</small></div>
+      <div class="card"><small>Missing classes</small><div class="big">${cov.missing.length}</div><small>${esc(cov.missing.join(", ") || "none")}</small></div>
+    </div>
+    <p class="sub">Regions: ${regions} · terrain not recorded</p>
+    <h3>Error patterns by Object Class</h3>
+    <table><tr><th>Object Class</th><th class="num">Chips with it</th><th class="num">Captions of them</th><th class="num">Captions claiming it</th><th class="num">Missed</th>
+      <th class="num">False positive</th><th class="num">Miscounted</th><th class="num">Misplaced</th></tr>
+    ${errors.map((e) => `<tr><td>${esc(e.name)}${e.thin ? ' <small class="sub">(thin)</small>' : ""}</td>
+      <td class="num">${e.chips}</td><td class="num">${e.labelled}</td><td class="num">${e.claimed}</td><td class="num">${pct(e.miss_rate)}</td>
+      <td class="num">${pct(e.false_positive_rate)}</td><td class="num">${pct(e.miscount_rate)}</td>
+      <td class="num">${pct(e.misplaced_rate)}</td></tr>`).join("") || '<tr><td colspan="8">No Claims an Answer Key can check.</td></tr>'}</table>
+    <h3>Look-alike confusions</h3>
+    ${card.confusions.length ? `<ul>${card.confusions.map((c) => `<li>${esc(c.labelled)} called ${esc(c.claimed)} in ${c.captions} Captions
+      (${pct(c.of_labelled)} of the Captions where it's there), e.g. <code>${esc(c.example)}</code></li>`).join("")}</ul>`
+      : "<p>None found among the classes an Answer Key can check.</p>"}
+    <h3>What this card can't show</h3>
+    <ul>${card.limits.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`;
+}
+
 async function batchPage(id, section) {
   const me = SEQ;
   const [b, prov] = await Promise.all([api(`api/batches/${encodeURIComponent(id)}`),
@@ -704,6 +736,12 @@ async function batchPage(id, section) {
   } catch (e) {
     gateHtml = `<p class="sub">Regression gate: ${esc(e.message)}</p>`;
   }
+  let cardHtml = "";
+  try {
+    cardHtml = datasetCard(await api(`api/batches/${encodeURIComponent(id)}/dataset-card`));
+  } catch (e) {
+    cardHtml = `<h2 id="dataset-card">Caption dataset card</h2><p class="sub">${esc(e.message)}</p>`;
+  }
   if (stale(me)) return;
   const c = b.config;
   $view.innerHTML = `<p><a href="#/batches">← Batches</a></p><h1>${esc(c.batch_id)}</h1>
@@ -711,6 +749,7 @@ async function batchPage(id, section) {
     <code>${esc(c.prompt_sha)}</code> (${esc(c.prompt_source)}) · Judge ${esc(c.judge_model || "off")} · Cases
     <code>${esc(c.cases_sha)}</code> · <a href="#/batches/${esc(id)}/provenance">full provenance</a></p>
     ${gateHtml}
+    ${cardHtml}
     ${provenancePanel(prov)}
     <h2>Report</h2>
     <p class="sub">The same self-contained report the CLI writes; <a href="api/batches/${encodeURIComponent(id)}/report.html" target="_blank">open it on its own</a>.</p>

@@ -60,6 +60,7 @@ BATCH_FILES = [
     ("captions.jsonl", "one Caption per Run"),
     ("retrieval.jsonl", "retrieval over each Repeat's Captions"),
     ("summary.json", "per-Case means and Spreads"),
+    ("dataset-card.json", "the Caption dataset card: duplication, coverage, error patterns"),
     ("report.md", "the report, as Markdown"),
 ]
 # A Run's stored files, as suffixes of <case-id>--r<repeat>.

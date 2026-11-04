@@ -924,9 +924,10 @@ step = "report"
 title = "A caption dataset card: duplication, coverage, vocabulary spread, per-class error patterns"
 area = "Evaluation"
 tier = "Should"
-status = "todo"
+status = "doing"
 closes = ["CAP-22"]
 start = "docs/caption-design.md §3.6"
+notes = "Built 2026-11-04 for the one Caption Set that exists today, a Batch's own Captions: dataset_card.py makes the card from caption records, with no model, so replay rebuilds it. It covers size, duplication across Chips (exact, and near by word-trigram Jaccard ≥ 0.8), coverage by Object Class and region, vocabulary, and per-class misses, false positives, miscounts, misplacements, and look-alike confusions from the ontology's confusers. It lists its limits, including that it can't show whether Captions improve Clay v2. Left to do: a card per imported set. That needs caption-importer, which only has to produce the same records. Confidence intervals come with stratified-verdict, and terrain coverage needs terrain on Cases. Checked on a real Bedrock Batch (3 Cases × 2 Repeats), which found and fixed a Misplaced rate above 100% when a Caption splits one class over several Claims."
 after = ["stratified-verdict"]
 context = "One report per caption set: size and duplication rate, class, region, and terrain coverage against what Clay will caption, vocabulary spread, and per-class error patterns from the ontology (miscounts, look-alike confusions such as greenhouses called solar arrays). It also says what it can't show: whether captions improve Clay v2."
 done_when = [
@@ -937,6 +938,15 @@ done_when = [
 refs = [
   "docs/caption-design.md §3.6",
   "docs/caption-design.md §2.1 (CAP-22)",
+]
+see_it = "A Batch's page in the web app (#/batches/<id>/dataset-card), the Caption dataset card section at the end of report.html and report.md, and batches/<id>/dataset-card.json in the store."
+changes = [
+  "src/clayzer/dataset_card.py: from_batch, build, to_markdown and to_html, from caption records any source can produce",
+  "src/clayzer/batch.py: write_reports builds the card and stores dataset-card.json, so rescore rebuilds it offline",
+  "src/clayzer/report.py, src/clayzer/report_html.py: the card as a report section",
+  "src/clayzer/ui/app.py, src/clayzer/ui/static/app.js: /api/batches/<id>/dataset-card and the Batch page's card",
+  "src/clayzer/provenance.py: dataset-card.json among the Batch's listed files",
+  "tests/test_dataset_card.py: confusions, miscounts, duplication, coverage, limits, reports, replay, and the web app",
 ]
 
 [[task]]

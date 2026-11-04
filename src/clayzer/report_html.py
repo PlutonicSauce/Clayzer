@@ -487,5 +487,9 @@ def render_html(b: dict, store) -> str:
                     f'<td class="num">{_badge(q["reciprocal_rank"])}</td></tr>'
                 )
         html.append("</table>")
+    if b.get("dataset_card"):
+        from clayzer.dataset_card import to_html
+
+        html.append(to_html(b["dataset_card"]))
     html.append(f"</main><script>{SCRIPT}</script></body></html>")
     return "\n".join(html)

@@ -404,6 +404,22 @@ def create_app(settings: Settings, region: str = "dev", allow_launch: bool = Fal
                 else "text/plain; charset=utf-8")  # fmt: skip
         return Response(store.get(key), media_type=kind)
 
+    @app.get("/api/batches/{batch_id}/dataset-card")
+    def batch_dataset_card(batch_id: str):
+        """The Batch's Captions as a Caption Set, described by its dataset card (CAP-22). Built
+        on the fly, without writing, for Batches reported before cards existed."""
+        from clayzer import dataset_card
+
+        bid = _safe(batch_id)
+        key = dataset_card.card_key(bid)
+        if store.exists(key):
+            return json.loads(store.get(key))
+        if not store.exists(f"batches/{bid}/summary.json"):
+            raise HTTPException(404, "no dataset card: the Batch hasn't been summarized")
+        b = batches.load(store, bid)
+        source = {"kind": "batch", "id": bid, "generator": b["config"].caption_model}
+        return dataset_card.build(dataset_card.from_batch(b), source)
+
     @app.get("/api/batches/{batch_id}/report.html", response_class=HTMLResponse)
     def report(batch_id: str):
         key = f"batches/{_safe(batch_id)}/report.html"

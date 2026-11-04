@@ -84,5 +84,9 @@ def render(b: dict) -> str:
                 f"- Repeat {r['repeat']}: correctness {_f(g['correctness'])}, coverage "
                 f"{_f(g['coverage'])}, fidelity {_f(fid)}. {text}"
             )
+    if b.get("dataset_card"):
+        from clayzer.dataset_card import to_markdown
+
+        lines += ["", to_markdown(b["dataset_card"]).rstrip()]
     lines.append("")
     return "\n".join(lines)

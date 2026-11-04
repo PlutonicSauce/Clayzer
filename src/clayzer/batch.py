@@ -599,6 +599,17 @@ def write_reports(store, batch_id: str) -> None:
     b = load(store, batch_id)
     b["summaries"] = load_summaries(store, batch_id, b["results"])
     b["narratives"] = load_narratives(store, batch_id, b["results"])
+    if b["summary"] is not None:
+        from clayzer import dataset_card
+
+        # The Batch's Captions as one Caption Set (CAP-22); deterministic, so replay rebuilds it.
+        source = {"kind": "batch", "id": batch_id, "generator": b["config"].caption_model}
+        b["dataset_card"] = dataset_card.build(dataset_card.from_batch(b), source)
+        store.put(
+            dataset_card.card_key(batch_id),
+            (json.dumps(b["dataset_card"], indent=2) + "\n").encode(),
+            JSON,
+        )
     store.put(_key(batch_id, "report.md"), render(b).encode(), "text/markdown")
     html = render_html(b, store).encode()
     store.put(_key(batch_id, "report.html"), html, "text/html; charset=utf-8")
