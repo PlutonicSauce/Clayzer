@@ -128,6 +128,23 @@ def test_label_corrections_drop_add_and_merge_once():
         )
 
 
+def test_a_cells_correction_moves_a_label_and_keeps_the_rest():
+    import pytest
+
+    from clayzer.cases import apply_corrections
+
+    solar = {"object": "solar_array", "count": 1, "position": "north_west",
+             "cells": ["north_west", "centre", "south"], "attributes": {"size": "large"},
+             "source": "uspvdb", "source_ids": ["405019"]}  # fmt: skip
+    fix = [{"case": "c", "object": "solar_array", "action": "cells", "cells": ["south", "centre"]}]
+    once = apply_corrections("c", [solar], fix)
+    assert once[0]["cells"] == ["centre", "south"] and once[0]["position"] == "south"
+    assert once[0]["attributes"] == {"size": "large"} and once[0]["source_ids"] == ["405019"]
+    assert once[0]["source"] == "uspvdb+manual" and apply_corrections("c", once, fix) == once
+    with pytest.raises(ValueError):
+        apply_corrections("c", [], fix)
+
+
 def test_the_texas_test_set_is_held_apart_from_development():
     assert TEST_CASES and all(c["region"] == "test" for c in TEST_CASES)
     assert all(c["region"] == "dev" for c in CASES)

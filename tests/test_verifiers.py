@@ -292,3 +292,10 @@ def test_a_build_that_timed_out_but_finished_on_lgnds_side_counts():
     geo = Slow()
     assert lgnd.ensure_classifier(geo.call, "slow-one", {"a": ["x"], "b": ["y"]}) is None
     assert ("toolbox_classifier_build", lgnd.BUILD_TIMEOUT) in geo.calls
+
+
+def test_suggestions_skip_usgs_sites_that_are_already_cases():
+    measured = {"groups": {"solar_array": {"gaps": ["woodland"]}}}
+    sites = iter(["uspvdb 2", "uspvdb 77", "uspvdb 2"])  # uspvdb 2 is CASES' fixed-dev-uspvdb-2
+    found = spread.suggest(CASES, measured, FakeGeo().call, near=lambda lat, lon, g: next(sites))
+    assert [m["command"] for m in found[0]["matches"]] == ["clayzer case uspvdb 77"]

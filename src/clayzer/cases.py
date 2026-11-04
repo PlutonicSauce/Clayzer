@@ -30,15 +30,25 @@ def load_corrections(path=CORRECTIONS) -> list[dict]:
 
 
 def apply_corrections(case_id: str, labels: list[dict], corrections: list[dict]) -> list[dict]:
-    """The labels with this Case's hand corrections applied: drops removed, adds merged in."""
+    """The labels with this Case's hand corrections applied: drops removed, adds merged in,
+    cells replaced."""
     out = [dict(lb) for lb in labels]
     for c in (c for c in corrections if c["case"] == case_id):
         if c["action"] == "drop":
             out = [lb for lb in out if lb["object"] != c["object"]]
             continue
-        if c["action"] != "add" or not c.get("cells") or set(c["cells"]) - set(GRID):
+        if c["action"] not in ("add", "cells") or not c.get("cells") or set(c["cells"]) - set(GRID):
             raise ValueError(f"bad label correction for {case_id}: {c}")
         lb = next((lb for lb in out if lb["object"] == c["object"]), None)
+        if c["action"] == "cells":  # keeps the label's count, attributes and source ids
+            if lb is None:
+                raise ValueError(f"no {c['object']} label to correct for {case_id}: {c}")
+            lb["cells"] = [g for g in GRID if g in c["cells"]]
+            if lb["position"] not in lb["cells"]:
+                lb["position"] = c["cells"][0]
+            if not lb["source"].endswith("manual"):
+                lb["source"] += "+manual"
+            continue
         if lb is None:
             out.append({"object": c["object"], "count": c.get("count"), "position": c["cells"][0],
                         "cells": [g for g in GRID if g in c["cells"]], "attributes": {},

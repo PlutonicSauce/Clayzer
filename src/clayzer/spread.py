@@ -166,6 +166,9 @@ def suggest(cases: list[dict], measured: dict, call, near=None, per_gap: int = 3
     near = near or _nearest_usgs
     area = region_box(cases)
     centres = [cell_centre(c["chips"][0]["bbox"], "centre") for c in cases]
+    # A match can be over 1 km from every Chip and still be nearest a site that's a Case.
+    have = {f"{m.group(1)} {m.group(2)}" for c in cases
+            if (m := re.match(r"^[a-z]+-[^-]+-(uspvdb|uswtdb)-(\d+)$", c["id"]))}  # fmt: skip
     out = []
     for g, info in measured["groups"].items():
         for setting in info["gaps"]:
@@ -183,7 +186,7 @@ def suggest(cases: list[dict], measured: dict, call, near=None, per_gap: int = 3
                     command = f"clayzer case neg {lon:.5f} {lat:.5f} --n <next>"
                 else:
                     site = near(lat, lon, g)
-                    if site is None:
+                    if site is None or site in have:
                         continue
                     command = f"clayzer case {site}"
                 if any(f["command"] == command for f in found):
