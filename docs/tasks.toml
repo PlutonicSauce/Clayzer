@@ -2127,3 +2127,36 @@ refs = [
   "docs/caption-design.md §2.3 (REQ-14)",
   "src/clayzer/batch.py",
 ]
+
+[[task]]
+id = "spoken-summary"
+step = "output"
+title = "Let people hear a Batch's result as a short spoken summary"
+area = "Evaluation"
+tier = "Could"
+status = "done"
+closes = ["AWS-14"]
+start = "src/clayzer/listen.py"
+notes = "Done 2026-11-04. Default voice Emma (British English, neural engine); CLAYZER_VOICE and CLAYZER_VOICE_ENGINE change it, e.g. Ruth with the generative engine. A Batch made before this has no summary until `clayzer listen <batch-id>` runs."
+see_it = "uv run clayzer listen <batch-id> --play, or the Listen section at the top of a Batch page"
+changes = [
+  "src/clayzer/listen.py: facts by code, a Nova Pro script checked against them, a Polly MP3, saved with a hash of the facts",
+  "src/clayzer/cli.py: `clayzer listen`, and every finished Batch makes one (`--no-listen` skips it)",
+  "src/clayzer/ui/app.py: /api/batches/<id>/listen and listen.mp3, and a launched Batch makes one",
+  "src/clayzer/ui/static/app.js: a player and transcript at the top of the Batch page",
+  "docs/caption-design.md: AWS-14 in §2.2 and a Polly row in the §3.4 services table",
+  "docs/caption-plan.md: AWS-14 in the AWS task and requirement tables",
+  "docs/cli.md: Listening to a result, and the voice settings",
+  "tests/test_listen.py: the fallback, the number check, replay, and the web routes",
+]
+context = "The report and the gate are written for people who read tables. A spoken summary gives anyone the result in under a minute: what was tested, the scores out of 100 and how they moved against the Baseline, the gate's verdict, and what to do next. The numbers must come from code, never the model, and the hosted app must stay read-only (REQ-09)."
+done_when = [
+  "A finished Batch has listen.mp3 and listen.json in its folder",
+  "A script stating a number not in the facts is replaced by the code-written one",
+  "The Batch page plays it with no Bedrock or Polly call",
+]
+refs = [
+  "src/clayzer/listen.py",
+  "docs/cli.md",
+  "docs/caption-design.md §2.2 (AWS-14)",
+]

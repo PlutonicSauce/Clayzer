@@ -15,6 +15,7 @@ clayzer summarize <batch-id>                rebuild every Run's summary from its
 clayzer compare <batch-a> <batch-b>         what changed, and by how much
 clayzer baseline accept <batch-id>          make a Batch the Baseline (baselines/<name>/)
 clayzer gate <batch-id>                     regression gate: exit 0 pass, 1 fail, 2 inconclusive
+clayzer listen <batch-id> [--play]          a spoken summary of the result (Nova Pro + Polly MP3)
 clayzer experiment <id> --hypothesis TEXT   record a gated attempt; --accept keeps it if it passes
 clayzer ui [--allow-launch]                 the team web app on http://127.0.0.1:8770
 clayzer ui --calibrate                      also let /label save hand-made labels into labels/
@@ -127,6 +128,8 @@ def main(argv: list[str] | None = None) -> int:
         help="check each drafted Claim with LGND Geo before writing (needs `clayzer login lgnd`)",
     )  # fmt: skip
     b.add_argument("--resume", metavar="BATCH_ID", help="finish an existing Batch")
+    b.add_argument("--no-listen", action="store_true",
+                   help="don't make the spoken summary (Nova Pro + Polly) at the end")  # fmt: skip
     b.add_argument("--no-narrate", action="store_true",
                    help="skip the model-written Trace summaries")  # fmt: skip
 
@@ -164,6 +167,15 @@ def main(argv: list[str] | None = None) -> int:
     g.add_argument("--baseline", default="default")
     g.add_argument("--tolerance", type=float, default=None)
     g.add_argument("--max-token-increase", type=float, default=None, help="0.5 = +50%%")
+
+    li = sub.add_parser("listen", help="a spoken summary of a Batch's result, saved as an MP3")
+    li.add_argument("batch_id")
+    li.add_argument("--baseline", default="default")
+    li.add_argument("--no-model", action="store_true", help="use the code-written script")
+    li.add_argument(
+        "--force", action="store_true", help="rewrite it even if the facts are the same"
+    )
+    li.add_argument("--play", action="store_true", help="then play it (macOS afplay)")
 
     ex = sub.add_parser("experiment", help="record one labelled prompt experiment, offline")
     ex.add_argument("batch_id")
@@ -330,6 +342,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Batch {batch_id} in {store.url(f'batches/{batch_id}/')}")
         _print_summary(summary)
         print(f"open {_local_report(store, settings, batch_id)}")
+        if not a.no_listen and not summary.get("stopped"):
+            from clayzer.listen import after_batch
+
+            after_batch(store, settings, batch_id)
         return 0 if not summary.get("stopped") else 3
 
     if a.cmd == "batches":
@@ -462,6 +478,35 @@ def main(argv: list[str] | None = None) -> int:
             p.error(str(e))
         print(render_gate(result), end="")
         return result.exit_code
+
+    if a.cmd == "listen":
+        import subprocess
+        import tempfile
+
+        from clayzer.config import bedrock
+        from clayzer.gate import load_baseline
+        from clayzer.listen import audio_key, listen, polly
+
+        try:
+            base = load_baseline(settings.baselines_dir, a.baseline)
+        except FileNotFoundError:
+            base = None
+        try:
+            rec = listen(store, a.batch_id, base, None if a.no_model else bedrock(settings),
+                         polly(), force=a.force)  # fmt: skip
+        except (ValueError, FileNotFoundError) as e:
+            p.error(str(e))
+        print(rec["text"])
+        how = f"{rec['model']} wrote it" if rec["source"] == "model" else "code wrote it"
+        state = "written" if rec["written"] else "already up to date"
+        print(f"\n({how}; read by Polly {rec['voice']}, {rec['engine']}; {state})")
+        print(store.url(audio_key(a.batch_id)))
+        if a.play:
+            with tempfile.NamedTemporaryFile(suffix=".mp3") as tmp:
+                tmp.write(store.get(audio_key(a.batch_id)))
+                tmp.flush()
+                subprocess.run(["afplay", tmp.name], check=False)
+        return 0
 
     if a.cmd == "experiment":
         from clayzer.batch import load

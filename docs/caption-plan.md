@@ -598,6 +598,7 @@ v0.2 of [`ontology/objects.toml`](../ontology/objects.toml) (reviewed 2026-11-04
 | Bedrock batch inference for large caption runs | AWS-10 | Captioning | Could | After the prompt is settled |
 | AgentCore captioner holding the LGND sign-in | AWS-11 | Captioning | Could | Only after checking AgentCore in an account |
 | Confirm no disallowed services | AWS-12 | Demo and delivery | Must | In the readiness check before the demo |
+| Spoken summary of each Batch: Nova Pro script, Polly MP3, played on the Batch page | AWS-14 | Evaluation | Could | Done: docs/cli.md, Listening to a result |
 
 **What a participant account allows** (checked 2026-11-04 in one account): writing X-Ray trace
 segments, CloudWatch metrics, and CloudWatch Logs all worked. Turning on Bedrock model
@@ -691,7 +692,7 @@ decisions is in ADR-0006 and ADR-0007.
 | Rubric coverage | All five criteria in Must (CAP-14): label preparation time measured as wall-clock time; cost partial on Bedrock, full GPU comparison Should |
 | Caption data from any source | The Sandbox scores Clay's own caption sets, not only ours: an importer (Must, CAP-20), a dataset verdict with confidence intervals and a dataset card (Should, CAP-21, CAP-22); training Clay v2 to measure downstream benefit stays out of scope |
 | Object classes | One Object Ontology file (`ontology/objects.toml`, ADR-0008): ~20 classes, at most three levels, a crosswalk over OSM tags and standard land-cover classes; Captions stay free text, only Claims use classes |
-| AWS services | Each maps to a rubric criterion or brief constraint (AWS-01 to AWS-13). Must: Bedrock, Titan, S3, IAM. Should: SageMaker GPU endpoint, ADOT to X-Ray and CloudWatch, CDK, Fargate and CloudFront. Could: Step Functions, batch inference, AgentCore |
+| AWS services | Each maps to a rubric criterion or brief constraint (AWS-01 to AWS-14). Must: Bedrock, Titan, S3, IAM. Should: SageMaker GPU endpoint, ADOT to X-Ray and CloudWatch, CDK, Fargate and CloudFront. Could: Step Functions, batch inference, AgentCore, Polly (done) |
 | Traceability | CAP-01 to CAP-19 for caption requirements, REQ-01 to REQ-19 ([caption-design.md §2.3](caption-design.md#23-evaluation-loop-requirements)) for the loop; section 11 maps both |
 | Vocabulary | Chip, Chip Pair, Fixed Case, Change Case, Caption, Claim, Reference Label, Answer Key, Reference Caption |
 
@@ -776,3 +777,4 @@ architecture in §3.4. Tasks are in section 7, "AWS service tasks".
 | AWS-11 | AgentCore captioner with the LGND sign-in | §2 Could; §8 | Could; checked in an account first |
 | AWS-12 | No disallowed services | §2 Out; §7 AWS tasks | Must |
 | AWS-13 | Least-privilege, short-lived access; nothing secret in the repo | §2 Must; §7 Day 1 | Must |
+| AWS-14 | A spoken summary of each Batch, through Polly | §7 AWS tasks | Could (done) |

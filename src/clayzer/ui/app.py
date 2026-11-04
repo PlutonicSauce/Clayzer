@@ -24,6 +24,7 @@ from clayzer import provenance
 from clayzer.cases import cases_key, load_cases, parse_jsonl
 from clayzer.config import REPO, Settings
 from clayzer.gate import DEFAULT_TOLERANCE, compare, gate, load_baseline
+from clayzer.listen import after_batch
 
 STATIC = Path(__file__).parent / "static"
 SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$")
@@ -440,6 +441,21 @@ def create_app(
             raise HTTPException(404, "no report for this Run yet")
         return json.loads(store.get(key))
 
+    @app.get("/api/batches/{batch_id}/listen")
+    def listen_script(batch_id: str):
+        """The spoken summary's script and facts (listen.py); made by `clayzer listen`."""
+        key = f"batches/{_safe(batch_id)}/listen.json"
+        if not store.exists(key):
+            raise HTTPException(404, "no spoken summary yet")
+        return json.loads(store.get(key))
+
+    @app.get("/api/batches/{batch_id}/listen.mp3")
+    def listen_audio(batch_id: str):
+        key = f"batches/{_safe(batch_id)}/listen.mp3"
+        if not store.exists(key):
+            raise HTTPException(404, "no spoken summary yet")
+        return Response(store.get(key), media_type="audio/mpeg")
+
     @app.get("/api/compare")
     def compare_two(a: str, b: str):
         return compare(light(a), light(b))
@@ -479,9 +495,11 @@ def create_app(
         def work():
             try:
                 s = batches.resume(batch_id, settings, store, progress=job["lines"].append)
-                job["state"] = "stopped" if s.get("stopped") else "done"
                 if s.get("stopped"):
                     job["lines"].append(s["stopped"])
+                else:
+                    after_batch(store, settings, batch_id, progress=job["lines"].append)
+                job["state"] = "stopped" if s.get("stopped") else "done"
             except Exception as e:  # noqa: BLE001 -- shown in the browser; the Batch can be resumed
                 job["state"] = "failed"
                 job["lines"].append(f"failed: {e}")

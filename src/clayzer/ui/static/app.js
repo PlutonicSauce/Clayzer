@@ -810,12 +810,25 @@ async function batchPage(id, section) {
   } catch (e) {
     gateHtml = `<p class="sub">Regression gate: ${esc(e.message)}</p>`;
   }
+  let listenHtml = "";
+  try {
+    const l = await api(`/api/batches/${encodeURIComponent(id)}/listen`);
+    const by = l.source === "model" ? `written by ${esc(l.model)} from the facts` : "written by code from the facts";
+    listenHtml = `<h2>Listen</h2>
+      <audio controls preload="none" src="/api/batches/${encodeURIComponent(id)}/listen.mp3"></audio>
+      <p class="sub">A spoken summary of this result, ${by}, read by Amazon Polly (${esc(l.voice)}).
+        Made ${esc(l.created)} against Baseline ${esc(l.baseline_id || "none")}.</p>
+      <details><summary>Transcript</summary><p>${esc(l.text)}</p></details>`;
+  } catch (e) {
+    listenHtml = `<p class="sub">No spoken summary yet: <code>uv run clayzer listen ${esc(id)}</code></p>`;
+  }
   if (stale(me)) return;
   const c = b.config;
   $view.innerHTML = `<p><a href="#/batches">← Batches</a></p><h1>${esc(c.batch_id)}</h1>
     <p class="sub">${c.case_ids.length} Cases × ${c.repeats} Repeats · ${esc(c.caption_model)} · prompt
     <code>${esc(c.prompt_sha)}</code> (${esc(c.prompt_source)}) · Judge ${esc(c.judge_model || "off")} · Cases
     <code>${esc(c.cases_sha)}</code> · <a href="#/batches/${esc(id)}/provenance">full provenance</a></p>
+    ${listenHtml}
     ${gateHtml}
     ${provenancePanel(prov)}
     <h2>Report</h2>
