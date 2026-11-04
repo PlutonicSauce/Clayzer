@@ -363,7 +363,9 @@ def main(argv: list[str] | None = None) -> int:
         for st in steps:
             at = st.attributes
             tokens = (at.get("usage") or {}).get("totalTokens", "")
-            result = st.error or (st.output or {}).get("stop_reason", "")
+            # A tool Step's output is the tool's text; an llm Step's is a dict.
+            out = st.output if isinstance(st.output, dict) else {}
+            result = st.error or out.get("stop_reason", "")
             if at.get("fault"):
                 f = at["fault"]
                 result = (

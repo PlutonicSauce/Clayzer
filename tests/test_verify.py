@@ -161,7 +161,7 @@ class RewritingBedrock(FakeBedrock):
 
 
 @pytest.mark.skipif(importlib.util.find_spec("mcp") is None, reason="needs the tools extra")
-def test_a_batch_with_verification(tmp_path, monkeypatch):
+def test_a_batch_with_verification(tmp_path, monkeypatch, capfd):
     store = LocalStore(tmp_path / "data", tmp_path / "batches")
     for case in (SOLAR, WIND):
         store.put(f"chips/{case['chips'][0]['id']}.png", case["chips"][0]["id"].encode())
@@ -190,3 +190,10 @@ def test_a_batch_with_verification(tmp_path, monkeypatch):
         "search_chip_lat_lon",
         "reasoning_imagery_check",
     ]
+    # `clayzer trace` lists the verifier's tool Steps, whose outputs are text, not dicts.
+    from clayzer import cli
+
+    monkeypatch.setattr(cli, "load_env", lambda: None)
+    monkeypatch.setattr(cli.Settings, "from_env", classmethod(lambda cls: settings))
+    assert cli.main(["trace", bid, WIND["id"]]) == 0
+    assert "search_chip_lat_lon" in capfd.readouterr().out
