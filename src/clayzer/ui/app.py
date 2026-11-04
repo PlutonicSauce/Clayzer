@@ -390,14 +390,14 @@ def create_app(
                 "sha": provenance.sha(json.dumps(case, sort_keys=True).encode()),
                 "reference_labels": len(case.get("reference_labels", [])),
                 "chip_uri": chip["uri"],
-                "chip_store_url": store.url(chip["uri"]),
+                "chip_store_url": store.url(chip["uri"]) if chip.get("uri") else None,
                 "chip_sha256": chip_shas.get(chip["uri"]),
                 # Every Chip the Run was given: one, or a Change Case's pair, earlier first.
                 "chips": [
                     {
                         "uri": c["uri"],
                         "date": c.get("date"),
-                        "store_url": store.url(c["uri"]),
+                        "store_url": store.url(c["uri"]) if c.get("uri") else None,
                         "sha256": chip_shas.get(c["uri"]),
                     }
                     for c in case["chips"]

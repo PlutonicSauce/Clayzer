@@ -177,8 +177,10 @@ function scorecard(B) {
   const prep = criterion(5, "Label preparation time", "How long does it take to prepare the labels?",
     `<div class="figure"><b>≈ ${secs(B.label_prep_seconds_per_case)}</b> per Case
        <span class="sub">(${secs(B.label_prep_seconds)} for ${plural(B.cases, "Case")})</span></div>
-     <p class="crit-note">Time to build each Case's Reference Labels. Whether Clay means this or the time to
-     write the Captions is a question for Clay.</p>`);
+     <div class="figure"><b>${secs(B.seconds_per_caption)}</b> per Caption</div>
+     <p class="crit-note">Both readings until Clay says which it means: the time to build each Case's
+     Reference Labels, and the time to write each Caption (a Caption is itself a training label for
+     Clay v2).</p>`);
   const how = `<div class="crit how-worked">
     <div class="crit-head"><span class="crit-n">+</span><span class="crit-name">And how it worked</span></div>
     <div class="crit-q">Did the Harness work well, judged from its Trace?</div>

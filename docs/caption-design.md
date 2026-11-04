@@ -443,7 +443,8 @@ Caption files.
    Bedrock VLMs with the cost criterion marked partial.
 3. **"Label preparation time" is ambiguous:** the time to build the reference labels (answer
    keys), or the time to produce captions, which are themselves training labels for Clay v2?
-   Ask Clay.
+   Ask Clay. Until then both are reported (Case-building time per Case, captioning time per
+   Caption).
 4. **NAIP Requester-Pays cost:** pre-stage a small chip set once and reuse it across Batches.
    Chips should also go into the demo pack (NAIP is public domain) so caption Stories replay
    offline.

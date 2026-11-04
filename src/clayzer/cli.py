@@ -10,6 +10,8 @@ clayzer batch --resume <batch-id>           finish a Batch (expired credentials,
 clayzer batches                             list Batches
 clayzer report <batch-id>                   rebuild a Batch's report.md and report.html
 clayzer rescore <batch-id>                  score stored Captions again with the current scorer
+clayzer score-import <name> [--no-judge]    score an imported Caption Set like Captions: no Harness
+clayzer verdict <name> [--per-stratum N]    how far a Caption Set can be trusted: rates with intervals
 clayzer trace <batch-id> <case-id> [-r N]   show one Run's summary and Trace, Step by Step
 clayzer summarize <batch-id>                rebuild every Run's summary from its Trace, offline
 clayzer compare <batch-a> <batch-b>         what changed, and by how much
@@ -87,6 +89,10 @@ def _print_summary(summary: dict) -> None:
         f"  Runs: {r['ok']} ok, {r['harness_faults']} Harness Faults, "
         f"{r['sandbox_failures']} Sandbox Failures, of {r['planned']}"
     )
+    if b.get("imported"):
+        from clayzer.report import imported_note
+
+        print(f"  {imported_note(b)}")
     if summary.get("stopped"):
         print(f"  STOPPED: {summary['stopped']}")
 
@@ -191,6 +197,20 @@ def main(argv: list[str] | None = None) -> int:
                     help="import a Batch's own Captions, to check the importer against known Cases")  # fmt: skip
     im.add_argument("--export", type=Path, metavar="JSONL",
                     help="with --from-batch: also write the Caption Set itself to this file")  # fmt: skip
+
+    si = sub.add_parser("score-import", help="score an imported Caption Set, with no Harness run")
+    si.add_argument("name", help="the Caption Set's name, as given to clayzer import")
+    si.add_argument("--label", default="", help="a short name for the Batch")
+    si.add_argument("--no-judge", action="store_true", help="skip the fidelity Judge")
+    si.add_argument("--only", nargs="*", help="Case ids to score")
+
+    vd = sub.add_parser("verdict", help="a Caption Set's error rates, with 95% intervals")
+    vd.add_argument("name", help="the Caption Set's name, as given to clayzer import")
+    vd.add_argument("--per-stratum", type=int, default=100,
+                    help="captions judged per class (about 100 gives ±10 points near 50%%)")  # fmt: skip
+    vd.add_argument("--full", metavar="BATCH_ID",
+                    help="rebuild from this whole-set Batch instead of scoring the set again")  # fmt: skip
+    vd.add_argument("--judged", metavar="BATCH_ID", help="with --full: its judged sample Batch")
 
     rs = sub.add_parser("rsicd", help="RSICD's human captions as a Caption Set file, to import")
     rs.add_argument("--split", choices=["train", "val", "test"], default="test")
@@ -526,6 +546,57 @@ def main(argv: list[str] | None = None) -> int:
         for s in result.skipped[:10]:
             print(f"  skipped {s['caption_id']}: {s['reason']}")
         return 0 if result.cases else 1
+
+    if a.cmd == "score-import":
+        from clayzer import batch as batches
+        from clayzer.importer import import_key
+
+        key = import_key(a.name)
+        if not store.exists(key):
+            print(f"no Caption Set at {store.url(key)}: run clayzer import first", file=sys.stderr)
+            return 2
+        cases = load_cases(store, key)
+        if a.only:
+            cases = [c for c in cases if c["id"] in set(a.only)]
+        print(f"scoring {len(cases)} imported captions from {store.url(key)}")
+        bid = batches.create(cases, settings, store, 1, a.label or f"import-{a.name}",
+                             f"import-{a.name}", judge=not a.no_judge, source="imported")  # fmt: skip
+        print(f"Batch {bid}")
+        _print_summary(batches.resume(bid, settings, store))
+        return 0
+
+    if a.cmd == "verdict":
+        from clayzer import batch as batches
+        from clayzer import verdict as vd
+        from clayzer.importer import import_key
+
+        if a.full:
+            full = batches.load(store, a.full)
+            judged = batches.load(store, a.judged) if a.judged else None
+        else:
+            cases = load_cases(store, import_key(a.name))
+            if not cases:
+                print(f"no Caption Set at {store.url(import_key(a.name))}", file=sys.stderr)
+                return 2
+            print(f"cheap checks on all {len(cases)} captions (no Judge)")
+            fid = batches.create(cases, settings, store, 1, f"verdict-{a.name}-all",
+                                 f"import-{a.name}", judge=False, source="imported")  # fmt: skip
+            batches.resume(fid, settings, store)
+            full = batches.load(store, fid)
+            ids = set(vd.sample(full, a.per_stratum))
+            print(f"judging a stratified sample of {len(ids)}")
+            jid = batches.create([c for c in cases if c["id"] in ids], settings, store, 1,
+                                 f"verdict-{a.name}-judged", f"import-{a.name}",
+                                 source="imported")  # fmt: skip
+            batches.resume(jid, settings, store)
+            judged = batches.load(store, jid)
+        v = vd.build(full, judged)
+        store.put(vd.verdict_key(a.name), (json.dumps(v, indent=2) + "\n").encode(),
+                  "application/json")  # fmt: skip
+        md = vd.render(v)
+        store.put(vd.verdict_key(a.name).replace(".json", ".md"), md.encode(), "text/markdown")
+        print(md)
+        return 0
 
     if a.cmd == "rsicd":
         from clayzer import rsicd

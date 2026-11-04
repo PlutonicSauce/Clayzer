@@ -21,6 +21,7 @@ from clayzer.report_html import (
     _claim_table,
     _f,
     _trace_summary,
+    chip_meta,
 )
 from clayzer.trace import loads, trace_key
 
@@ -215,7 +216,8 @@ def build(store, b: dict, result: dict) -> tuple[str, dict]:
                 "of Claims that got appeared, disappeared, or unchanged right",
             ),
         )
-    png = store.get(chip["uri"]) if store.exists(chip["uri"]) else None
+    # An imported caption may have no image.
+    png = store.get(chip["uri"]) if chip.get("uri") and store.exists(chip["uri"]) else None
     html = [
         "<!doctype html><html lang='en'><head><meta charset='utf-8'>",
         f"<title>Run {escape(result['run_id'])}</title>",
@@ -231,7 +233,7 @@ def build(store, b: dict, result: dict) -> tuple[str, dict]:
             for t, v, n in cards) + "</div>",
         "<section class='case'><div class='chip'>",
         _chip_svg(png, case["reference_labels"], g.get("rows", [])),
-        f"<div class='meta mono'>{escape(chip['id'])} · NAIP {escape(chip['date'])} · {escape(chip['source'])}</div>",
+        f"<div class='meta mono'>{chip_meta(case, chip)}</div>",
         "</div><div>",
         "<h2>Caption</h2>",
         f"<blockquote>{escape(cap['text'] if cap and cap.get('text') else '(no Caption)')}</blockquote>",
