@@ -644,7 +644,9 @@ data look like that, or can you send its real schema? How large is the full set,
 imagery (NAIP, Sentinel-2) and regions does it cover?
 
 - What does **label preparation time** measure: preparing Reference Labels, or producing
-  Captions (which are training labels for Clay v2)?
+  Captions (which are training labels for Clay v2)? Until Clay answers (assumed 2026-11-04),
+  reports give both: wall-clock time to build each Case's Reference Labels, per Case and in
+  total, and time to write each Caption.
 - Format and location of the **example captions**; fixed, change, or both?
 - Format and location of the **retrieval evaluation datasets** the brief mentions; which queries
   and which Chips do they cover?

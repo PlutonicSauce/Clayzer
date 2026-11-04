@@ -12,6 +12,19 @@ def _ms(d: dict | None) -> str:
     return _f(d["mean"]) + (f" ± {d['spread']:.2f}" if d.get("spread") is not None else "")
 
 
+def imported_note(batch: dict) -> str | None:
+    """For an imported Caption Set: which captions couldn't be scored on every criterion."""
+    imp = batch.get("imported")
+    if not imp:
+        return None
+    return (
+        f"Imported captions, scored with no Harness run: {imp['captions']} scored, "
+        f"{imp['claims_extracted']} with Claims extracted from their text. "
+        f"{imp['not_located']} have no location, so aren't grounded; {imp['no_image']} have no "
+        "image, so aren't judged for fidelity."
+    )
+
+
 def render(b: dict) -> str:
     cfg, s = b["config"], b["summary"]
     batch = s["batch"]
@@ -32,6 +45,8 @@ def render(b: dict) -> str:
             f"{runs['sandbox_failures']} Sandbox Failures, of {runs['planned']} planned."
         ),
     ]
+    if imported_note(batch):
+        lines += ["", imported_note(batch)]
     if s.get("stopped"):
         lines += ["", (f"**Stopped early:** {s['stopped']}. Resume with "
                       f"`clayzer batch --resume {cfg.batch_id}`.")]  # fmt: skip
@@ -50,7 +65,11 @@ def render(b: dict) -> str:
         ),
         f"| Fidelity | {_f(batch['fidelity'])} | image-aware Judge |",
         f"| Retrieval | {_ms(batch['retrieval_mrr'])} | MRR per Repeat, mean ± Spread |",
-        f"| Label preparation time | {_f(batch['label_prep_seconds'], 1)} s | building all Cases |",
+        (
+            f"| Label preparation time | {_f(batch['label_prep_seconds'], 1)} s | building all "
+            f"Cases ({_f(batch['label_prep_seconds_per_case'], 1)} s each); writing a Caption: "
+            f"{_f(batch['seconds_per_caption'], 1)} s. Both until Clay says which it means |"
+        ),
         (
             f"| Cost (partial) | {_f(batch['seconds_per_caption'], 1)} s, "
             f"{_f(batch['tokens_per_caption'], 0)} tokens per Caption | Bedrock hides GPU time |"

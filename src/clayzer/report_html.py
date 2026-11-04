@@ -9,6 +9,7 @@ import base64
 from html import escape
 
 from clayzer.grid import GRID
+from clayzer.report import imported_note
 
 CELL = 512 / 3
 
@@ -103,6 +104,14 @@ def _cell_xy(cell: str) -> tuple[float, float]:
 
 def _short(obj: str) -> str:
     return obj.replace("_", " ")
+
+
+def chip_meta(case: dict, chip: dict) -> str:
+    """The line under a Chip: its id, date, and source. An imported caption's image may be any
+    sensor's, or have no date."""
+    date = escape(chip.get("date") or "undated")
+    return (f"{escape(chip['id'])} · {'' if case.get('imported') else 'NAIP '}{date} · "
+            f"{escape(chip['source'])}")  # fmt: skip
 
 
 def _chip_svg(png: bytes | None, labels: list[dict], rows: list[dict]) -> str:
@@ -377,7 +386,9 @@ def render_html(b: dict, store) -> str:
             "",
         ),
         ("Label preparation", f"{_f(batch['label_prep_seconds'], 0)} s",
-         f"building {len(cfg.case_ids)} Cases", " platform"),
+         (f"building {len(cfg.case_ids)} Cases; writing a Caption "
+         f"{_f(batch['seconds_per_caption'], 1)} s (both until Clay says which it means)"),
+         " platform"),
         ("Cost (partial)", f"{_f(batch['seconds_per_caption'], 1)} s",
          f"{_f(batch['tokens_per_caption'], 0)} tokens per Caption; no GPU time on Bedrock",
          " platform"),
@@ -400,6 +411,8 @@ def render_html(b: dict, store) -> str:
             f"{runs['sandbox_failures']} Sandbox Failures · {runs['planned']} planned</p>"
         ),
     ]
+    if imported_note(batch):
+        html.append(f"<p class='sub'>{escape(imported_note(batch))}</p>")
     if s.get("stopped"):
         html.append(
             f"<p class='badge b-warn'>Stopped early: {escape(s['stopped'])}. Resume with "
@@ -448,14 +461,11 @@ def render_html(b: dict, store) -> str:
         html += [
             "<section class='case'><div class='chip'>",
             _chip_svg(
-                store.get(chip["uri"]) if store.exists(chip["uri"]) else None,
+                store.get(chip["uri"]) if chip.get("uri") and store.exists(chip["uri"]) else None,
                 case["reference_labels"],
                 first["grounding"]["rows"] if first else [],
             ),
-            (
-                f"<div class='meta mono'>{escape(chip['id'])} · NAIP {escape(chip['date'])} · "
-                f"{escape(chip['source'])}</div></div><div>"
-            ),
+            (f"<div class='meta mono'>{chip_meta(case, chip)}</div></div><div>"),
             f"<h2>{escape(case_id)}</h2>",
             (
                 f"<p class='sub'>{summ['runs']} scored Runs · {summ['harness_faults']} Harness "

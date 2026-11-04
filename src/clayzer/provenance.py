@@ -107,7 +107,8 @@ def code_version() -> tuple[str | None, bool | None]:
 
 def chip_manifest(store, cases: list[dict]) -> dict[str, str]:
     """Every Chip's store key -> the SHA-256 of its image, as the Batch starts."""
-    uris = sorted({chip["uri"] for case in cases for chip in case["chips"]})
+    # An imported row may have no image (uri None); it has nothing to hash.
+    uris = sorted({chip["uri"] for case in cases for chip in case["chips"] if chip.get("uri")})
     with ThreadPoolExecutor(8) as pool:
         hashes = pool.map(lambda u: hashlib.sha256(store.get(u)).hexdigest(), uris)
         return dict(zip(uris, hashes, strict=True))

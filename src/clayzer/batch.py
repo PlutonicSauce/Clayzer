@@ -42,6 +42,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 from clayzer import harness, lgnd, provenance, verifiers
 from clayzer.cases import parse_jsonl, to_jsonl
 from clayzer.config import Settings, bedrock
+from clayzer.extract import extract, extract_model
 from clayzer.grounding import grounding
 from clayzer.judge import fidelity
 from clayzer.retrieval import retrieval
@@ -98,6 +99,11 @@ class BatchConfig:
     # A hash of ontology/verifiers.toml, the route each class's Claims are verified by; None
     # without verification.
     verifiers_sha: str | None = None
+    # Where Captions come from: "harness" (our Harness writes them) or "imported" (an imported
+    # Caption Set's own captions, scored with no Harness run; CAP-20).
+    source: str = "harness"
+    # The model that extracts Claims from imported captions that have none (extract.py).
+    extract_model: str | None = None
     # Settings this version doesn't know, from a Batch another branch wrote to the shared store.
     extra: dict = field(default_factory=dict)
 
@@ -162,6 +168,79 @@ def _classify(e: Exception) -> str:
     return SANDBOX_FAILURE
 
 
+def _not_grounded() -> dict:
+    """Grounding for a Case with no location: nothing to compare Claims with, so every part is
+    missing rather than wrong (an empty Answer Key would make every Claim a false positive)."""
+    parts = ("correctness", "coverage", *COMPONENTS, "change", "unscored_share")
+    return {**dict.fromkeys(parts), "rows": [], "counts": {}, "missed": [], "unscored": [],
+            "relation_rows": [], "relations_unscored": [], "not_grounded": "no location"}  # fmt: skip
+
+
+def _imported_image(store, chip: dict) -> tuple[str | None, bytes | None]:
+    """An imported row's image, when the store has it under chips/; else none, and the row is
+    scored on grounding and retrieval only."""
+    uri = chip.get("uri")
+    if uri and uri.startswith("chips/") and store.exists(uri):
+        return uri, store.get(uri)
+    return None, None
+
+
+def _score_imported(client, cfg: BatchConfig, case: dict, repeat: int, store):
+    """One imported caption, scored like a Caption with no Harness run (CAP-20). Its own Claims
+    are used if the row has them; otherwise they're extracted from its text (extract.py), as a
+    scoring Step. Fidelity needs the image, grounding needs a location: a row without one gets
+    no score for it, and says so. Returns (result, caption) like _run_one."""
+    imp = case["imported"]
+    run_id = f"{case['id']}#{repeat}"
+    base = {"run_id": run_id, "case_id": case["id"], "repeat": repeat}
+    tracer = Tracer(
+        RunInfo(run_id=run_id, task="caption", case_id=case["id"], repeat=repeat,
+                batch_id=cfg.batch_id, model_id=imp.get("generator") or "imported",
+                prompt_sha="", metadata={"source": "imported", "caption_id": imp["caption_id"],
+                                         "judge_model": cfg.judge_model}),
+        [StoreSink(store)],
+    )  # fmt: skip
+    image_key, png = _imported_image(store, case["chips"][0])
+    try:
+        try:
+            given = imp.get("claims")
+            if given:
+                claims = {"objects": given.get("objects", []),
+                          "relations": given.get("relations", []),
+                          "uncertain": given.get("uncertain", [])}  # fmt: skip
+            else:
+                claims, _ = extract(client, cfg.extract_model, imp["caption"], tracer)
+            cap = {**base, "text": imp["caption"], **claims}
+            result = {
+                **base, "status": OK, "error": None,
+                "grounding": grounding(cap, case["reference_labels"]) if case.get("located")
+                else _not_grounded(),
+                "fidelity": None, "workflow": None,
+                "imported": {"claims": "source" if given else "extracted",
+                             "located": bool(case.get("located")), "image": png is not None},
+            }  # fmt: skip
+            if cfg.judge_model and png is not None:
+                result["fidelity"], _ = fidelity(
+                    client, cfg.judge_model, cap, png, tracer, image_key
+                )
+        except (ClientError, BotoCoreError, RuntimeError) as e:
+            if isinstance(e, ClientError | BotoCoreError):
+                _classify(e)
+            # Extraction and the Judge are the evaluation's work: their failure is ours.
+            faults = tracer.finish(SANDBOX_FAILURE, None, str(e)[:500])
+            return {
+                **base,
+                "status": SANDBOX_FAILURE,
+                "error": str(e)[:500],
+                "faults": faults,
+            }, None
+        result["faults"] = tracer.finish(OK, cap["text"])
+        return result, cap
+    except CredentialsExpired as e:
+        tracer.finish("stopped", None, f"credentials expired: {e}"[:500])
+        raise
+
+
 def _run_one(
     client, cfg: BatchConfig, prompt: str, case: dict, repeat: int, store, toolbox=None,
     verifier=None, chip_shas: dict[str, str] | None = None,
@@ -173,6 +252,8 @@ def _run_one(
     matches the one hashed when the Batch started is a Sandbox Failure: scoring it would score
     a different input under the same name.
     """
+    if cfg.source == "imported":
+        return _score_imported(client, cfg, case, repeat, store)
     chips = case["chips"]
     chip = chips[0]
     # A Change Case's Chip Pair (earlier first) goes to the Harness and the Judge as a list.
@@ -301,6 +382,7 @@ def create(
     judge: bool = True,
     tools: list[str] | None = None,
     verify: str | None = None,
+    source: str = "harness",
 ) -> str:
     """Write a new Batch's configuration, prompt, and frozen Cases. Returns the Batch id."""
     # Labels become part of store keys, so only letters, digits, dashes and underscores.
@@ -312,7 +394,13 @@ def create(
     )
     frozen = to_jsonl(cases)
     judge_prompt = provenance.judge_prompt().encode()
-    chips = (json.dumps(provenance.chip_manifest(store, cases), indent=2) + "\n").encode()
+    if source == "imported":
+        # Only the images the store has: a row without one is scored without fidelity.
+        hashed = [{**c, "chips": [ch for ch in c["chips"] if _imported_image(store, ch)[0]]}
+                  for c in cases]  # fmt: skip
+    else:
+        hashed = cases
+    chips = (json.dumps(provenance.chip_manifest(store, hashed), indent=2) + "\n").encode()
     onto_version, onto_sha = provenance.ontology_version()
     commit, dirty = provenance.code_version()
     from clayzer.narrate import summary_model
@@ -343,6 +431,8 @@ def create(
         code_dirty=dirty,
         summary_model=summary_model(),
         verifiers_sha=_sha(verifiers.DEFAULT.read_bytes()) if verify else None,
+        source=source,
+        extract_model=extract_model(settings) if source == "imported" else None,
     )
     store.put(
         _key(batch_id, "batch.json"), (json.dumps(asdict(cfg), indent=2) + "\n").encode(), JSON
@@ -412,7 +502,8 @@ def resume(batch_id: str, settings: Settings, store, progress=print, narrate: bo
             store.put(_key(batch_id, "captions.jsonl"), to_jsonl(captions), NDJSON)
 
     retr = [] if stopped else _retrieval(client, cfg, cases, captions)
-    if narrate and not stopped:
+    # A narrative tells what a Harness did; an imported caption had none.
+    if narrate and not stopped and cfg.source != "imported":
         from clayzer.narrate import narrate_batch
 
         narrate_batch(client, store, batch_id, results, progress=progress)
@@ -428,6 +519,9 @@ def _one_line(r: dict) -> str:
     if r["status"] == SANDBOX_FAILURE:
         return f"Sandbox Failure ({(r['error'] or '')[:80]})"
     g = r["grounding"]
+    if g.get("not_grounded"):
+        f = (r.get("fidelity") or {}).get("score")
+        return "not grounded (no location)" + (f", fidelity {f:.2f}" if f is not None else "")
     f = (r.get("fidelity") or {}).get("score")
     tag = "Harness Fault, " if r["status"] == HARNESS_FAULT else ""
 
@@ -517,6 +611,15 @@ def summarize(cfg: BatchConfig, cases: list[dict], results: list[dict], retr: li
                 k: sum((r.get("faults") or {}).get(k, 0) for r in results)
                 for k in ("harness", "environment", "sandbox", "soft")
             },
+            # An imported Caption Set: which criteria each caption could be scored on (CAP-20).
+            "imported": {
+                "captions": len(scored),
+                "not_located": sum(not r["imported"]["located"] for r in scored),
+                "no_image": sum(not r["imported"]["image"] for r in scored),
+                "claims_extracted": sum(r["imported"]["claims"] == "extracted" for r in scored),
+            }
+            if cfg.source == "imported"
+            else None,
         },
     }
 
@@ -534,10 +637,14 @@ def rescore(batch_id: str, store) -> dict:
 
     b = load(store, batch_id)
     labels = {c["id"]: c["reference_labels"] for c in b["cases"]}
+    # An imported Case with no location stays ungrounded; everything else is regrounded.
+    unlocated = {c["id"] for c in b["cases"] if c.get("located") is False}
     captions = {(c["case_id"], c["repeat"]): c for c in b["captions"]}
     for r in b["results"]:
         cap = captions.get((r["case_id"], r["repeat"]))
-        if r["status"] == OK and cap is not None:
+        if r["case_id"] in unlocated:
+            pass
+        elif r["status"] == OK and cap is not None:
             r["grounding"] = grounding(cap, labels[r["case_id"]])
         elif r["status"] == HARNESS_FAULT:
             empty = {"text": "", "objects": [], "relations": [], "uncertain": []}

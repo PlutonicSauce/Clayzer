@@ -982,10 +982,10 @@ step = "output"
 title = "Label preparation time per label set (definition still asked of Clay)"
 area = "Evaluation"
 tier = "Must"
-status = "doing"
+status = "done"
 closes = ["CAP-13"]
 start = "Case prep_seconds; caption-plan.md §9"
-notes = "Recorded per Case and summed per Batch; the definition is a question for Clay."
+notes = "Done 2026-11-04 on an assumption, stated in caption-plan.md §9 and caption-design.md §5: until Clay says which it means, reports give both readings, wall-clock time to build each Case's Reference Labels (per Case and in total) and time to write each Caption. Revisit when Clay answers."
 context = "Clay's fifth criterion. Each Case records `prep_seconds` (building it) and Batches sum them. Clay hasn't said whether it means preparing Reference Labels or producing Captions (which are Clay v2's training labels); the question is in plan §9."
 done_when = [
   "The definition confirmed with Clay, or the assumption stated in the plan",
@@ -995,6 +995,14 @@ refs = [
   "docs/caption-plan.md §9",
   "src/clayzer/cases.py (prep_seconds)",
   "docs/caption-design.md §2.1 (CAP-13)",
+]
+see_it = "The home page's Label preparation time criterion shows both figures; so do the Batch report's Label preparation card and report.md's row."
+changes = [
+  "src/clayzer/report.py: label preparation shows Case-building time and captioning time",
+  "src/clayzer/report_html.py: the Label preparation card shows both",
+  "src/clayzer/ui/static/app.js: the home page shows both",
+  "docs/caption-plan.md: the assumption stated in §9",
+  "docs/caption-design.md: the assumption stated in §5",
 ]
 
 [[task]]
@@ -1145,9 +1153,10 @@ step = "output"
 title = "Score an imported caption set on the same criteria, with no Harness run"
 area = "Evaluation"
 tier = "Must"
-status = "todo"
+status = "done"
 closes = ["CAP-20"]
 start = "docs/caption-design.md §3.6; src/clayzer/batch.py"
+notes = "Done 2026-11-04: a Batch with `source = \"imported\"` scores an imported Caption Set's own captions, with no Harness run. Each caption uses its row's Claims, or Claims extracted from its text (extract.py, recorded as a scoring Step). Grounding needs a location: an unlocated caption is not grounded (every part missing, not zero, so an empty Answer Key doesn't make its Claims false positives). Fidelity needs the image in the store under chips/: a row without one isn't judged. Retrieval runs as for any Batch. The summary and both reports say how many captions had no location, no image, or extracted Claims. No Workflow Score or narrative, since no Harness ran. Being in the midday freeze means running `clayzer score-import` (or `clayzer verdict`) on the day; that run is with the demo Stories, not done here."
 after = ["caption-importer", "claims-from-text"]
 context = "Once imported, a caption set goes through the same scoring as our Captions: grounding against the Answer Keys, fidelity where an image is available, retrieval. No Harness runs; the captions are the input. Rows with no image are scored on grounding and retrieval only, and the verdict says so."
 done_when = [
@@ -1159,6 +1168,17 @@ refs = [
   "docs/caption-design.md §3.6",
   "docs/caption-design.md §2.1 (CAP-20)",
 ]
+see_it = "CLI: `uv run clayzer import <file> --name <set>`, then `uv run clayzer score-import <set>`. The Batch's report (#/batches/<id>) opens with how many captions couldn't be grounded or judged."
+changes = [
+  "src/clayzer/batch.py: BatchConfig.source and extract_model; _score_imported scores one imported caption; summarize reports what could be scored; rescore keeps unlocated captions ungrounded",
+  "src/clayzer/cli.py: `clayzer score-import <name>`",
+  "src/clayzer/report.py: imported_note, shown in both reports",
+  "src/clayzer/report_html.py: chip_meta, shared with the Run report; a Chip may have no image or date",
+  "src/clayzer/run_report.py: a Chip may have no image",
+  "src/clayzer/ui/app.py: a Chip may have no image",
+  "src/clayzer/provenance.py: chip_manifest skips Chips with no image",
+  "tests/test_score_imported.py: given and extracted Claims, unlocated and image-less rows, the report note, rescore, and the CLI",
+]
 
 [[task]]
 id = "stratified-verdict"
@@ -1166,9 +1186,10 @@ step = "output"
 title = "A dataset-level verdict: stratified sample, Wilson 95% intervals per rate and per stratum, cheap checks on the whole set"
 area = "Evaluation"
 tier = "Should"
-status = "todo"
+status = "done"
 closes = ["CAP-21"]
 start = "docs/caption-design.md §3.6"
+notes = "Done 2026-11-04: src/clayzer/verdict.py. Cheap checks on every caption with no Judge: false Claims, miscounts, wrong cells, missed labels, too-small Claims, duplicate texts, and vocabulary. The Judge runs on a sample of up to N captions per primary class (fixed seed). Every rate is a share of the captions it applies to, with a 95% Wilson interval, overall and per stratum (class, region, terrain). The overall unfaithful rate is weighted back to the set's class mix, with a Kish effective-size interval. Terrain uses a Case's setting or the source's scene class; most Cases have neither yet, because spread.py doesn't save its settings. Not yet run on a real set (needs Bedrock)."
 after = ["score-imported"]
 context = "To say how far a whole caption set can be trusted, sample it by class, region, and terrain, run the Judge on the sample, and report every error rate with a 95% Wilson interval, overall and per stratum (about 100 items per stratum for plus or minus 10 points near 50%). Cheap checks with no Judge (grounding, duplication, vocabulary, too-small Claims) run on the whole set."
 done_when = [
@@ -1180,6 +1201,12 @@ refs = [
   "docs/caption-design.md §3.6",
   "docs/caption-design.md §2.1 (CAP-21)",
   "ontology/objects.toml",
+]
+see_it = "CLI: `uv run clayzer verdict <set> [--per-stratum 100]` scores the set, judges the sample, and writes verdicts/<set>.json and .md in the store; `--full <batch> --judged <batch>` rebuilds it offline from those two Batches."
+changes = [
+  "src/clayzer/verdict.py: strata, the stratified sample, Wilson intervals (weighted for the overall fidelity rate), cheap checks, vocabulary, and the Markdown verdict",
+  "src/clayzer/cli.py: `clayzer verdict <name>`",
+  "tests/test_verdict.py: Wilson values, the sample, every rate and stratum on a small set, and the CLI with an offline rebuild",
 ]
 
 [[task]]
