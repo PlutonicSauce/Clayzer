@@ -17,6 +17,10 @@ clayzer baseline accept <batch-id>          make a Batch the Baseline (baselines
 clayzer gate <batch-id>                     regression gate: exit 0 pass, 1 fail, 2 inconclusive
 clayzer ui [--allow-launch]                 the team web app on http://127.0.0.1:8770
 
+clayzer login lgnd                          sign in to an MCP server that needs it (browser, once)
+clayzer tools roda                          list an MCP server's tools
+clayzer tools lgnd --call TOOL --args JSON  call one tool and print the result
+
 Everything is read from and written to the store: local folders, or CLAYZER_STORE=s3://...
 """
 
@@ -153,7 +157,16 @@ def main(argv: list[str] | None = None) -> int:
     ui.add_argument("--host", default="127.0.0.1")
     ui.add_argument("--port", type=int, default=8770)
 
+    lg = sub.add_parser("login", help="sign in to an MCP server that needs it (opens a browser)")
+    lg.add_argument("server")
+    tl = sub.add_parser("tools", help="list an MCP server's tools, or call one")
+    tl.add_argument("server")
+    tl.add_argument("--call", metavar="TOOL", help="call this tool")
+    tl.add_argument("--args", default="{}", help="the tool's arguments as JSON")
+
     a = p.parse_args(argv)
+    if a.cmd in ("login", "tools"):
+        return _tools_command(a)
     store = settings.store()
     key = cases_key(a.region)
 
@@ -351,6 +364,39 @@ def main(argv: list[str] | None = None) -> int:
         serve(settings, a.region, a.allow_launch, a.host, a.port)
         return 0
     return 1
+
+
+def _tools_command(a) -> int:
+    """`clayzer login <server>` and `clayzer tools <server>`."""
+    try:
+        from clayzer.mcp_auth import NotSignedIn, auth_dir
+        from clayzer.tools import Toolbox
+    except ImportError:
+        print("MCP tools need the tools extra: uv sync --extra tools", file=sys.stderr)
+        return 1
+    args = json.loads(a.args) if a.cmd == "tools" else {}
+    try:
+        with Toolbox.named([a.server], interactive=a.cmd == "login") as box:
+            version = box.versions.get(a.server, "")
+            if a.cmd == "login":
+                print(f"Signed in to {a.server} ({version}): {len(box.specs)} tools.")
+                print(f"The sign-in is saved in {auth_dir()}, outside the repo.")
+                return 0
+            if not a.call:
+                print(f"{a.server} ({version}): {len(box.specs)} tools")
+                for t in box.specs:
+                    first = (t.description or "").strip().splitlines()[0:1]
+                    print(f"  {t.name}: {first[0][:100] if first else ''}")
+                return 0
+            result = box.call(a.call, args)
+            print(result.text)
+            return 1 if result.is_error else 0
+    except NotSignedIn as e:
+        print(e, file=sys.stderr)
+        return 1
+    except ValueError as e:
+        print(e, file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":

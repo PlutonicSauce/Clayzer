@@ -1,10 +1,11 @@
-"""MCP tools for the agentic Harness (REQ-01): stdio MCP servers behind one flat set of tools.
+"""MCP tools for the agentic Harness (REQ-01): MCP servers behind one flat set of tools.
 
 The Harness is synchronous and a Batch runs its Runs one after another, so a Toolbox owns one
 event loop on a background thread and the servers stay up for the whole Batch. Same shape as
 the Sandbox's provider (breaking-barriers tools/mcp.py): servers are pinned, so the tools under
 test don't change between Batches that are compared, and child servers get the full parent
-environment (the SDK's default drops the AWS and uv variables they need).
+environment (the SDK's default drops the AWS and uv variables they need). Servers either run
+locally over stdio or are remote over HTTP; remote ones may need a sign-in (mcp_auth.py).
 
 Only servers allowed for the caption Harness are listed (caption-plan.md §3): none may read an
 Answer Key, or grounding becomes circular (ADR-0006). Needs the `tools` extra.
@@ -27,12 +28,15 @@ _NAME_LIMIT = 64
 @dataclass(frozen=True)
 class McpServer:
     name: str
-    command: str
+    command: str = ""
     args: list[str] = field(default_factory=list)
     # For uvx-launched Python servers: the pinned package and its "module:function" entry
     # point, so the server can be relaunched with the OS trust store (see launch).
     package: str | None = None
     entrypoint: str | None = None
+    # Remote servers: the streamable-HTTP endpoint, and whether it needs an OAuth sign-in.
+    url: str | None = None
+    oauth: bool = False
 
     def launch(self) -> tuple[str, list[str]]:
         """Command and args to start the server.
@@ -69,6 +73,10 @@ def _uvx(name: str, package: str, entrypoint: str) -> McpServer:
 SERVERS: dict[str, McpServer] = {
     # Registry of Open Data on AWS: dataset discovery and sampling. Allowed: no Answer Key data.
     "roda": _uvx("roda", "awslabs.roda-mcp-server==0.1.7", "awslabs.roda_mcp_server.server:main"),
+    # LGND Geo: search, classify, and check imagery over NAIP and Sentinel-2 embeddings.
+    # Allowed: it reads imagery and an image model, not OSM or USGS. Needs `clayzer login lgnd`.
+    # Remote, so it can't be pinned by version; Batches record what it reported (initialize).
+    "lgnd": McpServer("lgnd", url="https://geo.lgnd.ai/mcp", oauth=True),
 }
 
 
@@ -93,9 +101,14 @@ class Toolbox:
     Use as a context manager. Tool names must be unique across the servers.
     """
 
-    def __init__(self, servers: list[McpServer], call_timeout: float = 60.0):
+    def __init__(
+        self, servers: list[McpServer], call_timeout: float = 60.0, interactive: bool = False
+    ):
         self.servers = servers
         self.call_timeout = call_timeout
+        # Only `clayzer login` may open a browser to sign in; Batches use the saved sign-in.
+        self.interactive = interactive
+        self.versions: dict[str, str] = {}
         self.specs: list[ToolSpec] = []
         self._sessions: dict = {}
         self._loop = asyncio.new_event_loop()
@@ -135,18 +148,48 @@ class Toolbox:
             raise
 
     async def _connect_all(self) -> None:
+        self._stack = AsyncExitStack()
+        blocked: list[str] = []
+        try:
+            await self._connect_each(blocked)
+        except BaseException:
+            if blocked:
+                from clayzer.mcp_auth import NotSignedIn
+
+                raise NotSignedIn(blocked[0]) from None
+            raise
+
+    async def _connect_each(self, blocked: list[str]) -> None:
         from mcp import ClientSession, StdioServerParameters
         from mcp.client.stdio import stdio_client
 
-        self._stack = AsyncExitStack()
         seen: dict[str, str] = {}
         for server in self.servers:
-            command, args = server.launch()
-            params = StdioServerParameters(command=command, args=args, env=dict(os.environ))
-            read, write = await self._stack.enter_async_context(stdio_client(params))
+            if server.url:
+                from mcp.client.streamable_http import streamable_http_client
+
+                from clayzer.mcp_auth import http_client, oauth_provider
+
+                auth = (
+                    oauth_provider(server.name, server.url, self.interactive, blocked)
+                    if server.oauth
+                    else None
+                )
+                client = await self._stack.enter_async_context(http_client(auth))
+                read, write = await self._stack.enter_async_context(
+                    streamable_http_client(server.url, http_client=client)
+                )
+            else:
+                command, args = server.launch()
+                params = StdioServerParameters(command=command, args=args, env=dict(os.environ))
+                read, write = await self._stack.enter_async_context(stdio_client(params))
             session = await self._stack.enter_async_context(ClientSession(read, write))
-            await session.initialize()
+            info = await session.initialize()
             self._sessions[server.name] = session
+            impl = getattr(info, "server_info", None)
+            self.versions[server.name] = (
+                f"{impl.name} {impl.version}" if impl else server.package or server.url or ""
+            )
             for tool in (await session.list_tools()).tools:
                 if tool.name in seen:
                     raise ValueError(

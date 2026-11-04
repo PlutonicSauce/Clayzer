@@ -305,10 +305,11 @@ step = "harness"
 title = "MCP client in the Harness with its own LGND Geo OAuth sign-in"
 area = "Captioning"
 tier = "Must"
-status = "todo"
+status = "done"
 closes = ["REQ-01", "REQ-02"]
 start = "caption-plan.md §1.3; mcp Python SDK OAuth client"
 after = ["agentic-harness"]
+notes = "Done 2026-11-04: `clayzer login lgnd` signs in once in the browser; the Harness then reaches LGND Geo over streamable HTTP (18 tools, mcp-server 4.0.10). Verified live: search_chip_lat_lon found the dev solar Chip's NAIP observation (2022-07-02, the same date), and reasoning_imagery_check supported \"rows of solar panels\" and rejected \"wind turbines\". Access tokens last 5 minutes; the SDK can't refresh them in a new process, so the token store refreshes them itself (verified live). Next: verify-then-write."
 context = "LGND Geo is OAuth-protected per user (WorkOS AuthKit), and Claude Code's sign-in can't be reused from Python. The Harness needs its own MCP client over streamable HTTP with an OAuth flow (the mcp Python SDK has an OAuth client provider), with the token stored outside the repo. Tried 2026-11-03 through Claude Code: 18 tools; the imagery check confirmed a true Claim and rejected a false one."
 done_when = [
   "The Harness lists LGND Geo's tools from Python",
@@ -319,6 +320,13 @@ refs = [
   "docs/caption-plan.md §1.3",
   "docs/caption-plan.md §3 (LGND Geo row)",
   ".mcp.json",
+]
+see_it = "CLI: `clayzer login lgnd` (once, in the browser), then `clayzer tools lgnd` to list its tools and `clayzer tools lgnd --call <tool> --args <json>` to call one (README, Tools). In a Batch, `--tools lgnd` puts its calls in each Run's page (#/runs/<batch>/<case>/<repeat>)."
+changes = [
+  "src/clayzer/mcp_auth.py: OAuth sign-in with dynamic client registration and a one-shot callback on 127.0.0.1; the sign-in saved privately outside the repo; expired tokens refreshed through the sign-in service; TLS from CLAYZER_MCP_SYSTEM_TRUST or SSL_CERT_FILE",
+  "src/clayzer/tools.py: remote servers over streamable HTTP with OAuth; `lgnd` added; each server's reported name and version recorded",
+  "src/clayzer/cli.py: `clayzer login` and `clayzer tools`",
+  "tests/test_mcp_auth.py: the token store, the callback, TLS, refresh, and a Toolbox over HTTP",
 ]
 
 [[task]]
@@ -1378,6 +1386,28 @@ refs = [
   "docs/caption-plan.md §7 (AWS service tasks)",
 ]
 
+[[task]]
+id = "github-ci"
+step = "ship"
+title = "GitHub Actions CI: lint, format, tests, and the deck smoke test on every push and PR"
+area = "Platform"
+tier = "Should"
+status = "todo"
+start = ".github/workflows/ci.yml (new)"
+context = "Six people push to one public repo, and today nothing checks a PR before it merges. A GitHub Actions workflow runs on every push and pull request: `uv run ruff check src tests`, `uv run ruff format --check src tests`, `uv run pytest` with the `ui` and `tools` extras, and `node tests/deck_smoke.mjs`. The tests already run offline (fake Bedrock, local MCP servers), so CI needs no AWS credentials and gets none. uv.lock is gitignored because a local one records a private package index, so CI resolves from public PyPI; decide whether to commit a lock generated against public PyPI so CI and laptops install the same versions. Once the readiness check exists, run its leak scan here too."
+done_when = [
+  "The workflow runs on push and pull_request and passes on the main branch",
+  "A PR that breaks a test or lint fails its check",
+  "No secrets or AWS credentials in the workflow",
+  "The README shows the CI status badge",
+]
+refs = [
+  "pyproject.toml",
+  "tests/deck_smoke.mjs",
+  "README.md",
+  ".gitignore",
+]
+
 # ── Demo and delivery ───────────────────────────────────────────────────────────────────
 
 [[task]]
@@ -1481,6 +1511,27 @@ refs = [
   "GLOSSARY.md (Story)",
 ]
 
+
+[[task]]
+id = "contributing-guide"
+step = "ship"
+title = "CONTRIBUTING.md: how to set up, pick a task, branch, test, and open a PR"
+area = "Demo and delivery"
+tier = "Should"
+status = "todo"
+start = "CONTRIBUTING.md (new)"
+context = "Teammates from several organizations work in one public repo, each in their own AWS account. Write down what's only in people's heads today. Set up: uv, the `ui` and `tools` extras, AWS keys in a gitignored .env, `clayzer login lgnd`. Pick a task: the Tasks page and docs/tasks.toml (put your name in `owner`; follow `after`). Branch and PR: one task per branch, worktrees for parallel work, the PR updates the task's status, and done tasks get `see_it` and `changes`. Check before a PR: lint, format, tests (the same as CI). Public-repo rules: no .env, data/, batches/, benchmark images, private hostnames, package indexes, or account ids; use GLOSSARY.md terms; record decisions as ADRs."
+done_when = [
+  "CONTRIBUTING.md covers setup, picking a task, branching, checks, the PR, and the public-repo rules",
+  "It links the README, GLOSSARY.md, docs/tasks.toml, and docs/adr/",
+  "A teammate who hasn't used the repo follows it to a passing test run",
+]
+refs = [
+  "README.md",
+  "GLOSSARY.md",
+  "docs/tasks.toml",
+  "docs/adr/",
+]
 
 # ── Stretch goals: cost and quality at scale (caption-design.md §8, ideas 8–16) ────────────
 

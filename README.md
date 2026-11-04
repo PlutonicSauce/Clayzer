@@ -114,6 +114,22 @@ uv sync --extra tools
 uv run clayzer batch --tools roda --label roda
 ```
 
+LGND Geo (`lgnd`) is remote and signs each person in through OAuth. Sign in once; the sign-in
+is saved in `~/.clayzer/auth/` (or `CLAYZER_AUTH_DIR`), outside the repo, and refreshes itself.
+A Batch never opens a browser: without a saved sign-in it stops and says to run `login`.
+
+```sh
+uv run clayzer login lgnd     # opens the browser once
+uv run clayzer tools lgnd     # its 18 tools
+uv run clayzer tools lgnd --call search_chip_lat_lon --args '{"index": "naip", "lat": 35.2294, "lon": -118.1930}'
+uv run clayzer tools lgnd --call reasoning_imagery_check \
+  --args '{"claim": "Rows of solar panels cover the ground here.", "kind": "place", "nodes": ["naip/obs:613218812"]}'
+```
+
+The first call returns the newest NAIP observation at a point (`naip/obs:...`); the second asks
+LGND's image model whether that observation supports a claim. Behind a TLS-intercepting proxy,
+set `CLAYZER_MCP_SYSTEM_TRUST=1`.
+
 A Batch writes `batches/<batch-id>/` in the store: `batch.json` (models, prompt hash, Cases
 hash, Repeats, scorer version), `prompt.txt`, `cases.jsonl` (frozen at the start),
 `results.jsonl`, `captions.jsonl`, `retrieval.jsonl`, `summary.json` (per-Case mean and
