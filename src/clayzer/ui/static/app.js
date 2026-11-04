@@ -70,7 +70,7 @@ const FLOW = [
   {
     key: "capture", phase: "observe", title: "Capture", sub: "record every Step in a Trace", area: "Platform",
     what: `Every ${term("Run")} is recorded as a ${term("Trace")}: one ${term("Step")} per model turn or tool call, in order, with its arguments, result, failures and retries, latency, and cost. For captions, cost means GPU time and GPU count and size, not tokens; Bedrock only reports time and tokens, so cost stays partial there. Traces are kept in the store, so a Run can be judged later without running it again.`,
-    why: "Clay's ask is to evaluate agentic workflows, and what isn't recorded can't be evaluated. Every model call is now a Step with its full prompt and response, timing, tokens, retries, and error codes, and Judge calls are marked as scoring. Tool-call Steps arrive with the agentic Harness. The Trace format is ours and OpenTelemetry is an export (ADR-0001), so the tracing tool stays swappable.",
+    why: "Clay's ask is to evaluate agentic workflows, and what isn't recorded can't be evaluated. Every model call is now a Step with its full prompt and response, timing, tokens, retries, and error codes, and Judge calls are marked as scoring. Each failed Step is attributed (ADR-0003): a Harness Fault counts against the Harness, an Environment Fault (throttling, network, access) doesn't, and a failed Judge is a Sandbox Failure. Tool-call Steps arrive with the agentic Harness. The Trace format is ours and OpenTelemetry is an export (ADR-0001), so the tracing tool stays swappable.",
     code: ["batches/<batch-id>/traces/<case-id>--r<repeat>.jsonl", "src/clayzer/trace.py", "uv run clayzer trace <batch-id> <case-id>", "ADR-0001 (Trace format), ADR-0003 (fault attribution)"],
   },
   {

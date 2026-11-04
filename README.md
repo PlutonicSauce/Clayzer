@@ -110,7 +110,10 @@ hash, Repeats, scorer version), `prompt.txt`, `cases.jsonl` (frozen at the start
 Spread), `report.md`, `report.html`, and `traces/`: one Trace per Run
 (`<case-id>--r<repeat>.jsonl`). A Trace records every model call as a Step, with the full
 prompt and response, the image by key and hash, wall time and Bedrock's own latency, tokens,
-retries, and the error code of anything that failed; Judge calls are marked as scoring.
+retries, and the error code of anything that failed; Judge calls are marked as scoring. Each
+failed Step is attributed (ADR-0003, `faults.py`): a Harness Fault (a bad request, a missing
+`submit_caption` call, anything unrecognized), an Environment Fault (throttling, timeouts,
+network, access), or a Sandbox Failure (the Judge). Runs and Batch summaries carry the counts.
 
 ```sh
 uv run clayzer trace <batch-id> <case-id> --repeat 1          # one Run, Step by Step

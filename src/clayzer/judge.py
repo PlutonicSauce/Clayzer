@@ -75,7 +75,9 @@ def fidelity(
             "tools": ["submit_verdict"],
             "max_tokens": 1000,
         }
-        resp = tracer.converse(client, "judge", "fidelity", request, recorded)
+        resp = tracer.converse(
+            client, "judge", "fidelity", request, recorded, {"expects_tool": "submit_verdict"}
+        )
     blocks = resp["output"]["message"]["content"]
     verdict = next((b["toolUse"]["input"] for b in blocks if "toolUse" in b), None)
     step = {

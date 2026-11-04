@@ -249,11 +249,19 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Run {info.run_id} · {info.status} · {took:.1f} s · {info.model_id}")
         if info.error:
             print(f"  error: {info.error}")
+        faults = info.metadata.get("faults") or {}
+        if any(faults.values()):
+            print("  faults: " + ", ".join(f"{k} {v}" for k, v in faults.items() if v))
         print(f"  {'#':>2} {'kind':<6} {'name':<10} {'ms':>7} {'tokens':>7} {'retries':>7}  result")
         for st in steps:
             at = st.attributes
             tokens = (at.get("usage") or {}).get("totalTokens", "")
             result = st.error or (st.output or {}).get("stop_reason", "")
+            if at.get("fault"):
+                f = at["fault"]
+                result = (
+                    f"{f['attribution'].upper()}{' (soft)' if f['soft'] else ''}: {f['reason']}"
+                )
             print(
                 f"  {st.index:>2} {st.kind:<6} {st.name:<10} {at.get('latency_ms', ''):>7} "
                 f"{tokens:>7} {at.get('retries', ''):>7}  {str(result)[:70]}"

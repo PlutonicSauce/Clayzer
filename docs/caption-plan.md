@@ -596,6 +596,15 @@ v0.1 of [`ontology/objects.toml`](../ontology/objects.toml) matches the code's l
 | AgentCore captioner holding the LGND sign-in | AWS-11 | Captioning | Could | Only after checking AgentCore in an account |
 | Confirm no disallowed services | AWS-12 | Demo and delivery | Must | In the readiness check before the demo |
 
+**What a participant account allows** (checked 2026-11-04 in one account): writing X-Ray trace
+segments, CloudWatch metrics, and CloudWatch Logs all worked. Turning on Bedrock model
+invocation logging, creating dashboards, IAM roles, and CloudFormation stacks, and changing
+X-Ray's trace destination simulate as allowed (a simulation ignores organization-level SCPs, so
+those may still be refused). X-Ray's Transaction Search is off, so traces go to X-Ray only; it
+must be turned on (an account setting) before using X-Ray's direct OpenTelemetry endpoint or
+CloudWatch's generative-AI views. ADOT to X-Ray works without it. AgentCore is reachable (no
+runtimes yet).
+
 ## 8. Risks
 
 | Risk | Mitigation |

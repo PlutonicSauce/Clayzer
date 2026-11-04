@@ -155,9 +155,18 @@ class Tracer:
         self.run, self.sinks, self.steps = run, sinks, []
         self.run.started_at = time.time()
 
-    def converse(self, client, kind: StepKind, name: str, request: dict, recorded_input: dict):
+    def converse(
+        self,
+        client,
+        kind: StepKind,
+        name: str,
+        request: dict,
+        recorded_input: dict,
+        attributes: dict | None = None,
+    ):
         """Call Bedrock Converse and record it as a Step. Re-raises the call's error after
-        recording it."""
+        recording it. `attributes` are added to the Step's (e.g. `expects_tool`)."""
+        extra = attributes or {}
         _attempts.log = []
         started = time.time()
         try:
@@ -177,6 +186,7 @@ class Tracer:
                           "request_id": meta.get("RequestId"),
                           "retries": meta.get("RetryAttempts", len(_attempts.log)),
                           "failed_attempts": _attempts.log,
+                          **extra,
                       })  # fmt: skip
             _attempts.log = None
             raise
@@ -197,6 +207,7 @@ class Tracer:
             # Cost is tokens and time on Bedrock; GPU time only when self-hosted (CAP-12).
             "cost": {"input_tokens": usage.get("inputTokens"),
                      "output_tokens": usage.get("outputTokens"), "gpu_seconds": None},
+            **extra,
         })  # fmt: skip
         _attempts.log = None
         return resp
@@ -221,8 +232,16 @@ class Tracer:
         self.steps.append(Step(self.run.run_id, len(self.steps), kind, name, started, ended,
                                input_, output, error, attributes))  # fmt: skip
 
-    def finish(self, status: RunStatus, final_answer: str | None = None, error: str | None = None):
+    def finish(
+        self, status: RunStatus, final_answer: str | None = None, error: str | None = None
+    ) -> dict:
+        """Attribute faults (ADR-0003), write the Trace to every sink, and return the counts."""
+        from clayzer.faults import attribute
+
         self.run.ended_at = time.time()
         self.run.status, self.run.final_answer, self.run.error = status, final_answer, error
+        counts = attribute(self.steps)
+        self.run.metadata["faults"] = counts
         for sink in self.sinks:
             sink.write(self.run, self.steps)
+        return counts

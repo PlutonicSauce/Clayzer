@@ -133,7 +133,9 @@ def caption(
             "tool_choice": "submit_caption",
             "max_tokens": 1500,
         }
-        resp = tracer.converse(client, "llm", "caption", request, recorded)
+        resp = tracer.converse(
+            client, "llm", "caption", request, recorded, {"expects_tool": "submit_caption"}
+        )
     seconds = round(time.monotonic() - started, 2)
     blocks = resp["output"]["message"]["content"]
     submitted = next((b["toolUse"]["input"] for b in blocks if "toolUse" in b), None)

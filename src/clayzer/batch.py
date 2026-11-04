@@ -166,12 +166,12 @@ def _run_one(client, cfg: BatchConfig, prompt: str, case: dict, repeat: int, sto
                 "seconds_to_caption": e.step["seconds"],
                 "caption_tokens": e.step["usage"].get("totalTokens"),
             }  # fmt: skip
-            tracer.finish(HARNESS_FAULT, None, str(e))
+            result["faults"] = tracer.finish(HARNESS_FAULT, None, str(e))
             return result, {**base, **empty}
         except (ClientError, BotoCoreError) as e:
             status = _classify(e)
-            tracer.finish(status, None, str(e)[:500])
-            return {**base, "status": status, "error": str(e)[:500]}, None
+            faults = tracer.finish(status, None, str(e)[:500])
+            return {**base, "status": status, "error": str(e)[:500], "faults": faults}, None
 
         cap = {**base, **cap}
         result = {
@@ -189,9 +189,10 @@ def _run_one(client, cfg: BatchConfig, prompt: str, case: dict, repeat: int, sto
                 if isinstance(e, ClientError | BotoCoreError):
                     _classify(e)
                 # A Judge that fails leaves the Run without a valid fidelity score.
-                tracer.finish(SANDBOX_FAILURE, cap["text"], f"judge: {e}"[:500])
-                return {**base, "status": SANDBOX_FAILURE, "error": f"judge: {e}"[:500]}, cap
-        tracer.finish(OK, cap["text"])
+                faults = tracer.finish(SANDBOX_FAILURE, cap["text"], f"judge: {e}"[:500])
+                failed = {**base, "status": SANDBOX_FAILURE, "error": f"judge: {e}"[:500]}
+                return {**failed, "faults": faults}, cap
+        result["faults"] = tracer.finish(OK, cap["text"])
         return result, cap
     except CredentialsExpired as e:
         tracer.finish("stopped", None, f"credentials expired: {e}"[:500])
@@ -367,6 +368,11 @@ def summarize(cfg: BatchConfig, cases: list[dict], results: list[dict], retr: li
                 "ok": sum(r["status"] == OK for r in results),
                 "harness_faults": sum(r["status"] == HARNESS_FAULT for r in results),
                 "sandbox_failures": sum(r["status"] == SANDBOX_FAILURE for r in results),
+            },
+            # Failed Steps by who's to blame (ADR-0003), over every Run including failed ones.
+            "step_faults": {
+                k: sum((r.get("faults") or {}).get(k, 0) for r in results)
+                for k in ("harness", "environment", "sandbox", "soft")
             },
         },
     }
