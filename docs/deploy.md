@@ -135,4 +135,9 @@ partway.
 - **One stack per account.** A teammate hosting in their own account bootstraps it and creates
   the deploy role there. Running CI against that account needs a second environment with its
   own role and store.
+- **The token's `sub` claim.** This repo uses GitHub's immutable subjects, so its tokens say
+  `repo:PlutonicSauce@<id>/Clayzer@<id>:environment:aws`, not `repo:PlutonicSauce/Clayzer:...`.
+  The deploy role accepts both. If `configure-aws-credentials` says "Not authorized to perform
+  sts:AssumeRoleWithWebIdentity", compare the role's trust policy with
+  `gh api repos/PlutonicSauce/Clayzer/actions/oidc/customization/sub`.
 - **`cdk destroy`** removes everything except the store bucket, which is retained.
