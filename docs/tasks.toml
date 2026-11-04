@@ -230,10 +230,11 @@ step = "case"
 title = "Importer: a caption set becomes Cases, with Answer Keys attached by location and date"
 area = "Data and Cases"
 tier = "Must"
-status = "todo"
+status = "doing"
 closes = ["CAP-20"]
 start = "docs/caption-design.md §3.6; src/clayzer/cases.py"
 after = ["import-format"]
+notes = "Built 2026-11-04: `clayzer import` (src/clayzer/importer.py), JSON Lines and GeoParquet (import extra). Checked on our own Captions: the Baseline Batch's 12 Captions imported back give the same Reference Labels as the current Case builder on all 4 Cases (one differs from that old Batch's Case only because solar labels now come from USPVDB polygons). Waiting on the RSICD test: RSICD isn't on hand (and is never committed); unlocated rows like RSICD's are supported and tested offline."
 context = "Each record of an imported caption set becomes a Case; Answer Keys attach by footprint and date exactly as for our Chips (a label only counts if the site existed by the acquisition date), and ADR-0006 still applies. Captions may be Sentinel-2 rather than NAIP: compare each class's `min_visible_m` in the ontology with the row's `gsd_m` and flag Claims about objects too small to see. Build and test on RSICD's Reference Captions converted to the format, and on our own Caption files."
 done_when = [
   "`clayzer import <file>` creates Cases from GeoParquet or JSON Lines",

@@ -164,6 +164,16 @@ def main(argv: list[str] | None = None) -> int:
     ui.add_argument("--host", default="127.0.0.1")
     ui.add_argument("--port", type=int, default=8770)
 
+    im = sub.add_parser("import", help="a Caption Set from any source becomes Cases")
+    im.add_argument(
+        "file", nargs="?", type=Path, help="JSON Lines or GeoParquet, one caption per row"
+    )
+    im.add_argument("--name", help="the Caption Set's name: Cases go to cases/import-<name>.jsonl")
+    im.add_argument("--from-batch", metavar="BATCH_ID",
+                    help="import a Batch's own Captions, to check the importer against known Cases")  # fmt: skip
+    im.add_argument("--export", type=Path, metavar="JSONL",
+                    help="with --from-batch: also write the Caption Set itself to this file")  # fmt: skip
+
     ex = sub.add_parser("extract", help="the Claims a caption's text makes; or calibrate that")
     ex.add_argument("text", nargs="?", help="a caption")
     ex.add_argument("--check", metavar="BATCH_ID",
@@ -367,6 +377,32 @@ def main(argv: list[str] | None = None) -> int:
         )
         print(render_gate(result), end="")
         return result.exit_code
+
+    if a.cmd == "import":
+        from clayzer.importer import caption_rows, import_key, import_rows, read_rows
+
+        if a.from_batch:
+            from clayzer import batch as batches
+
+            rows, name = caption_rows(batches.load(store, a.from_batch)), a.name or a.from_batch
+            if a.export:
+                a.export.write_text("".join(json.dumps(r) + "\n" for r in rows))
+                print(f"wrote the Caption Set to {a.export}")
+        elif a.file:
+            rows, name = read_rows(a.file), a.name or a.file.stem
+        else:
+            print("give a Caption Set file, or --from-batch <batch-id>", file=sys.stderr)
+            return 2
+        print(f"{len(rows)} captions → {store.url(import_key(name))}")
+        result = import_rows(rows, name)
+        store.put(import_key(name), to_jsonl(result.cases), "application/x-ndjson")
+        located = sum(c["located"] for c in result.cases)
+        small = sum(1 for c in result.cases if c["imported"]["too_small"])
+        print(f"  {len(result.cases)} Cases ({located} located), {len(result.skipped)} skipped, "
+              f"{small} with Claims possibly too small for their imagery")  # fmt: skip
+        for s in result.skipped[:10]:
+            print(f"  skipped {s['caption_id']}: {s['reason']}")
+        return 0 if result.cases else 1
 
     if a.cmd == "extract":
         from clayzer.config import bedrock

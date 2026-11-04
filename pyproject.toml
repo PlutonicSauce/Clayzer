@@ -24,6 +24,9 @@ ui = [
 tools = [
     "mcp>=2.3,<3",
 ]
+import = [
+    "pyarrow>=15",
+]
 
 [project.scripts]
 clayzer = "clayzer.cli:main"

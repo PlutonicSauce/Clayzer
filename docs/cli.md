@@ -155,6 +155,23 @@ check catches wrong objects far better than a Claim one cell off.
 uv run clayzer batch --repeats 3 --verify --label verify
 ```
 
+## Importing a Caption Set
+
+A Caption Set from any source (Clay's, a benchmark's, another pipeline's) becomes Cases, one per
+caption, in the format of [caption-design.md §3.6](caption-design.md#36-evaluating-caption-data-from-any-source):
+JSON Lines, or GeoParquet with `uv sync --extra import`. Answer Keys attach by each row's
+footprint and date, as for our own Chips; a USGS site built after the acquisition year doesn't
+count. Rows without a location become Cases without Reference Labels. Claims about objects too
+small for the row's `gsd_m` are flagged.
+
+```sh
+uv run clayzer import captions.jsonl --name clay-v2         # → cases/import-clay-v2.jsonl
+uv run clayzer import --from-batch <batch-id> --export set.jsonl   # our own Captions, as a check
+```
+
+`--from-batch` turns a Batch's Captions into a Caption Set and imports it: the labels should
+match that Batch's Cases, since the footprints and dates are the same.
+
 ## Claims from free text
 
 Grounding scores structured Claims, but most caption sets are text only. `clayzer extract` has a
