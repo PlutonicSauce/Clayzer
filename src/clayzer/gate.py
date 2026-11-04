@@ -175,6 +175,11 @@ def _delta(a, b):
     return None if a is None or b is None else b - a
 
 
+def _per_1000(summary: dict, key: str):
+    x = summary.get(key)
+    return None if x is None else 1000 * x
+
+
 def compare(a: dict, b: dict) -> dict:
     """What changed from Batch a to Batch b: settings, Batch-level scores, and per Case."""
     sa, sb = a["summary"]["batch"], b["summary"]["batch"]
@@ -186,9 +191,15 @@ def compare(a: dict, b: dict) -> dict:
         ("unscored_share", "Unscored share of Claims"),
         ("seconds_per_caption", "Seconds per Caption"),
         ("tokens_per_caption", "Tokens per Caption"),
+        ("usd_per_1000_captions", "Dollars per 1,000 Captions"),
+        ("verified_claims_per_caption", "Verified Claims per Caption"),
+        ("verified_claims_per_dollar", "Verified Claims per dollar"),
+        ("verified_claims_per_gpu_second", "Verified Claims per GPU-second"),
     ):  # fmt: skip
-        batch_rows.append({"metric": label, "a": sa[key], "b": sb[key],
-                           "delta": _delta(sa[key], sb[key])})  # fmt: skip
+        # Batches from before a metric existed show it as missing, not as zero.
+        x, y = (_per_1000(s, "usd_per_caption") if key == "usd_per_1000_captions"
+                else s.get(key) for s in (sa, sb))  # fmt: skip
+        batch_rows.append({"metric": label, "a": x, "b": y, "delta": _delta(x, y)})
     ra, rb = sa["retrieval_mrr"], sb["retrieval_mrr"]
     batch_rows.insert(3, {
         "metric": "Retrieval (MRR)", "a": ra["mean"], "b": rb["mean"],

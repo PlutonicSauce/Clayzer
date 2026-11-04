@@ -1,0 +1,32 @@
+{
+  "model": "clay-v1.5",
+  "checkpoint": "clay-v1.5.ckpt",
+  "checkpoint_bytes": 5158764629,
+  "model_dir": "model-main",
+  "device": "cpu",
+  "region": "dev",
+  "chips": 63,
+  "dimension": 1024,
+  "image_size": "native",
+  "mean": [
+    110.16,
+    115.41,
+    98.15
+  ],
+  "std": [
+    47.23,
+    39.82,
+    35.43
+  ],
+  "waves": [
+    0.65,
+    0.56,
+    0.48
+  ],
+  "native_gsd_m": 0.6,
+  "time_encoding": "iso-week/52,hour/24",
+  "pooling": "cls",
+  "seconds": 391.38,
+  "embeddings_sha256": "19b91e8fddc528ab5a726f173a41f3dc9ac0b4b3cd09d534abf344925fcd1e9f",
+  "cases": "fixtures/caption/cases/caption-dev.jsonl"
+}

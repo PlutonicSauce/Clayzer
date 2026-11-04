@@ -98,7 +98,7 @@ status = "done"
 closes = ["CAP-18"]
 start = "LGND Geo search_place_find; then uv run clayzer case neg <lon> <lat>"
 after = ["dev-cases"]
-notes = "Done 2026-11-04: 10 look-alike negatives in fixtures/caption-lookalike (4 greenhouses, 4 parking lots, 2 reflective roofs), found with LGND Geo's search_place_find over NAIP in eastern Kern County (the queries are in its README), each checked by eye for panels USPVDB misses (one dropped; one kept after LGND's imagery check). First Batch (Nova Pro, 1 Repeat): 4 of 10 Captions claimed a solar array: 3 of 4 greenhouses, 1 of 2 roofs (storage units), 0 of 4 parking lots. Kept apart from the development set until dev-cases is finished, so its mix and Baseline don't move; folding them in is then one push."
+notes = "Done 2026-11-04: 10 look-alike negatives in fixtures/caption-lookalike (4 greenhouses, 4 parking lots, 2 reflective roofs), found with LGND Geo's search_place_find over NAIP in eastern Kern County (the queries are in its README), each checked by eye for panels USPVDB misses (one dropped; one kept after LGND's imagery check). First Batch (Nova Pro, 1 Repeat): 4 of 10 Captions claimed a solar array: 3 of 4 greenhouses, 1 of 2 roofs (storage units), 0 of 4 parking lots. Folded into the development set on 2026-11-04 with a new Baseline (20261104T211847Z-dev74-base, replayed from 20261104T193330Z-dev74-base after main corrected one turbine count): over 3 Repeats, greenhouses fooled the captioner in 9 of 12 Runs, reflective roofs 3 of 6, parking lots 0 of 12."
 context = "Negatives that look like positives test whether the captioner can tell a greenhouse or a parking lot from a solar array. LGND Geo's `search_place_find` takes a text description (\"greenhouse\", \"solar farm\") or an example, inside a bounding box, over NAIP. Keep results USGS doesn't list; `clayzer case neg` refuses a point with a USGS record within about 300 m. The ontology lists each class's look-alikes (`confusers`)."
 done_when = [
   "At least 8 look-alike negatives (greenhouses, parking lots, reflective roofs)",
@@ -110,11 +110,13 @@ refs = [
   "ontology/objects.toml",
   "src/clayzer/cases.py (build_negative)",
 ]
-see_it = "`uv run clayzer push --from fixtures/caption-lookalike`, then `uv run clayzer --region dev-lookalike batch --repeats 3 --label lookalike`: the Batch's page shows which look-alikes a Caption called solar."
+see_it = "Part of the development set: `uv run clayzer push --from fixtures/caption`, then any dev Batch. Its report's \"Fooled by look-alikes\" row counts, per kind, the Runs whose Caption called one a solar array."
 changes = [
-  "fixtures/caption-lookalike/cases/caption-dev-lookalike.jsonl: the 10 Cases, each with what it imitates and the LGND search that found it",
-  "fixtures/caption-lookalike/README.md: how they were found and checked, and how to load them",
-  "tests/test_lookalike_fixtures.py: enough of them, each with its Chip, none labelled solar or wind, no Chip name shared with the development set, nothing private",
+  "fixtures/caption/cases/caption-dev.jsonl: the 10 look-alike Cases, each with what it imitates and the LGND search that found it",
+  "fixtures/caption/README.md: how they were found and checked",
+  "src/clayzer/batch.py: the Batch summary counts, per look-alike kind, the Runs a Caption was fooled (`lookalikes`)",
+  "src/clayzer/report_html.py: a \"Fooled by look-alikes\" row in the Batch report (report.py has it in Markdown)",
+  "tests/test_lookalike_fixtures.py: the look-alikes in the development set, and the per-kind count",
 ]
 
 [[task]]
@@ -393,10 +395,11 @@ step = "case"
 title = "Relabel water in the committed Cases: only water there all year"
 area = "Data and Cases"
 tier = "Should"
-status = "todo"
+status = "done"
 closes = ["CAP-10"]
 start = "src/clayzer/answer_keys.py osm_object; fixtures/caption/cases/"
 after = ["ontology-review"]
+notes = "Done 2026-11-04 with lookalike-negatives, for one re-baseline. relabel_water rebuilt only the water label of each Case with water under the year-round rule; every other label stayed as it was. 13 Cases changed, only in water: 10 lost it (7 dev wind sites, 1 dev solar site, 2 Texas sites), 2 shrank, and Texas neg-10's wet pond came back by hand correction (north and north-east, from the image). New dev Baseline 20261104T211847Z-dev74-base (74 Cases x 3; Batch 20261104T193330Z-dev74-base replayed onto main's corrected turbine count): coverage on the 9 relabelled dev Cases rose from 0.612 to 0.857; the other Cases moved by -0.009 on average."
 context = "ontology-review changed osm_object so intermittent streams, ditches, and intermittent water no longer count as water: in the desert they are dry washes, and their labels counted as misses against coverage though no Caption claims water there. The committed Cases still carry the old labels: 11 lose their water label (8 of them dev turbines in dry hills) and 2 shrink. Relabel the OSM labels of the dev and Texas Cases with the new rule, keep the hand corrections applied, and add water back by hand where an intermittent pond is wet in the image (Texas neg-10). The dev Baseline then needs a new Batch of its own (about an hour): lookalike-negatives kept its Cases apart and didn't re-baseline. Its one water label (fixed-dev-lookalike-neg-107) is a canal, so the look-alike set doesn't change."
 done_when = [
   "OSM labels of the committed Cases rebuilt with the new water rule, hand corrections still applied",
@@ -407,6 +410,33 @@ refs = [
   "ontology/objects.toml (water)",
   "fixtures/caption/cases/label-corrections.toml",
   "docs/caption-plan.md §3",
+]
+see_it = "`fixtures/caption/cases/caption-dev.jsonl` and `caption-test.jsonl`; the Baseline in `baselines/default/` (`clayzer gate <batch>`)."
+changes = [
+  "src/clayzer/cases.py: relabel_water rebuilds a Case's water label from OSM under the current rule and applies the hand corrections again",
+  "fixtures/caption/cases/caption-dev.jsonl: 9 dev Cases relabelled (water only)",
+  "fixtures/caption/cases/caption-test.jsonl: 4 Texas Cases relabelled (water only)",
+  "fixtures/caption/cases/label-corrections.toml: Texas neg-10's wet pond added by hand",
+  "baselines/default/batch.json: the new dev Baseline, 74 Cases x 3 Repeats",
+  "tests/test_relabel.py: only water changes, corrections apply again, a Change Case's water stays unknown",
+]
+
+[[task]]
+id = "run-report-speed"
+step = "report"
+title = "Write per-Run reports faster: a 222-Run Batch spends about an hour on them"
+area = "Platform"
+tier = "Could"
+status = "todo"
+start = "src/clayzer/run_report.py (write_run_reports)"
+context = "The dev Baseline on 2026-11-04 took about 45 minutes for its Runs and then about 15 seconds per Run writing their reports (about an hour for 222), longer than the Runs themselves, and a resume writes them all again. Every score is saved before this step, so nothing waits on it, but it ties up the process and a resume. Likely each report re-reads the Batch and its files from the store; read once, write in parallel, and skip reports that are already up to date."
+done_when = [
+  "A 222-Run Batch writes its reports in a few minutes",
+  "A resume rewrites only the reports of Runs it re-ran",
+]
+refs = [
+  "src/clayzer/run_report.py",
+  "src/clayzer/batch.py (write_reports)",
 ]
 
 [[task]]
@@ -438,32 +468,36 @@ refs = [
 [[task]]
 id = "dataset-corroboration"
 step = "case"
-title = "Corroborate and enrich Case Reference Labels with SkyScript and MegaEarth"
+title = "Corroborate the USGS labels with OSM's power mapping, and list OSM's candidate classes"
 area = "Data and Cases"
 tier = "Could"
-status = "todo"
+status = "done"
 closes = []
-start = "fixtures/caption/cases/caption-dev.jsonl; then the SkyScript repo and the MegaEarth dataset card"
+start = "uv run clayzer corroborate fixtures/caption/cases/*.jsonl fixtures/caption-lookalike/cases/*.jsonl"
 after = ["dev-cases"]
-context = "Our Reference Labels come from USGS and OSM, and nothing outside them checks those labels today. Two public datasets could. SkyScript (wangzhecheng/skyscript) pairs remote-sensing images, including a NAIP subset, with captions templated from OSM tags. MegaEarth (Mead0w1ark/megaearth-osm-sentinel2 on Hugging Face) pairs Sentinel-2 windows with OSM labels over 485 classes, split by geography. For each Case, find any image that overlaps its Chip and compare their labels with ours. Both label from OSM, so agreeing on an OSM class mostly shows the OSM snapshots match. The useful checks are USGS-labelled solar and wind (an outside source agreeing), and disagreement in either direction, which marks a Case to look at by eye. The second aim is enrichment: their labels can add objects our Answer Keys miss in a Chip, and their samples can suggest new Case locations for classes we have few of. An added label has to map to an ontology class (a missing class goes through ontology-review first), records which dataset it came from, and is checked by eye before it becomes a Reference Label. Sentinel-2 is 10 m against NAIP's 0.6 m, so only large objects compare. Neither dataset's captions are gold (caption-plan.md §3). Check each license first; download at run time, never commit."
+notes = "Done 2026-11-04 over all 134 fixed Cases (dev, Texas, look-alikes). Reshaped first: SkyScript and MegaEarth both label from OSM, our own Answer Key for everything but solar and wind, so they can't corroborate it; MegaEarth covers only 7 of our Cases at 2.56 km (its two solar windows agree with USPVDB), and SkyScript's overlap would cost 2.8 GB to find (both recorded in docs/sources.toml as unused). The independent check is OSM's own power mapping. Solar agrees on 45 of 58 Cases with solar; the 13 USGS-only Cases all show panels, so OSM just doesn't map those plants. No negative or look-alike has OSM solar or wind, so nothing suggests USGS missed a site. Wind agrees on 25 of 26: OSM and the Chip show an 18th turbine in uswtdb-3073564's south-east cell, now a hand correction with its count; OSM also has exactly one turbine on uswtdb-3036765 and uswtdb-3044325, settling dev-cases' open question. OSM maps none of the candidate classes in our Chips except 3 substations, so it can't key them either. The dev label change goes into the next dev Baseline (water-relabel)."
+see_it = "uv run clayzer corroborate fixtures/caption/cases/caption-dev.jsonl --json corroboration.json"
+changes = [
+  "src/clayzer/corroborate.py: OSM's power mapping and candidate classes per Chip, compared with the USGS labels; one Overpass query per 20 Chips, resumable",
+  "src/clayzer/cli.py: the corroborate command",
+  "src/clayzer/cases.py: a hand correction can give the corrected count",
+  "fixtures/caption/cases/label-corrections.toml: uswtdb-3073564's 18th turbine",
+  "fixtures/caption/cases/caption-dev.jsonl: the correction applied",
+  "docs/sources.toml: MegaEarth and SkyScript, checked and not used; corroborate under OSM",
+  "tests/test_corroborate.py: plants around the Chip, multipolygons, turbine counts, candidates, each disagreement, batching, and resuming",
+]
+context = "Our Reference Labels come from USGS (solar and wind) and OSM (everything else), and nothing outside them checked the labels. OSM's own power tags (power=plant and power=generator with a solar or wind source, the ontology's osm_reference, which the Answer Keys never use) are an independent record of the same sites. For each Case, compare them with the USGS labels, and send each disagreement to an eye check: USGS listed RE Gaskell West 5 and Samson Solar III years before their panels show in NAIP. The same query lists OSM's features of the ontology's candidate classes (substation, storage tank, well pad, construction site) as evidence for making one claimable, never as Reference Labels. OSM is read only to prepare Cases (ADR-0006)."
 done_when = [
-  "Each dataset's license and coverage checked and added to docs/sources.toml",
-  "A script that, for each development Case, finds overlapping SkyScript or MegaEarth samples and lists where their labels agree or disagree with our Reference Labels",
-  "Disagreements reviewed by eye; any wrong Reference Label fixed or the Case replaced",
-  "Labels they add that our Answer Keys miss mapped to ontology classes, checked by eye, and added to the Cases with their source recorded",
-  "Candidate Case locations from their samples listed for classes with few Cases",
-  "Nothing from either dataset in git",
+  "A command that compares every Case's USGS labels with OSM's power mapping and lists OSM's candidate classes",
+  "Every disagreement checked by eye; any wrong Reference Label fixed or the Case replaced",
+  "SkyScript and MegaEarth checked and recorded in docs/sources.toml",
 ]
 refs = [
-  "docs/caption-plan.md §3 (What scores what; SkyScript not gold)",
-  "docs/caption-design.md §1 (Auxiliary datasets row)",
-  "docs/tech-hackathon.md (datasets table)",
-  "docs/sources.toml",
+  "ontology/objects.toml (osm_reference)",
   "src/clayzer/answer_keys.py",
-  "ontology/objects.toml",
+  "fixtures/caption/cases/label-corrections.toml",
+  "docs/sources.toml (megaearth, skyscript)",
 ]
-
-# ── Captioning ──────────────────────────────────────────────────────────────────────────
 
 [[task]]
 id = "skeleton"
@@ -1347,6 +1381,7 @@ tier = "Must"
 status = "done"
 closes = ["REQ-09"]
 start = "batches/<id>/captions.jsonl"
+notes = "Done 2026-11-04: `clayzer rescore` already rebuilt everything from the store; tests/test_replay.py now proves it. It runs a Batch, breaks its stored grounding, deletes its reports, then cuts the network (sockets refuse), AWS credentials, and the Bedrock client, and runs `clayzer rescore` through the CLI: grounding is recomputed, every Judge verdict and the retrieval results come back unchanged (none requested again), and the Batch report and every Run report are rewritten. No code change was needed for the replay itself. Then `clayzer replay` (2026-11-04) rescores a recorded Batch against updated Cases into a new Batch, with no model calls: rescore grades against the Batch's frozen Cases, so a label fix would make the Baseline incomparable. Replay reuses the Captions, Judge verdicts and Traces, re-grounds every Run with the new labels, re-ranks retrieval from the stored ranked lists, and records replayed_from and the new cases_sha. It refuses when the Case ids or Chips differ, or when a newly relevant query was never ranked. Used for the dev Baseline: 20261104T193330Z-dev74-base replayed as 20261104T211847Z-dev74-base after main corrected one turbine count; only that Case's count score moved. Replay copies its S3 objects one at a time (about 12 minutes for 222 Runs). The gate now counts a Run whose Caption made no gradable Claims as a complete correctness sample (correctness is undefined there, not missing), so such a Batch can be accepted. Step 7 2026-11-04: clayzer replay reads only explicit local files and writes a new disjoint output directory. Recomputes deterministic grounding/workflow and summaries, retains recorded Fidelity/retrieval, preserves failure statuses, warns on missing evidence/evaluator changes, and hashes inputs. Tests block sockets, Bedrock, boto3, embeddings and MCP; verify original hashes and deterministic repeated exports."
 context = "The brief's fallback: a recorded Trace can be scored and reported with no model, MCP server, credentials, or network, with Judge verdicts replayed from saved results. `clayzer rescore` already re-scores stored Captions; extend it so reports rebuild fully offline, and prove it with the network off."
 done_when = [
   "A Batch rescored and reported with the network disabled",
@@ -1357,10 +1392,9 @@ refs = [
   "docs/caption-design.md §2.3 (REQ-09)",
   "src/clayzer/batch.py (rescore)",
 ]
+see_it = "CLI: `uv run clayzer rescore <batch-id>` with the network off (a local store, CLAYZER_STORE unset); `uv run clayzer replay <batch-id> --cases <key>` for updated Cases, writing a new Batch with replayed_from in its batch.json. The tests: `uv run pytest tests/test_replay.py tests/test_replay_updated_cases.py`. uv run python scripts/report_demo.py --output /tmp/clayzer-report-demo-new; see docs/report-handoff.md"
+changes = ["tests/test_replay_stored_batch.py: a Batch rescored and reported through the CLI with no network, AWS credentials, or Bedrock client; Judge verdicts and retrieval reused", "src/clayzer/batch.py: rescore's docstring says Judge verdicts are reused, never requested again", "src/clayzer/batch.py: replay and _rerank rescore a recorded Batch against updated Cases offline", "src/clayzer/cli.py: clayzer replay subcommand", "src/clayzer/gate_evidence.py: a Run with nothing to grade is a complete correctness sample", "tests/test_replay_updated_cases.py: replay against updated Cases offline, a replayed Baseline gating a live Batch, and the refusals", "src/clayzer/batch.py: _regrade is the per-Run regrading shared by rescore and replay", "src/clayzer/replay.py: non-destructive offline replay into an isolated LocalStore", "src/clayzer/cli.py: replay command and ui --local-root for an offline read-only demo", "tests/test_replay.py: network prohibition, identities, missing/invalid inputs, historical and updated 63-Case formats"]
 
-notes = "Step 7 2026-11-04: clayzer replay reads only explicit local files and writes a new disjoint output directory. Recomputes deterministic grounding/workflow and summaries, retains recorded Fidelity/retrieval, preserves failure statuses, warns on missing evidence/evaluator changes, and hashes inputs. Tests block sockets, Bedrock, boto3, embeddings and MCP; verify original hashes and deterministic repeated exports."
-see_it = "uv run python scripts/report_demo.py --output /tmp/clayzer-report-demo-new; see docs/report-handoff.md"
-changes = ["src/clayzer/replay.py: non-destructive offline replay into an isolated LocalStore", "src/clayzer/cli.py: replay command and ui --local-root for an offline read-only demo", "tests/test_replay.py: network prohibition, identities, missing/invalid inputs, historical and updated 63-Case formats"]
 [[task]]
 id = "iam"
 step = "ship"
@@ -1412,10 +1446,10 @@ step = "ship"
 title = "CDK app for the stack, deployable into any teammate's account"
 area = "Platform"
 tier = "Should"
-status = "doing"
+status = "done"
 closes = ["AWS-07"]
 start = "infra/app.py"
-notes = "The hosting stack (roles, Fargate, load balancer, CloudFront; the bucket imported or created) is deployed in one participant account. Waiting on a teammate deploying it in theirs, and on a checked `cdk destroy`. The ADOT collector moved to xray (2026-11-04)."
+notes = "Deployed in two participant accounts. In the second (2026-11-04), `cdk destroy` removed everything but the retained bucket, a fresh deploy came back, and CI now deploys main into it. A redeploy after destroy creates a new bucket, so pass `-c store=` once a store holds data. The ADOT collector moved to xray (2026-11-04)."
 context = "One CDK app creates the whole stack in any teammate's account (AWS-07): the bucket, IAM roles, and the web app service; xray adds the ADOT collector to it. `cdk synth` works without an account, so it can be drafted early."
 done_when = [
   "`cdk deploy` succeeds in one account and a teammate deploys the same app in theirs",
@@ -1425,6 +1459,12 @@ done_when = [
 refs = [
   "docs/caption-design.md §2.2 (AWS-07)",
   "docs/caption-plan.md §7 (AWS service tasks)",
+]
+see_it = "docs/deploy.md: the manual deploy step by step; the stack's Url output is the hosted site."
+changes = [
+  "infra/app.py: credential-free synth (`-c cloudfront_prefix_list=`), ClusterName and ServiceName outputs, and a project=clayzer tag on every resource",
+  "infra/github_oidc.py: the role CI deploys with, trusting only this repo's `aws` environment",
+  "docs/deploy.md: the manual deploy, what each step becomes in CI, and what to watch",
 ]
 
 [[task]]
@@ -1732,7 +1772,7 @@ step = "ship"
 title = "GitHub Actions CI: lint, format, tests, and the deck smoke test on every push and PR"
 area = "Platform"
 tier = "Should"
-status = "doing"
+status = "done"
 start = ".github/workflows/ci.yml (new)"
 context = "Six people push to one public repo, and today nothing checks a PR before it merges. A GitHub Actions workflow runs on every push and pull request: `uv run ruff check src tests`, `uv run ruff format --check src tests`, `uv run pytest` with the `ui` and `tools` extras, and `node tests/deck_smoke.mjs`. The tests already run offline (fake Bedrock, local MCP servers), so CI needs no AWS credentials and gets none. uv.lock is gitignored because a local one records a private package index, so CI resolves from public PyPI; decide whether to commit a lock generated against public PyPI so CI and laptops install the same versions. Once the readiness check exists, run its leak scan here too."
 done_when = [
@@ -1746,6 +1786,13 @@ refs = [
   "tests/deck_smoke.mjs",
   "README.md",
   ".gitignore",
+]
+notes = "Pushes run CI only on main; branches get their checks from their PR. The deploy job runs on pushes to main and by hand, in the `aws` environment, which still needs a branch rule limiting it to main (repo admin). uv.lock stays uncommitted."
+see_it = "The CI badge at the top of the README, and Actions → CI: the five jobs on every push to main."
+changes = [
+  ".github/workflows/ci.yml: lint (ruff, bugbear, complexity, vulture), tests with 75% coverage, the deck smoke test and duplication, credential-free cdk synth and OIDC trust tests, and a deploy job over GitHub's OIDC with a check of the live URL",
+  ".nvmrc: Node 24 for CI and laptops",
+  "README.md: the CI badge and the checks to run before a PR",
 ]
 
 # ── Demo and delivery ───────────────────────────────────────────────────────────────────
@@ -1815,7 +1862,13 @@ step = "ship"
 title = "Readiness check: no disallowed services, licenses, nothing secret committed"
 area = "Demo and delivery"
 tier = "Must"
-status = "todo"
+status = "done"
+notes = "Done 2026-11-04. Scanned main, every file in its history, and every branch's history: no long-lived keys, tokens, or .env ever committed (.env is gitignored), no account ids, ARNs, deployment hostnames, or employer references in any file, no benchmark data (RSICD, LEVIR, VRSBench, SkyScript, MegaEarth appear only as code), the ODbL notice beside every OSM-derived Case file, and no disallowed service in src/ or infra/. Added the Apache-2.0 LICENSE (the official text). tests/test_repo_readiness.py keeps the repo half passing in every test run, and each check was shown to catch a planted violation. Credentials and public buckets are `clayzer readiness` (AWS-13, on feat/offline-replay-and-proxy-paths). Left as is by decision: 82 early commits carry work-domain author emails; no file content does."
+see_it = "uv run pytest tests/test_repo_readiness.py"
+changes = [
+  "LICENSE: Apache License 2.0, the official text",
+  "tests/test_repo_readiness.py: the license, no account ids, ARNs, hostnames, or employer references, no benchmark data, ODbL notices, and no disallowed services",
+]
 closes = ["AWS-12", "REQ-13", "REQ-17"]
 start = "caption-plan.md §7"
 
@@ -1881,9 +1934,10 @@ step = "report"
 title = "Report verified Claims per dollar and per GPU-second next to cost per Caption"
 area = "Evaluation"
 tier = "Could"
-status = "doing"
+status = "done"
 closes = ["CAP-12", "CAP-10"]
 start = "src/clayzer/report.py"
+notes = "Done 2026-11-04: a Claim is verified when its type is in the Answer Key and every part scored on it is right (position, its type's count, attributes, change). Each Run records its verified Claims and its Harness cost from the Trace (Judge Steps left out); Batches report verified Claims per Caption, dollars per Caption, verified Claims per dollar, and per GPU-second (empty on Bedrock). Dollars use the on-demand price table in src/clayzer/cost.py (Nova Pro, Nova Lite, Claude Opus/Sonnet/Haiku 5.5; Claude rows are Anthropic list prices, to confirm against Bedrock's); an unpriced model gets no dollar figure. rescore backfills both from stored Traces. Shown with the fake Bedrock in tests/test_cost.py: at the same correctness (1.0), a vaguer prompt is cheaper per Caption but earns 625 verified Claims per dollar against the specific prompt's 1,000. Not yet run on the real base and vague Batches. Step 7 2026-11-04 [PARTIAL]: per-Run evidence-yield interface deduplicates object Claims, retains parent credit and separates supported fields from accuracy. Dollar ratios require explicit verified USD/model/region/source/method/date observations; GPU ratios require measured GPU seconds. This stricter evidence-yield interface remains separate from the upstream cost.py list-price estimates and Batch/Compare aggregation, which are preserved; real Bedrock pricing verification remains outstanding. No token-to-GPU inference."
 context = "Clay cares about cost and quality together. One number joins them, and it fixes a known weakness: grounding rewards vaguer Captions (fewer Claims scores higher), but a vague Caption earns few verified Claims. Uses the token and timing data Runs already record."
 done_when = [
   "Each Batch report shows verified Claims per dollar (Bedrock prices) and per GPU-second where GPU time exists",
@@ -1895,10 +1949,9 @@ refs = [
   "src/clayzer/report.py",
   "src/clayzer/grounding.py",
 ]
+see_it = "A Batch's report (#/batches/<id>, and report.md and report.html in the store): the Verified Claims per dollar card and row. Compare (#/compare/<a>/<b>, `clayzer compare`): Dollars per 1,000 Captions, Verified Claims per Caption, per dollar, and per GPU-second. `clayzer rescore <batch-id>` adds them to an older Batch that has Traces. Run JSON scores.evidence_yield and the Run report cost evidence section; see docs/report-handoff.md for limits."
+changes = ["src/clayzer/cost.py: the price table, a Run's Harness cost from its Trace, and verified_claims", "src/clayzer/batch.py: each Run records cost and verified_claims; summarize rolls them up; rescore backfills them from Traces", "src/clayzer/gate.py: Compare shows the change in each, missing (not zero) for Batches from before them", "src/clayzer/report.py: a Verified Claims per dollar row", "src/clayzer/report_html.py: a Verified Claims per dollar card", "tests/test_cost.py: verified Claims, Harness-only cost, a vaguer prompt scoring worse per dollar at the same correctness, Compare, and rescore backfill", "src/clayzer/report_cost.py: descriptive claim/field accounting and measured-cost interface", "src/clayzer/run_report.py: per-Run accounting with unavailable reasons", "tests/test_report_cost.py: unknown cost, deduplication, partial credit, omitted fields and synthetic cost observations"]
 
-notes = "Step 7 2026-11-04 [PARTIAL]: per-Run evidence-yield interface deduplicates object Claims, retains parent credit and separates supported fields from accuracy. Dollar ratios require explicit verified USD/model/region/source/method/date observations; GPU ratios require measured GPU seconds. All real ratios remain unavailable. Batch/Compare aggregation and real Bedrock pricing verification are not implemented; no token-to-GPU inference."
-see_it = "Run JSON scores.evidence_yield and the Run report cost evidence section; see docs/report-handoff.md for limits."
-changes = ["src/clayzer/report_cost.py: descriptive claim/field accounting and measured-cost interface", "src/clayzer/run_report.py: per-Run accounting with unavailable reasons", "tests/test_report_cost.py: unknown cost, deduplication, partial credit, omitted fields and synthetic cost observations"]
 [[task]]
 id = "resolution-ladder"
 step = "harness"
@@ -2130,4 +2183,37 @@ refs = [
   "docs/vision-hackathon.md §Business Constraints",
   "docs/caption-design.md §2.3 (REQ-14)",
   "src/clayzer/batch.py",
+]
+
+[[task]]
+id = "spoken-summary"
+step = "output"
+title = "Let people hear a Batch's result as a short spoken summary"
+area = "Evaluation"
+tier = "Could"
+status = "done"
+closes = ["AWS-14"]
+start = "src/clayzer/listen.py"
+notes = "Done 2026-11-04. Default voice Emma (British English, neural engine); CLAYZER_VOICE and CLAYZER_VOICE_ENGINE change it, e.g. Ruth with the generative engine. A Batch made before this has no summary until `clayzer listen <batch-id>` runs."
+see_it = "uv run clayzer listen <batch-id> --play, or the Listen section at the top of a Batch page"
+changes = [
+  "src/clayzer/listen.py: facts by code, a Nova Pro script checked against them, a Polly MP3, saved with a hash of the facts",
+  "src/clayzer/cli.py: `clayzer listen`, and every finished Batch makes one (`--no-listen` skips it)",
+  "src/clayzer/ui/app.py: /api/batches/<id>/listen and listen.mp3, and a launched Batch makes one",
+  "src/clayzer/ui/static/app.js: a player and transcript at the top of the Batch page",
+  "docs/caption-design.md: AWS-14 in §2.2 and a Polly row in the §3.4 services table",
+  "docs/caption-plan.md: AWS-14 in the AWS task and requirement tables",
+  "docs/cli.md: Listening to a result, and the voice settings",
+  "tests/test_listen.py: the fallback, the number check, replay, and the web routes",
+]
+context = "The report and the gate are written for people who read tables. A spoken summary gives anyone the result in under a minute: what was tested, the scores out of 100 and how they moved against the Baseline, the gate's verdict, and what to do next. The numbers must come from code, never the model, and the hosted app must stay read-only (REQ-09)."
+done_when = [
+  "A finished Batch has listen.mp3 and listen.json in its folder",
+  "A script stating a number not in the facts is replaced by the code-written one",
+  "The Batch page plays it with no Bedrock or Polly call",
+]
+refs = [
+  "src/clayzer/listen.py",
+  "docs/cli.md",
+  "docs/caption-design.md §2.2 (AWS-14)",
 ]

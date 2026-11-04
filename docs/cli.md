@@ -77,7 +77,12 @@ from the USGS APIs (`https://energy.usgs.gov/api/uspvdb/v1/projects`,
 
 Where a Chip clearly contradicts its labels (houses OSM never mapped, a dry wash mapped as
 water), record the fix in `fixtures/caption/cases/label-corrections.toml`. Every build applies
-it, so the fix survives a rebuild; hand-added labels have `source = "manual"` and no count.
+it, so the fix survives a rebuild; hand-added labels have `source = "manual"` and no count unless
+the correction gives one.
+
+`uv run clayzer corroborate <cases.jsonl> ... --json out.json` checks the Cases' USGS solar and
+wind labels against OSM's own power mapping and lists each disagreement to check by eye; it also
+counts OSM features of the ontology's candidate classes in each Chip. Reruns resume from `--json`.
 
 **Setting spread.** A gate can only see what its Cases show. `clayzer spread` labels each
 Case's surroundings (one cell of its Chip without its subject) with an LGND settings classifier
@@ -107,7 +112,8 @@ uv run clayzer experiment <candidate-batch-id> --hypothesis "Expected improvemen
 # Add --accept to promote a passing, comparable development Batch and record it as kept.
 ```
 
-Other options: `--caption-model`, `--only <case-id> ...`, `--no-judge`, `--no-narrate`.
+Other options: `--caption-model`, `--only <case-id> ...`, `--no-judge`, `--no-narrate`,
+`--no-listen`.
 
 See [the regression-gate guide](regression-gate.md) for the one-change prompt workflow,
 saved JSON and Markdown experiment logs, and an untested coverage prompt to evaluate.
@@ -119,6 +125,7 @@ saved JSON and Markdown experiment logs, and an untested coverage prompt to eval
 | `clayzer rescore <batch-id>` | score its stored Captions again with the current scorer, no model calls |
 | `clayzer trace <batch-id> <case-id> --repeat 1` | one Run, Step by Step (`--json` for the raw Trace) |
 | `clayzer summarize <batch-id>` | rebuild every Run's summary offline (`--narrate` writes missing narratives) |
+| `clayzer listen <batch-id>` | a spoken summary of the result, saved as an MP3 (`--play` plays it, `--no-model` skips Bedrock) |
 
 Each Run ends `ok`, `harness_fault` (no usable Caption: scored 0), or `sandbox_failure` (Bedrock,
 network, or credentials: no valid score, excluded). Results are saved after every Run. Expired
@@ -139,6 +146,7 @@ A Batch writes `batches/<batch-id>/` in the store:
   Claims and Reference Labels on the 3×3 grid, mean ± Spread per Case, and every Repeat's Caption
 - `traces/`: one Trace per Run (`<case-id>--r<repeat>.jsonl`), with its summary and narrative
 - `runs/`: one report per Run (`<case-id>--r<repeat>.html` and `.json`)
+- `listen.mp3`, `listen.json`: the spoken summary and its script, once `clayzer listen` has run
 
 A **Trace** records every model and tool call as a Step: the full prompt and response, the image
 by key and hash, wall time and Bedrock's latency, tokens, retries, and the error code of anything
@@ -149,6 +157,22 @@ request, a missing `submit_caption` call, anything unrecognized), an Environment
 Every Run gets a **summary** of its Trace: code writes the facts (`summarize.py`), and a model
 writes a readable narrative from the Trace alone (`narrate.py`, `CLAYZER_SUMMARY_MODEL`). The
 narrative is saved with a hash of its Trace, so replays never call a model.
+
+### Listening to a result
+
+Every finished Batch gets a spoken summary for people who'd rather hear the result than read
+the report (`listen.py`); `--no-listen` skips it, and `clayzer listen <batch-id>` makes or remakes
+one for any Batch. Code works out the facts: how many places were
+captioned, the scores out of 100 and how they moved against the Baseline, the regression gate's
+verdict, and which places dropped. Nova Pro (`CLAYZER_SUMMARY_MODEL`) turns the facts into a short
+script, and Amazon Polly reads it aloud. If the script states a number the facts don't contain,
+or Bedrock isn't reachable, the code-written script is used instead.
+
+The MP3 and its script are saved in the Batch, with a hash of the facts. The web app's Batch
+page plays the saved file and shows the transcript, so the hosted, read-only app never calls
+Bedrock or Polly. Running `listen` again rewrites them only when the facts changed, for example
+after a `rescore` or a new Baseline (`--force` rewrites anyway). It needs `polly:SynthesizeSpeech`
+in addition to Bedrock.
 
 ### How it's scored
 
@@ -325,6 +349,7 @@ Put these in `.env` at the repo root (gitignored), or export them.
 | `CLAYZER_JUDGE_MODEL` | `us.anthropic.claude-opus-5-5` |
 | `CLAYZER_EMBED_MODEL` | `amazon.titan-embed-text-v2:0` |
 | `CLAYZER_SUMMARY_MODEL` | `us.amazon.nova-pro-v1:0` (writes Run narratives) |
+| `CLAYZER_VOICE`, `CLAYZER_VOICE_ENGINE` | `Emma`, `neural` (the Polly voice for `clayzer listen`; a generative voice such as `Amy` or `Ruth` needs `generative`) |
 | `CLAYZER_TOKEN_BUDGET` | unset (the Workflow Score's cost part is left out) |
 | `CLAYZER_BEDROCK_ENDPOINT_URL` | unset (a private Bedrock endpoint, if your network needs one) |
 | `CLAYZER_OVERPASS_URL` | `https://overpass-api.de/api/interpreter` |

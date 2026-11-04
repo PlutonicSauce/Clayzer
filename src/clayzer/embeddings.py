@@ -1,30 +1,39 @@
-"""LGND's Clay v1.5 embeddings for the Chips we score (CAP-18), joined Chip by Chip to the cell
-each Chip lies in.
+"""Chip embeddings, two complementary jobs in one module.
 
-Caption reuse across near-duplicate Chips and Claims straight from embeddings (caption-design.md
-§8, ideas 13 and 14) both start here. The embeddings are LGND's monthly-aggregated set on Source
-Cooperative: one 256-dimension Clay v1.5 vector per Major TOM cell (1,280 m, Sentinel-2 at 10 m)
-per month, from 2017. They're read anonymously: no LGND sign-in, no LGND Geo quota, no AWS
-charge to the reader.
+1. **LGND's published Clay v1.5 embeddings, joined Chip by Chip (CAP-18).** LGND's monthly-
+   aggregated set on Source Cooperative: one 256-dimension Clay v1.5 vector per Major TOM cell
+   (1,280 m, Sentinel-2 at 10 m) per month, from 2017, read anonymously (no sign-in, no quota, no
+   AWS charge). GeoParquet, hive-partitioned by two-character geohash, year, and month; each
+   (geohash, month) is queried once with a bounding-box filter. A Chip (~307 m) joins the cell
+   whose box holds its centre in the month of its NAIP date, else the nearest month within
+   MAX_MONTHS_AWAY; a Chip before 2017 has no embedding. Caption reuse across near-duplicates and
+   Claims straight from embeddings (caption-design.md §8, ideas 13–14) start here.
 
-**Attribution (CC BY 4.0):** LGND embeddings (Clay v1.5), https://source.coop/clay/lgnd-embeddings.
-Every row this module writes carries it, and anything built on them must too.
+   **Attribution (CC BY 4.0):** LGND embeddings (Clay v1.5), https://source.coop/clay/lgnd-embeddings.
+   Every row this module writes carries it, and anything built on them must too.
 
-The data is GeoParquet, hive-partitioned by two-character geohash, year, and month, Hilbert
-ordered, in ~240 MB row groups (geohash 9q in May 2022 is one 5.8 GB file of 24). So each
-(geohash, month) is queried once, with a bounding-box filter around its Chips: DuckDB reads only
-the row groups that box meets, never whole files.
-
-A Chip (about 307 m) is joined to the cell whose box holds its centre, in the month of its NAIP
-date; with no row there (clouds, or a gap) it takes the nearest month within MAX_MONTHS_AWAY,
-and says how far. A Chip from before 2017 has no embedding.
+2. **An `EmbeddingSource` for Layer B of the data-driven ontology (ADR-0010).** Per-Chip vectors
+   computed ONCE at Case-preparation time and stored on the Case (`chip["embedding"]`) — never per
+   caption, so a caption still costs only a dot product. Behind one interface so the rest of the
+   code doesn't care which source produced them:
+   - `PrecomputedEmbedding`: reuse vectors someone already published (e.g. the Clay run or the
+     LGND join above), keyed by Chip id or a location key, from JSONL or Parquet. No model call.
+   - `TitanImageEmbedding`: a fallback that embeds the Chip image on Bedrock (Titan multimodal),
+     one call per Chip at prep time only.
+   Both produce a plain list[float]; prototypes.py normalises.
 """
 
 from __future__ import annotations
 
+import base64
+import json
 from collections import defaultdict
 from collections.abc import Callable
 from datetime import UTC
+from pathlib import Path
+from typing import Protocol
+
+# ── 1. LGND published embeddings (geohash/partition join) ───────────────────────────────────
 
 ROOT = "s3://us-west-2.opendata.source.coop/clay/lgnd-embeddings/monthly-aggregated"
 MODEL, COLLECTION, CELL_M, DIMS = "v1.5", "sentinel-2-l2a", 1280, 256
@@ -170,3 +179,101 @@ def for_chips(points: list[dict], query_fn: Callable | None = None, progress=pri
 
 def embeddings_key(region: str) -> str:
     return f"embeddings/caption-{region}.jsonl"
+
+
+# ── 2. EmbeddingSource for Layer B (ADR-0010) ───────────────────────────────────────────────
+
+
+class EmbeddingSource(Protocol):
+    def embed_chip(self, chip: dict, png: bytes | None) -> list[float] | None:
+        """A vector for one Chip, or None when this source can't supply one (then Layer B is
+        simply skipped for that Chip)."""
+        ...
+
+
+class PrecomputedEmbedding:
+    """Reuse: look a Chip's published embedding up from a mapping. The mapping is keyed by Chip
+    id; a `key` callable can derive a different key (e.g. a geohash+date location key) from the
+    Chip when ids don't line up with the export."""
+
+    def __init__(self, mapping: dict[str, list[float]], key=None):
+        self.mapping = mapping
+        self.key = key or (lambda chip: chip["id"])
+
+    def embed_chip(self, chip: dict, png: bytes | None) -> list[float] | None:
+        return self.mapping.get(self.key(chip))
+
+
+class TitanImageEmbedding:
+    """Fallback: embed the Chip image with Bedrock Titan multimodal embeddings. One call per Chip,
+    at prep time only (never per caption)."""
+
+    def __init__(self, client, model: str = "amazon.titan-embed-image-v1"):
+        self.client, self.model = client, model
+
+    def embed_chip(self, chip: dict, png: bytes | None) -> list[float] | None:
+        if not png:
+            return None
+        body = json.dumps({"inputImage": base64.b64encode(png).decode()})
+        resp = self.client.invoke_model(modelId=self.model, body=body)
+        return json.loads(resp["body"].read())["embedding"]
+
+
+def load_precomputed(path: str | Path, key=None) -> PrecomputedEmbedding:
+    """Build a PrecomputedEmbedding from a JSONL (`{"chip_id"|"id": ..., "embedding": [...]}` per
+    line) or a GeoParquet with `chip_id`/`id` and `embedding` columns."""
+    path = Path(path)
+    mapping: dict[str, list[float]] = {}
+    if path.suffix in (".jsonl", ".ndjson", ".json"):
+        for line in path.read_text().splitlines():
+            if line.strip():
+                rec = json.loads(line)
+                cid = rec.get("chip_id") or rec["id"]
+                mapping[cid] = [float(x) for x in rec["embedding"]]
+    elif path.suffix in (".parquet", ".pq"):
+        import pyarrow.parquet as pq  # optional dep; only for the Parquet reuse path
+
+        for rec in pq.read_table(path).to_pylist():
+            cid = rec.get("chip_id") or rec.get("id")
+            mapping[cid] = [float(x) for x in rec["embedding"]]
+    else:
+        raise ValueError(f"unsupported embeddings file: {path.suffix} (use .jsonl or .parquet)")
+    return PrecomputedEmbedding(mapping, key=key)
+
+
+def attach_to_cases(cases: list[dict], source: EmbeddingSource, store=None) -> int:
+    """Set `chip["embedding"]` on every Chip a source can embed. Returns how many were set.
+
+    `store` is needed only by sources that read the image (Titan); the reuse path ignores it."""
+    n = 0
+    for case in cases:
+        for chip in case["chips"]:
+            png = None
+            if store is not None and chip.get("uri", "").startswith("chips/"):
+                try:
+                    png = store.get(chip["uri"])
+                except Exception:  # noqa: BLE001 -- a missing image just means no embedding
+                    png = None
+            vec = source.embed_chip(chip, png)
+            if vec:
+                chip["embedding"] = list(map(float, vec))
+                n += 1
+    return n
+
+
+def pairs_from_cases(cases: list[dict]) -> list[tuple[str, list[float]]]:
+    """(class_id, embedding) pairs for building prototypes from embedded Cases: each Case
+    contributes its Chip's embedding to every object class its Reference Labels name. Multi-class
+    Chips contribute to several centroids; curate with a hand JSONL if that's too coarse. Classes
+    outside LAYER_B_CLASSES are dropped later by prototypes.build.
+    """
+    pairs: list[tuple[str, list[float]]] = []
+    for case in cases:
+        for chip in case["chips"]:
+            emb = chip.get("embedding")
+            if not emb:
+                continue
+            classes = {lb["object"] for lb in case.get("reference_labels", [])}
+            for cid in classes:
+                pairs.append((cid, [float(x) for x in emb]))
+    return pairs

@@ -40,15 +40,35 @@ def apply_corrections(case_id: str, labels: list[dict], corrections: list[dict])
             raise ValueError(f"bad label correction for {case_id}: {c}")
         lb = next((lb for lb in out if lb["object"] == c["object"]), None)
         if lb is None:
-            out.append({"object": c["object"], "count": None, "position": c["cells"][0],
+            out.append({"object": c["object"], "count": c.get("count"), "position": c["cells"][0],
                         "cells": [g for g in GRID if g in c["cells"]], "attributes": {},
                         "source": "manual", "source_ids": []})  # fmt: skip
         else:  # applying twice changes nothing
             lb["cells"] = [g for g in GRID if g in set(lb["cells"]) | set(c["cells"])]
-            lb["count"] = None
+            lb["count"] = c.get("count")
             if not lb["source"].endswith("manual"):
                 lb["source"] += "+manual"
     return out
+
+
+def relabel_water(case: dict, chip: Chip, elements: list[dict], corrections: list[dict]) -> dict:
+    """The Case with its water label rebuilt from OSM `elements` under the current rule (only
+    water there all year, since ontology-review), every other label left as it is, and its hand
+    corrections applied again. Rebuilding only water keeps OSM edits made since the Case was
+    built out of it. A Change Case's water is the later Chip's, with change unknown."""
+    water = [lb for lb in ak.osm_labels(chip, elements) if lb["object"] == "water"]
+    if case.get("kind") == "change":
+        water = [{**lb, "change": "unknown"} for lb in water]
+    labels, placed = [], False
+    for lb in case["reference_labels"]:
+        if lb["object"] != "water":
+            labels.append(lb)
+        elif not placed:  # where the old water label was, so the order stays
+            labels += water
+            placed = True
+    if not placed:
+        labels += water
+    return {**case, "reference_labels": apply_corrections(case["id"], labels, corrections)}
 
 
 def _labels(chip: Chip) -> list[dict]:

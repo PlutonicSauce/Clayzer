@@ -581,6 +581,34 @@ v0.2 of [`ontology/objects.toml`](../ontology/objects.toml) (reviewed 2026-11-04
 | Prompt: list each class's look-alikes and minimum visible size; pick negative Cases from look-alikes | Captioning, Data and Cases | Should | Day 2 afternoon |
 | Check the NLCD and WorldCover crosswalks against the published legends | Data and Cases | Could | When land cover is scored |
 
+**Data-driven ontology (ADR-0010, [docs/ontology-data-driven.md](ontology-data-driven.md)).**
+The ontology now also feeds the captioner, in three layers (A look-alikes, C caption exemplars, B
+embedding prototypes). Implemented on branch `feat/ontology-data-driven`; opt-in per Batch
+(`ontology_context`, default off).
+
+| Task | Area | Tier | Status |
+|---|---|---|---|
+| Layer A + C in the prompt: look-alike note and caption exemplars (`ontology.prompt_context`, `objects.toml` v0.2) | Captioning | Should | Done on branch |
+| Layer B: class prototypes, nearest-class hint, cost and circularity guards (`prototypes.py`) | Captioning, Data and Cases | Could | Done on branch |
+| Embedding seam + three sources: Clay model (`scripts/clay_embed.py`), precomputed file, Titan multimodal (`embeddings.py`) | Data and Cases | Could | Done on branch |
+| Attach embeddings to Cases and build prototypes from them (`clayzer ontology embed-cases`, `build-prototypes`) | Data and Cases | Could | Done on branch |
+| Run Clay on a GPU box for real embeddings; build + commit a prototype file under `ontology/prototypes/` | Data and Cases | Could | To do (needs GPU + Clay weights) |
+
+**Ontology induction (ADR-0011, [docs/ontology-induction.md](ontology-induction.md)).** Build
+Layers A and C *from a caption corpus* via an LLM agent, independent of embeddings; reconcile with
+the keyed Answer-Key classes; Layer B becomes enrichment. Design approved; build pending confirmation.
+
+| Task | Area | Tier | Status |
+|---|---|---|---|
+| Caption-corpus loader + RSICD adapter to the §3.6 format | Data and Cases | Should | Designed, to build |
+| `clayzer ontology induce`: map/reduce extraction agent → candidate ontology JSON | Data and Cases | Should | Designed, to build (one-time Bedrock) |
+| Deterministic reconciliation of induced terms with the keyed/Answer-Key anchor | Data and Cases | Should | Designed, to build |
+| Validation + review diff; adopt a new ontology version, updating code lists in lockstep | Evaluation | Should | Designed, to build |
+| Optional: Layer B embedding cross-check of induced look-alikes | Data and Cases | Could | Designed, to build |
+| S3 Vectors bucket and index in the CDK app; load prototypes into it (AWS-03) | Platform | Could | To do |
+| Measure A, A+C, A+C+B as Batches on a held-out region; record grounding/retrieval and cost deltas | Evaluation | Should | To do (the headline pitch number) |
+| Co-occurrence priors (typical counts, class co-occurrence) in the build step | Data and Cases | Could | Documented, not built |
+
 ### AWS service tasks
 
 | Task | Requirement | Area | Tier | When |
@@ -598,6 +626,7 @@ v0.2 of [`ontology/objects.toml`](../ontology/objects.toml) (reviewed 2026-11-04
 | Bedrock batch inference for large caption runs | AWS-10 | Captioning | Could | After the prompt is settled |
 | AgentCore captioner holding the LGND sign-in | AWS-11 | Captioning | Could | Only after checking AgentCore in an account |
 | Confirm no disallowed services | AWS-12 | Demo and delivery | Must | In the readiness check before the demo |
+| Spoken summary of each Batch: Nova Pro script, Polly MP3, played on the Batch page | AWS-14 | Evaluation | Could | Done: docs/cli.md, Listening to a result |
 
 **What a participant account allows** (checked 2026-11-04 in one account): writing X-Ray trace
 segments, CloudWatch metrics, and CloudWatch Logs all worked. Turning on Bedrock model
@@ -613,6 +642,9 @@ runtimes yet).
 | Risk | Mitigation |
 |---|---|
 | Grounding becomes circular (the Harness sees the Answer Key) | ADR-0006; the region split; the Evaluation owner reviews the Harness's tool list before each Batch |
+| The data-driven ontology leaks the answer into captioning (ADR-0010) | Guidance is class-level only, built from a disjoint dev region and from Clay/LGND embeddings (not a scored Answer Key); `prototypes.guard_scoring_region` refuses to caption the build region |
+| Layer B hints are wrong for small objects (Clay/LGND is Sentinel-2 10 m; NAIP is 0.6 m) | `LAYER_B_CLASSES` limits Layer B to classes discriminable at 10 m; a hint is emitted only above a similarity floor |
+| The ontology feature adds cost a nonprofit can't justify | Layer B adds no model call (reuses published embeddings, one dot product); Layer A+C is a token-bounded, cacheable prefix; the feature is default-off and kept only if the gate shows it helps |
 | GPU cost needs a GPU instance (AWS work not yet done) | Cost is a Should; Must uses Bedrock VLMs and marks cost as partial |
 | NAIP Requester-Pays cost | Planetary Computer for preparation; pre-stage Chips once in S3 and reuse |
 | RSICD has no license | Run-time download only; never committed; cite; confirm with Clay |
@@ -691,7 +723,7 @@ decisions is in ADR-0006 and ADR-0007.
 | Rubric coverage | All five criteria in Must (CAP-14): label preparation time measured as wall-clock time; cost partial on Bedrock, full GPU comparison Should |
 | Caption data from any source | The Sandbox scores Clay's own caption sets, not only ours: an importer (Must, CAP-20), a dataset verdict with confidence intervals and a dataset card (Should, CAP-21, CAP-22); training Clay v2 to measure downstream benefit stays out of scope |
 | Object classes | One Object Ontology file (`ontology/objects.toml`, ADR-0008): ~20 classes, at most three levels, a crosswalk over OSM tags and standard land-cover classes; Captions stay free text, only Claims use classes |
-| AWS services | Each maps to a rubric criterion or brief constraint (AWS-01 to AWS-13). Must: Bedrock, Titan, S3, IAM. Should: SageMaker GPU endpoint, ADOT to X-Ray and CloudWatch, CDK, Fargate and CloudFront. Could: Step Functions, batch inference, AgentCore |
+| AWS services | Each maps to a rubric criterion or brief constraint (AWS-01 to AWS-14). Must: Bedrock, Titan, S3, IAM. Should: SageMaker GPU endpoint, ADOT to X-Ray and CloudWatch, CDK, Fargate and CloudFront. Could: Step Functions, batch inference, AgentCore, Polly (done) |
 | Traceability | CAP-01 to CAP-19 for caption requirements, REQ-01 to REQ-19 ([caption-design.md §2.3](caption-design.md#23-evaluation-loop-requirements)) for the loop; section 11 maps both |
 | Vocabulary | Chip, Chip Pair, Fixed Case, Change Case, Caption, Claim, Reference Label, Answer Key, Reference Caption |
 
@@ -794,3 +826,4 @@ architecture in §3.4. Tasks are in section 7, "AWS service tasks".
 | AWS-11 | AgentCore captioner with the LGND sign-in | §2 Could; §8 | Could; checked in an account first |
 | AWS-12 | No disallowed services | §2 Out; §7 AWS tasks | Must |
 | AWS-13 | Least-privilege, short-lived access; nothing secret in the repo | §2 Must; §7 Day 1 | Must |
+| AWS-14 | A spoken summary of each Batch, through Polly | §7 AWS tasks | Could (done) |

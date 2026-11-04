@@ -7,9 +7,11 @@
 #   case    the Case id
 #   object  an ontology class
 #   action  "add": the object is in the image but not in the labels. Its cells are merged into
-#           any existing label for the object, whose count becomes unknown (None).
+#           any existing label for the object, whose count becomes `count` if the correction
+#           gives one and unknown (None) if not.
 #           "drop": the label names something the image doesn't show.
 #   cells   for "add": every cell the object covers; the first is where most of it is
+#   count   for "add", optional: how many there are, once corrected
 #   reason  what the image shows, for the next person checking
 
 [[correction]]
@@ -108,6 +110,15 @@ case = "fixed-dev-uspvdb-401557"
 object = "water"
 action = "drop"
 reason = "Panels and bare ground; no water in the image."
+
+
+[[correction]]
+case = "fixed-dev-uswtdb-3073564"
+object = "wind_turbine"
+action = "add"
+cells = ["south_east"]
+count = 18
+reason = "OSM maps a turbine in the south-east corner that USWTDB doesn't list, and the Chip shows it (clayzer corroborate)."
 
 # ── Texas test set ──────────────────────────────────────────────────────────────────────
 
@@ -255,3 +266,10 @@ object = "road"
 action = "add"
 cells = ["centre", "north_east", "east", "south_east", "south", "south_west"]
 reason = "Tracks to a well pad; OSM has none."
+
+[[correction]]
+case = "fixed-test-neg-10"
+object = "water"
+action = "add"
+cells = ["north_east", "north"]
+reason = "A wet, muddy pond across the top: OSM maps it as intermittent water, which the water rule now drops, but it's wet in this image (2022-08-25). The centre and sides are dry field."

@@ -9,12 +9,14 @@ clayzer batch --repeats 3 --label base      run every Case 3 times; writes a Bat
 clayzer batch --resume <batch-id>           finish a Batch (expired credentials, failures)
 clayzer batches                             list Batches
 clayzer report <batch-id>                   rebuild a Batch's report.md and report.html
+clayzer replay <batch-id> [--cases KEY]     rescore a recorded Batch against updated Cases, offline
 clayzer rescore <batch-id>                  score stored Captions again with the current scorer
 clayzer trace <batch-id> <case-id> [-r N]   show one Run's summary and Trace, Step by Step
 clayzer summarize <batch-id>                rebuild every Run's summary from its Trace, offline
 clayzer compare <batch-a> <batch-b>         what changed, and by how much
 clayzer baseline accept <batch-id>          make a Batch the Baseline (baselines/<name>/)
 clayzer gate <batch-id>                     regression gate: exit 0 pass, 1 fail, 2 inconclusive
+clayzer listen <batch-id> [--play]          a spoken summary of the result (Nova Pro + Polly MP3)
 clayzer experiment <id> --hypothesis TEXT   record a gated attempt; --accept keeps it if it passes
 clayzer ui [--allow-launch]                 the team web app on http://127.0.0.1:8770
 clayzer ui --calibrate                      also let /label save hand-made labels into labels/
@@ -70,6 +72,88 @@ def _push(store, src: Path) -> int:
     return n
 
 
+def _ontology_command(a, settings) -> int:
+    """`clayzer ontology embed-cases | build-prototypes | show`: the Layer B index (ADR-0010)."""
+    from clayzer import prototypes as proto
+    from clayzer.ontology import load
+
+    version = load().version
+
+    if a.action == "show":
+        path = proto.default_path(version)
+        if not path.exists():
+            print(f"no prototype index at {path}; build one with "
+                  "`clayzer ontology build-prototypes`", file=sys.stderr)  # fmt: skip
+            return 1
+        p = proto.LocalPrototypes(path).load()
+        print(f"prototypes v{p.ontology_version}  dim {p.dim}  built on region "
+              f"{p.build_region!r} from {p.source} ({p.embedding_model})")  # fmt: skip
+        for cid in sorted(p.centroids):
+            conf = ", ".join(p.learned_confusers.get(cid, [])) or "—"
+            print(f"  {cid:14s} n={p.counts.get(cid, 0):<4d} nearest: {conf}")
+        return 0
+
+    store = settings.store()
+    key = cases_key(a.region)
+
+    if a.action == "embed-cases":
+        from clayzer import embeddings as emb
+
+        cases = load_cases(store, key)
+        if not cases:
+            print(f"no Cases in {store.url(key)}; build some with `clayzer case`", file=sys.stderr)
+            return 1
+        if a.source == "file":
+            if not a.emb_file:
+                print("--source file needs --from <jsonl|parquet>", file=sys.stderr)
+                return 1
+            source = emb.load_precomputed(a.emb_file)
+        else:
+            from clayzer.config import bedrock
+
+            source = emb.TitanImageEmbedding(bedrock(settings), a.model)
+        n = emb.attach_to_cases(cases, source, store)
+        store.put(key, to_jsonl(cases), "application/x-ndjson")  # one write, not one per Case
+        print(f"embedded {n} Chips in {len(cases)} Cases of region {a.region!r} → {store.url(key)}")
+        print("  next: `clayzer ontology build-prototypes --build-region "
+              f"{a.region}` (on a region you will NOT score)")  # fmt: skip
+        return 0
+
+    # build-prototypes: from an exemplar JSONL, or from --region's embedded Cases
+    from clayzer import embeddings as emb
+
+    build_region = a.build_region or a.region
+    if a.embeddings:
+        pairs = []
+        for line in a.embeddings.read_text().splitlines():
+            if line.strip():
+                rec = json.loads(line)
+                pairs.append((rec["class_id"], [float(x) for x in rec["embedding"]]))
+    else:
+        cases = load_cases(store, key)
+        pairs = emb.pairs_from_cases(cases)
+        if not pairs:
+            print(f"no embedded Cases in {store.url(key)}; run `clayzer ontology embed-cases` "
+                  "first, or pass an exemplar JSONL", file=sys.stderr)  # fmt: skip
+            return 1
+    protos = proto.build(
+        pairs, ontology_version=version, build_region=build_region,
+        source=a.source, embedding_model=a.embedding_model,
+    )  # fmt: skip
+    out = a.out or proto.default_path(version)
+    proto.LocalPrototypes(out).save(protos)
+    kept = ", ".join(f"{c}×{protos.counts[c]}" for c in sorted(protos.centroids))
+    dropped = sorted({c for c, _ in pairs} - set(protos.centroids))
+    print(f"built {len(protos.centroids)} class prototypes (dim {protos.dim}) → {out}")
+    print(f"  kept (Layer B classes seen in the data): {kept}")
+    if dropped:
+        print(
+            f"  dropped (outside LAYER_B_CLASSES for this embedding resolution): {', '.join(dropped)}"
+        )
+    print(f"  CIRCULARITY: built on region {build_region!r}; do NOT score this region with it")
+    return 0
+
+
 def _print_summary(summary: dict) -> None:
     b = summary["batch"]
     r = b["runs"]
@@ -97,9 +181,17 @@ def main(argv: list[str] | None = None) -> int:
     command_args = args[2:] if args[:1] == ["--region"] else args
     if command_args and command_args[0].startswith("--region="):
         command_args = command_args[1:]
-    local_report = command_args[:1] in (["replay"], ["evaluate"]) or (
-        command_args[:1] == ["ui"]
-        and any(x.split("=", 1)[0] == "--local-root" for x in command_args)
+    local_replay = command_args[:1] == ["replay"] and (
+        any(x.split("=", 1)[0] in {"--data", "--output"} for x in command_args)
+        or (len(command_args) > 1 and ("/" in command_args[1] or Path(command_args[1]).is_dir()))
+    )
+    local_report = (
+        local_replay
+        or command_args[:1] == ["evaluate"]
+        or (
+            command_args[:1] == ["ui"]
+            and any(x.split("=", 1)[0] == "--local-root" for x in command_args)
+        )
     )
     if not local_report:
         load_env()
@@ -137,8 +229,15 @@ def main(argv: list[str] | None = None) -> int:
         help="check each drafted Claim with LGND Geo before writing (needs `clayzer login lgnd`)",
     )  # fmt: skip
     b.add_argument("--resume", metavar="BATCH_ID", help="finish an existing Batch")
+    b.add_argument("--no-listen", action="store_true",
+                   help="don't make the spoken summary (Nova Pro + Polly) at the end")  # fmt: skip
     b.add_argument("--no-narrate", action="store_true",
                    help="skip the model-written Trace summaries")  # fmt: skip
+    b.add_argument(
+        "--ontology-context", action="store_true",
+        help="feed the captioner class-level ontology guidance: look-alikes, exemplars, and an "
+             "embedding-nearest-class hint where prototypes exist (ADR-0010)",
+    )  # fmt: skip
 
     sub.add_parser("batches", help="list Batches in the store")
     rp = sub.add_parser("report", help="rebuild a Batch's reports")
@@ -151,7 +250,8 @@ def main(argv: list[str] | None = None) -> int:
         "replay", help="rebuild a local recorded Batch into a fresh directory; no network"
     )
     replay.add_argument(
-        "source", type=Path, help="directory containing batch.json and frozen Cases"
+        "source",
+        help="recorded Batch id, or local directory containing batch.json and frozen Cases",
     )
     replay.add_argument(
         "--data", type=Path, help="local data/ or fixtures/caption directory with Chips"
@@ -159,6 +259,10 @@ def main(argv: list[str] | None = None) -> int:
     replay.add_argument(
         "--output", type=Path, help="new output directory; defaults to a fresh temporary directory"
     )
+
+    replay.add_argument("--cases", metavar="KEY", help="updated Case file for a stored Batch")
+    replay.add_argument("--label", default="replay", help="name for the updated-Case Batch")
+    replay.add_argument("--no-reports", action="store_true", help="skip stored Batch reports")
 
     tr = sub.add_parser("trace", help="show one Run's Trace, Step by Step")
     tr.add_argument("batch_id")
@@ -188,6 +292,15 @@ def main(argv: list[str] | None = None) -> int:
     g.add_argument("--tolerance", type=float, default=None)
     g.add_argument("--max-token-increase", type=float, default=None, help="0.5 = +50%%")
 
+    li = sub.add_parser("listen", help="a spoken summary of a Batch's result, saved as an MP3")
+    li.add_argument("batch_id")
+    li.add_argument("--baseline", default="default")
+    li.add_argument("--no-model", action="store_true", help="use the code-written script")
+    li.add_argument(
+        "--force", action="store_true", help="rewrite it even if the facts are the same"
+    )
+    li.add_argument("--play", action="store_true", help="then play it (macOS afplay)")
+
     ex = sub.add_parser("experiment", help="record one labelled prompt experiment, offline")
     ex.add_argument("batch_id")
     ex.add_argument("--hypothesis", required=True, help="what this one change should improve")
@@ -209,6 +322,39 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         help="read a local replay/demo root (data/ and batches/), ignoring S3 and .env",
     )
+
+    on = sub.add_parser("ontology", help="the data-driven Object Ontology (ADR-0010)")
+    on_sub = on.add_subparsers(dest="action", required=True)
+
+    ec = on_sub.add_parser(
+        "embed-cases",
+        help="attach a Clay/LGND embedding to every Chip in --region's Cases (one-time, prep step)",
+    )
+    ec.add_argument("--source", choices=["file", "titan"], default="file",
+                    help="file: reuse published Clay/LGND vectors; titan: Bedrock multimodal")  # fmt: skip
+    ec.add_argument("--from", dest="emb_file", type=Path,
+                    help="for --source file: a JSONL/Parquet of {chip_id, embedding}")  # fmt: skip
+    ec.add_argument("--model", default="amazon.titan-embed-image-v1",
+                    help="for --source titan: the Bedrock image embedding model")  # fmt: skip
+
+    bp = on_sub.add_parser(
+        "build-prototypes",
+        help="build Layer B class prototypes from embedded Cases, or an exemplar embeddings file",
+    )
+    bp.add_argument(
+        "embeddings", type=Path, nargs="?",
+        help="JSONL of exemplars: one {\"class_id\": ..., \"embedding\": [...]} per line. Omit to "
+             "build from --region's embedded Cases (run embed-cases first)",
+    )  # fmt: skip
+    bp.add_argument(
+        "--build-region",
+        help="provenance name for the region the exemplars come from; MUST differ from any scored "
+             "region. Defaults to --region",
+    )  # fmt: skip
+    bp.add_argument("--source", default="lgnd-embeddings", help="where the embeddings came from")
+    bp.add_argument("--embedding-model", default="clay-v1", help="the embedding model id")
+    bp.add_argument("--out", type=Path, help="output path (default ontology/prototypes/vN.json)")
+    on_sub.add_parser("show", help="print the current prototype index, if built")
 
     im = sub.add_parser("import", help="a Caption Set from any source becomes Cases")
     im.add_argument(
@@ -260,6 +406,10 @@ def main(argv: list[str] | None = None) -> int:
                     help="search LGND for each gap and print `clayzer case` commands")  # fmt: skip
     sp.add_argument("--max-calls", type=int, default=100,
                     help="stop before starting if it would take more LGND calls")  # fmt: skip
+    co = sub.add_parser("corroborate",
+                        help="check the Cases' USGS labels against OSM's power mapping")  # fmt: skip
+    co.add_argument("cases", nargs="+", type=Path, help="Case files (.jsonl)")
+    co.add_argument("--json", type=Path, help="also write every Case's result here")
 
     ev = sub.add_parser(
         "evaluate", help="score normalized JSONL captions offline, without a Harness"
@@ -271,17 +421,17 @@ def main(argv: list[str] | None = None) -> int:
     ev.add_argument("--recording", type=Path, help="saved matching text embedding recording")
 
     a = p.parse_args(argv)
-    if a.cmd == "replay":
+    if a.cmd == "replay" and (a.data or a.output or Path(a.source).is_dir() or "/" in a.source):
         from clayzer.replay import replay
 
         try:
-            target = replay(a.source, data=a.data, output=a.output)
+            target = replay(Path(a.source), data=a.data, output=a.output)
         except ValueError as exc:
             p.error(str(exc))
         print(
             target
             / "batches"
-            / json.loads((a.source / "batch.json").read_text())["batch_id"]
+            / json.loads((Path(a.source) / "batch.json").read_text())["batch_id"]
             / "report.html"
         )
         return 0
@@ -301,6 +451,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if a.cmd in ("login", "tools"):
         return _tools_command(a)
+    if a.cmd == "ontology":
+        return _ontology_command(a, settings)
     if a.cmd == "verifier" and a.action == "routes":
         from clayzer import verifiers
 
@@ -395,11 +547,16 @@ def main(argv: list[str] | None = None) -> int:
                 str(a.prompt) if a.prompt else "built-in", judge=not a.no_judge,
                 narrate=not a.no_narrate, tools=a.tools,
                 verify="lgnd" if a.verify else None,
+                ontology_context=a.ontology_context,
             )  # fmt: skip
             summary = batches.load(store, batch_id)["summary"]
         print(f"Batch {batch_id} in {store.url(f'batches/{batch_id}/')}")
         _print_summary(summary)
         print(f"open {_local_report(store, settings, batch_id)}")
+        if not a.no_listen and not summary.get("stopped"):
+            from clayzer.listen import after_batch
+
+            after_batch(store, settings, batch_id)
         return 0 if not summary.get("stopped") else 3
 
     if a.cmd == "batches":
@@ -533,6 +690,35 @@ def main(argv: list[str] | None = None) -> int:
         print(render_gate(result), end="")
         return result.exit_code
 
+    if a.cmd == "listen":
+        import subprocess
+        import tempfile
+
+        from clayzer.config import bedrock
+        from clayzer.gate import load_baseline
+        from clayzer.listen import audio_key, listen, polly
+
+        try:
+            base = load_baseline(settings.baselines_dir, a.baseline)
+        except FileNotFoundError:
+            base = None
+        try:
+            rec = listen(store, a.batch_id, base, None if a.no_model else bedrock(settings),
+                         polly(), force=a.force)  # fmt: skip
+        except (ValueError, FileNotFoundError) as e:
+            p.error(str(e))
+        print(rec["text"])
+        how = f"{rec['model']} wrote it" if rec["source"] == "model" else "code wrote it"
+        state = "written" if rec["written"] else "already up to date"
+        print(f"\n({how}; read by Polly {rec['voice']}, {rec['engine']}; {state})")
+        print(store.url(audio_key(a.batch_id)))
+        if a.play:
+            with tempfile.NamedTemporaryFile(suffix=".mp3") as tmp:
+                tmp.write(store.get(audio_key(a.batch_id)))
+                tmp.flush()
+                subprocess.run(["afplay", tmp.name], check=False)
+        return 0
+
     if a.cmd == "experiment":
         from clayzer.batch import load
         from clayzer.experiments import record_experiment
@@ -567,6 +753,18 @@ def main(argv: list[str] | None = None) -> int:
             p.error(str(e))
         print(f"Recovered experiment: {store.url(record + '.json')}")
         print(f"PR log: {store.url(record + '.md')}")
+        return 0
+
+    if a.cmd == "replay":
+        from clayzer import batch as batches
+
+        cases_file = a.cases or key
+        new_id = batches.replay(a.source, store, load_cases(store, cases_file), a.label,
+                                reports=not a.no_reports)  # fmt: skip
+        print(
+            f"replayed {a.source} against {store.url(cases_file)} as {new_id}, with no model calls"
+        )
+        _print_summary(batches.load(store, new_id)["summary"])
         return 0
 
     if a.cmd == "import":
@@ -656,6 +854,35 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  proposals a person changed: {r['edit_rate']:.0%}")
         print(f"  {r['failed']} failed; saved in {store.url(prefix)}/agreement.json")
         return 0
+
+    if a.cmd == "corroborate":
+        from clayzer import corroborate
+
+        cases = [c for f in a.cases for c in parse_jsonl(f.read_bytes())]
+        done = {}
+        if a.json and a.json.exists():  # resume an interrupted run
+            done = {r["case"]: r for r in json.loads(a.json.read_text())["cases"]}
+
+        def save(rows):
+            if a.json:
+                a.json.write_text(json.dumps(
+                    {"summary": corroborate.summary(rows), "cases": rows}, indent=2) + "\n")  # fmt: skip
+
+        print(f"{len(cases)} Cases, {len(done)} done before: one Overpass query per "
+              f"{corroborate.BATCH} Chips", flush=True)  # fmt: skip
+        rows = corroborate.corroborate(cases, done=done, save=save,
+                                       progress=lambda m: print(m, flush=True))  # fmt: skip
+        s = corroborate.summary(rows)
+        print(f"solar agrees on {s['solar_agree']} of {s['solar_cases']} Cases with solar; "
+              f"wind on {s['wind_agree']} of {s['wind_cases']} with turbines")  # fmt: skip
+        print("to check by eye: " + (", ".join(s["to_check"]) or "none"))
+        print("OSM candidate classes, Cases with each: "
+              + (", ".join(f"{k} {v}" for k, v in s["candidate_cases"].items()) or "none"))  # fmt: skip
+        if s["failed"]:
+            print(f"{len(s['failed'])} failed; run the same command again to retry them")
+        if a.json:
+            print(f"written to {a.json}")
+        return 1 if s["failed"] else 0
 
     if a.cmd in ("verifier", "spread"):
         return _lgnd_command(a, store, load_cases(store, key))
