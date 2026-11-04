@@ -90,6 +90,7 @@ Every command reads from and writes to the store. `uv run clayzer --help` lists 
 | `clayzer compare <batch-a> <batch-b>` | what changed between two Batches, and by how much |
 | `clayzer baseline accept <batch-id>` | make a Batch the Baseline |
 | `clayzer gate <batch-id>` | keep or reject a change: exit 0 pass, 1 fail, 2 inconclusive |
+| `clayzer experiment <batch-id> --hypothesis TEXT [--accept]` | save a gate decision and optionally promote a passing candidate ([guide](docs/regression-gate.md)) |
 | `clayzer trace <batch-id> <case-id> -r 1` | one Run's summary and Trace, Step by Step |
 | `clayzer login lgnd` / `clayzer tools lgnd` | sign in to LGND Geo, and list or call its tools |
 | `clayzer ui [--allow-launch]` | the web app; `--allow-launch` lets the browser start Batches |

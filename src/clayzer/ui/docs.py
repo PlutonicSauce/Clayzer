@@ -26,6 +26,8 @@ DOCS = [
     ("GLOSSARY.md", "Glossary"),
     ("README.md", "README: getting started"),
     ("docs/cli.md", "CLI and configuration reference"),
+    ("docs/regression-gate.md", "Regression gate: prompt experiments"),
+    ("docs/regression-gate-audit.md", "Regression gate: tests and limitations"),
     ("docs/tech-hackathon.md", "Brief: technical"),
     ("docs/vision-hackathon.md", "Brief: vision"),
 ]

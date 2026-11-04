@@ -18,12 +18,14 @@ and scores only, no Captions or Claim rows (so no OSM-derived data, caption-plan
 """
 
 import json
-import shutil
+import math
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Literal
 
+from clayzer import baseline_files
 from clayzer.batch import SANDBOX_FAILURE, BatchConfig, config_from
+from clayzer.gate_evidence import METRIC_PATHS, number, validate_rows, validate_summary
 from clayzer.provenance import RECORDED_SINCE  # None there means "not recorded", not "off"
 
 Verdict = Literal["pass", "fail", "inconclusive"]
@@ -31,13 +33,14 @@ EXIT_CODES: dict[Verdict, int] = {"pass": 0, "fail": 1, "inconclusive": 2}
 DEFAULT_TOLERANCE = 0.05
 TOKEN_WARNING = 0.25  # warn when mean tokens per Caption rise more than this
 SPREAD_WARNING = 3.0  # warn when a Case's Spread grows this many times (and by over 0.1)
-METRICS = ("correctness", "coverage", "fidelity", "workflow")
+METRICS = tuple(METRIC_PATHS)
 
 # Settings that change the measuring stick itself: a difference makes scores less comparable.
 MEASUREMENT = ("judge_model", "judge_prompt_sha", "embed_model", "cases_sha", "chips_sha",
-               "ontology_version", "ontology_sha", "scorer_version")  # fmt: skip
+               "ontology_version", "ontology_sha", "scorer_version", "region", "extra",
+               "repeats")  # fmt: skip
 # Settings a change to the captioner is expected to vary.
-CAPTIONER = ("caption_model", "prompt_sha", "prompt_source", "tools", "max_turns")
+CAPTIONER = ("caption_model", "prompt_sha", "prompt_source", "tools", "max_turns", "verify")
 # The code itself: a change can move either, so it's shown but not warned about.
 CODE = ("code_commit", "code_dirty")
 
@@ -54,42 +57,76 @@ def _scores_only(r: dict) -> dict:
                       ("correctness", "coverage", "precision", "recall", "count", "position",
                        "attributes", "relations", "unscored_share")} if g else None,
         "fidelity": {"score": (r.get("fidelity") or {}).get("score")} if r.get("fidelity") else None,
+        "workflow": {"score": (r.get("workflow") or {}).get("score")},
         "seconds_to_caption": r.get("seconds_to_caption"),
         "caption_tokens": r.get("caption_tokens"),
     }  # fmt: skip
 
 
-def accept_baseline(batch: dict, root: Path, name: str = "default") -> Path:
+def accept_baseline(
+    batch: dict,
+    root: Path,
+    name: str = "default",
+    *,
+    expected_snapshot: str | None = None,
+    experiment_record: dict | None = None,
+) -> Path:
     """Copy a Batch's configuration and scores into baselines/<name>/, replacing any old one."""
     cfg, summary = batch["config"], batch["summary"]
+    baseline_files.baseline_name(name)
+    validate_summary(batch)
     if not batch["results"] or summary is None:
         raise ValueError(f"{cfg.batch_id} has no results to accept")
     failures = sum(r["status"] == SANDBOX_FAILURE for r in batch["results"])
-    if failures or summary.get("stopped"):
+    expected = {(cid, repeat) for cid in cfg.case_ids for repeat in range(1, cfg.repeats + 1)}
+    actual = [(r["case_id"], r["repeat"]) for r in batch["results"]]
+    if (
+        failures
+        or summary.get("stopped")
+        or not expected
+        or set(actual) != expected
+        or len(actual) != len(expected)
+        or summary["batch"]["runs"]["planned"] != len(expected)
+    ):
         raise ValueError(
             f"{cfg.batch_id} is incomplete ({failures} Sandbox Failures); "
             "resume it first so the Baseline is complete"
         )
-    target = root / name
-    if target.exists():
-        shutil.rmtree(target)
-    target.mkdir(parents=True)
-    (target / "batch.json").write_text(json.dumps(asdict(cfg), indent=2) + "\n")
-    (target / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
-    rows = "".join(json.dumps(_scores_only(r)) + "\n" for r in batch["results"])
-    (target / "results.jsonl").write_text(rows)
-    (target / "ACCEPTED_FROM").write_text(cfg.batch_id + "\n")
-    return target
+    counts = validate_rows(batch)
+    for cid, case in summary["cases"].items():
+        for metric in METRICS:
+            measured = (case.get(metric) or {}).get("mean") is not None
+            if measured and counts[cid][metric] != cfg.repeats:
+                raise ValueError(f"{cid} {metric}: incomplete score samples")
+    files = {
+        "batch.json": json.dumps(asdict(cfg), indent=2, allow_nan=False) + "\n",
+        "summary.json": json.dumps(summary, indent=2, allow_nan=False) + "\n",
+        "results.jsonl": "".join(
+            json.dumps(_scores_only(r), allow_nan=False) + "\n" for r in batch["results"]
+        ),
+        "ACCEPTED_FROM": cfg.batch_id + "\n",
+    }
+    if experiment_record is not None:
+        files["experiment.json"] = json.dumps(experiment_record, indent=2, allow_nan=False) + "\n"
+    return baseline_files.publish(root, name, files, expected_snapshot)
 
 
 def load_baseline(root: Path, name: str = "default") -> dict:
-    d = root / name
+    baseline_files.baseline_name(name)
+    if not root.exists():
+        raise FileNotFoundError(f"no Baseline named {name!r} in {root}")
+    with baseline_files.directory(root, name) as d:
+        return _read_baseline(d, root, name)
+
+
+def _read_baseline(d: Path, root: Path, name: str) -> dict:
     if not (d / "summary.json").exists():
         raise FileNotFoundError(f"no Baseline named {name!r} in {root}")
     return {
         "config": config_from(json.loads((d / "batch.json").read_text())),
         "summary": json.loads((d / "summary.json").read_text()),
         "results": [json.loads(x) for x in (d / "results.jsonl").read_text().splitlines() if x],
+        "snapshot": baseline_files.snapshot(d),
     }
 
 
@@ -98,7 +135,7 @@ def load_baseline(root: Path, name: str = "default") -> dict:
 
 def setting_changes(a: BatchConfig, b: BatchConfig) -> list[dict]:
     out = []
-    for key in CAPTIONER + MEASUREMENT + CODE + ("repeats",):
+    for key in CAPTIONER + MEASUREMENT + CODE:
         va, vb = getattr(a, key), getattr(b, key)
         if va == vb:
             continue
@@ -109,6 +146,27 @@ def setting_changes(a: BatchConfig, b: BatchConfig) -> list[dict]:
                     else "captioner")  # fmt: skip
         out.append({"setting": key, "a": va, "b": vb, "kind": kind})
     return out
+
+
+def comparability_issues(a: BatchConfig, b: BatchConfig) -> list[str]:
+    issues = [
+        s["setting"]
+        for s in setting_changes(a, b)
+        if s["kind"] in {"measurement", "not recorded"} and s["setting"] not in CODE
+    ]
+    for label, cfg in (("Baseline", a), ("candidate", b)):
+        required = (
+            "chips_sha",
+            "ontology_version",
+            "ontology_sha",
+            "cases_sha",
+            "scorer_version",
+            "embed_model",
+        )
+        if cfg.judge_model:
+            required += ("judge_prompt_sha",)
+        issues.extend(f"{label} {key} not recorded" for key in required if not getattr(cfg, key))
+    return issues
 
 
 def _delta(a, b):
@@ -221,6 +279,9 @@ def _status(baseline, candidate, allowed) -> str:
         # can't be shown not to have regressed.
         return "missing"
     delta = candidate - baseline
+    # Decimal scores exactly on the boundary can subtract to e.g. -0.050000000000000044.
+    if math.isclose(abs(delta), allowed, rel_tol=0, abs_tol=1e-12):
+        return "ok"
     if delta < -allowed:
         return "regressed"
     return "improved" if delta > allowed else "ok"
@@ -228,7 +289,10 @@ def _status(baseline, candidate, allowed) -> str:
 
 def _check(case_id, metric, b: dict | None, c: dict | None, tolerance) -> Check:
     bm, cm = (b or {}).get("mean"), (c or {}).get("mean")
-    allowed = max(tolerance, (b or {}).get("spread") or 0.0)  # the Baseline's Spread only
+    spread = (b or {}).get("spread")
+    for label, value in (("Baseline", bm), ("candidate", cm), ("Spread", spread)):
+        number(value, f"{case_id} {metric} {label}", upper=1)
+    allowed = max(tolerance, spread or 0.0)  # the Baseline's Spread only
     if c is None and bm is not None:
         status = "missing"
     else:
@@ -244,7 +308,28 @@ def gate(
 ) -> GateResult:
     """`max_token_increase` (0.5 = +50%) makes a rise in tokens per Caption fail the gate;
     without it, a rise over 25% only warns."""
+    for name, value in (("tolerance", tolerance), ("max_token_increase", max_token_increase)):
+        if value is not None and (
+            type(value) not in (int, float) or not math.isfinite(value) or value < 0
+        ):
+            raise ValueError(f"{name} must be a finite, non-negative number")
+    if tolerance is None:
+        raise ValueError("tolerance must be a finite, non-negative number")
+    validate_summary(baseline)
+    validate_summary(candidate)
+    baseline_samples = validate_rows(baseline)
+    samples = validate_rows(candidate)
     bs, cs = baseline["summary"], candidate["summary"]
+    if not bs or not bs["cases"]:
+        raise ValueError("Baseline has no scored Cases; accept a complete Batch first")
+    if cs is None:
+        return GateResult(
+            "inconclusive",
+            baseline["config"].batch_id,
+            candidate["config"].batch_id,
+            [],
+            ["candidate has no summary; finish or resume its Batch, then gate again"],
+        )
     checks = []
     for case_id, b in bs["cases"].items():
         c = cs["cases"].get(case_id)
@@ -259,7 +344,9 @@ def gate(
 
     reasons = []
     regressed = [c for c in checks if c.status == "regressed"]
-    missing = sorted({c.case_id for c in checks if c.status == "missing"})
+    missing = sorted(
+        {c.case_id for c in checks if c.status == "missing"} | (set(bs["cases"]) - set(cs["cases"]))
+    )
     if regressed:
         reasons.append(
             f"{len(regressed)} regression(s): "
@@ -270,27 +357,79 @@ def gate(
 
     tb, tc = bs["batch"]["tokens_per_caption"], cs["batch"]["tokens_per_caption"]
     token_change = (tc - tb) / tb if tb and tc is not None else None
-    cost_regressed = (
-        max_token_increase is not None
-        and token_change is not None
-        and token_change > max_token_increase
+    zero_cost_increase = tb == 0 and tc is not None and tc > 0
+    unknown_cost = max_token_increase is not None and (
+        tb is None
+        or tc is None
+        or any(
+            row.get("caption_tokens") is None
+            for batch in (baseline, candidate)
+            for row in batch.get("results", [])
+            if row["status"] != SANDBOX_FAILURE
+        )
+    )
+    cost_regressed = max_token_increase is not None and (
+        zero_cost_increase or (token_change is not None and token_change > max_token_increase)
     )
     if cost_regressed:
         reasons.append(
-            f"tokens per Caption rose {token_change:+.0%}, over the allowed "
+            f"tokens per Caption rose {'from zero' if zero_cost_increase else f'{token_change:+.0%}'}, over the allowed "
             f"{max_token_increase:+.0%}"
         )
 
-    failures = cs["batch"]["runs"]["sandbox_failures"]
-    incomplete = failures or cs.get("stopped")
+    runs = cs["batch"]["runs"]
+    failures = runs["sandbox_failures"]
+    completed = runs.get("ok", 0) + runs.get("harness_faults", 0)
+    planned = len(candidate["config"].case_ids) * candidate["config"].repeats
+    incomplete = (
+        failures
+        or cs.get("stopped")
+        or ("planned" in runs and (completed != runs["planned"] or runs["planned"] != planned))
+        or any(
+            c.get("runs", candidate["config"].repeats) != candidate["config"].repeats
+            for c in cs["cases"].values()
+        )
+        or (set(cs["cases"]) != set(candidate["config"].case_ids))
+        or any(
+            check.baseline is not None
+            and check.case_id in samples
+            and samples[check.case_id][check.metric] < cs["cases"][check.case_id]["runs"]
+            for check in checks
+            if check.metric in METRICS
+        )
+        or (
+            "retrieval" in candidate
+            and bs["batch"]["retrieval_mrr"]["mean"] is not None
+            and sum(r.get("mrr") is not None for r in candidate["retrieval"])
+            < candidate["config"].repeats
+        )
+    )
+    partial_baseline = any(
+        check.baseline is not None
+        and check.case_id in baseline_samples
+        and baseline_samples[check.case_id][check.metric] < bs["cases"][check.case_id]["runs"]
+        for check in checks
+        if check.metric in METRICS
+    )
+    no_evidence = not any(c.baseline is not None and c.candidate is not None for c in checks)
+    incomparable = comparability_issues(baseline["config"], candidate["config"])
     if regressed or missing or cost_regressed:
         verdict: Verdict = "fail"
-    elif incomplete:
+    elif incomplete or unknown_cost or no_evidence or incomparable or partial_baseline:
         verdict = "inconclusive"
-        reasons.append(
-            f"candidate is incomplete ({failures} Sandbox Failures); "
-            "run `clayzer batch --resume`, then gate again"
-        )
+        if incomparable:
+            reasons.append("scores are not comparable: " + ", ".join(incomparable))
+        if unknown_cost:
+            reasons.append("token cap cannot be checked: token usage is missing")
+        if no_evidence:
+            reasons.append("no comparable Baseline and candidate scores")
+        if partial_baseline:
+            reasons.append("Baseline has incomplete metric samples; rebuild and re-accept it")
+        if incomplete:
+            reasons.append(
+                f"candidate is incomplete ({failures} Sandbox Failures, {completed} completed Runs); "
+                "run `clayzer batch --resume`, then gate again"
+            )
     else:
         verdict = "pass"
 
