@@ -78,6 +78,25 @@ p { margin: 0 0 18px; }
   letter-spacing: .06em; text-transform: uppercase; color: var(--ok); }
 .criterion p { margin-top: 10px; font-size: 19px; line-height: 1.4; color: #3e3a39; }
 .criteria + .source { margin: 16px 0 34px; }
+/* A big headline number card (Results): reuse the criterion card, enlarge the value. */
+.criterion b { font-size: 26px; }
+.criteria .criterion b:only-of-type { font-size: 26px; }
+
+/* The hook on the problem slide: a real wrong caption beside the ground truth. */
+.hook { align-self: center; padding: 34px 38px; border-radius: 16px; background: var(--captions);
+  border: 2px solid var(--captions-line); }
+.hook-label { margin: 0 0 14px; font-size: 18px; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--decision); }
+.hook blockquote { margin: 0 0 20px; padding-left: 20px; border-left: 4px solid var(--decision);
+  font-size: 27px; line-height: 1.4; font-style: italic; }
+.hook-truth { margin: 0; font-size: 24px; line-height: 1.45; color: #3e3a39; }
+
+/* The demo walk-through: numbered, roomy, one line each. */
+.demo-script { margin: 0; padding-left: 44px; font-size: 29px; line-height: 1.4; }
+.demo-script li { margin-bottom: 16px; }
+.demo-script b { color: var(--decision); }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em;
+  background: rgba(154, 74, 53, .08); padding: 1px 6px; border-radius: 5px; }
 
 /* Architecture diagram: colours live in diagram.js as SVG attributes. */
 .arch-slide h2 { margin-bottom: 18px; }
