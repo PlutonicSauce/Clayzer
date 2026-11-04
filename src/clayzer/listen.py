@@ -23,8 +23,8 @@ from datetime import UTC, datetime
 
 from clayzer import batch as batches
 
-DEFAULT_VOICE = "Ruth"
-DEFAULT_ENGINE = "generative"
+DEFAULT_VOICE = "Emma"  # British English; she has no generative voice, so neural
+DEFAULT_ENGINE = "neural"
 MAX_SCRIPT_CHARS = 1500  # Polly takes 3,000 characters per call; a minute of speech is ~900
 METRICS = {
     "correctness": "correctness, how much of what the captions claim is right",

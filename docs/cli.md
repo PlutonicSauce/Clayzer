@@ -349,7 +349,7 @@ Put these in `.env` at the repo root (gitignored), or export them.
 | `CLAYZER_JUDGE_MODEL` | `us.anthropic.claude-opus-5-5` |
 | `CLAYZER_EMBED_MODEL` | `amazon.titan-embed-text-v2:0` |
 | `CLAYZER_SUMMARY_MODEL` | `us.amazon.nova-pro-v1:0` (writes Run narratives) |
-| `CLAYZER_VOICE`, `CLAYZER_VOICE_ENGINE` | `Ruth`, `generative` (the Polly voice for `clayzer listen`; `neural` is cheaper) |
+| `CLAYZER_VOICE`, `CLAYZER_VOICE_ENGINE` | `Emma`, `neural` (the Polly voice for `clayzer listen`; a generative voice such as `Amy` or `Ruth` needs `generative`) |
 | `CLAYZER_TOKEN_BUDGET` | unset (the Workflow Score's cost part is left out) |
 | `CLAYZER_BEDROCK_ENDPOINT_URL` | unset (a private Bedrock endpoint, if your network needs one) |
 | `CLAYZER_OVERPASS_URL` | `https://overpass-api.de/api/interpreter` |

@@ -2137,7 +2137,7 @@ tier = "Could"
 status = "done"
 closes = ["AWS-14"]
 start = "src/clayzer/listen.py"
-notes = "Done 2026-11-04. Default voice Ruth (generative); CLAYZER_VOICE and CLAYZER_VOICE_ENGINE change it, e.g. Emma needs the neural engine. A Batch made before this has no summary until `clayzer listen <batch-id>` runs."
+notes = "Done 2026-11-04. Default voice Emma (British English, neural engine); CLAYZER_VOICE and CLAYZER_VOICE_ENGINE change it, e.g. Ruth with the generative engine. A Batch made before this has no summary until `clayzer listen <batch-id>` runs."
 see_it = "uv run clayzer listen <batch-id> --play, or the Listen section at the top of a Batch page"
 changes = [
   "src/clayzer/listen.py: facts by code, a Nova Pro script checked against them, a Polly MP3, saved with a hash of the facts",
