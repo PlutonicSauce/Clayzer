@@ -35,7 +35,7 @@ p { margin: 0 0 18px; }
 
 /* Dark title and closing slides over the site's hero image. */
 .slide.dark { color: var(--paper);
-  background: var(--night) url("/static/hero.jpg") right center / cover no-repeat; }
+  background: var(--night) url("../hero.jpg") right center / cover no-repeat; }
 .slide.dark::before { content: ""; position: absolute; inset: 0;
   background: linear-gradient(90deg, rgba(14, 13, 12, .96) 0%, rgba(14, 13, 12, .85) 40%,
     rgba(14, 13, 12, .3) 75%, rgba(14, 13, 12, .1) 100%); }

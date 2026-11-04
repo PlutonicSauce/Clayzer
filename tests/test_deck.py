@@ -13,8 +13,8 @@ def test_deck_is_served_with_its_modules(client):  # noqa: F811
     c, _ = client
     page = c.get("/deck")
     assert page.status_code == 200
-    for src in re.findall(r'"(/static/deck/[^"]+)"', page.text):
-        assert c.get(src).status_code == 200, src
+    for src in re.findall(r'"(static/deck/[^"]+)"', page.text):
+        assert c.get("/" + src).status_code == 200, src
 
 
 def test_every_relative_import_resolves():

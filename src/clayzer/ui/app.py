@@ -476,24 +476,33 @@ def create_app(settings: Settings, region: str = "dev", allow_launch: bool = Fal
 
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
+    # Every page links to the app's other URLs relatively, against a <base> that points back at the
+    # app's root. That way the app works behind a path-prefixing proxy (/proxy/8770/) as well as
+    # at the root, with no prefix to configure.
+    def page(name: str, base: str = "./") -> HTMLResponse:
+        html = (STATIC / name).read_text()
+        return HTMLResponse(html.replace("<head>", f'<head>\n  <base href="{base}">', 1))
+
     @app.get("/")
     def index():
-        return FileResponse(STATIC / "index.html")
+        return page("index.html")
 
     @app.get("/docs", include_in_schema=False)
     def docs_index():
         from fastapi.responses import RedirectResponse
 
-        return RedirectResponse("/docs/docs/caption-plan.md")
+        return RedirectResponse("docs/docs/caption-plan.md")
 
     @app.get("/docs/{path:path}", response_class=HTMLResponse, include_in_schema=False)
     def doc(path: str):
         from clayzer.ui.docs import render
 
-        page = render(path)
-        if page is None:
+        # /docs/<path> sits as many directories below the root as <path> has slashes, plus one.
+        up = "../" * (path.count("/") + 1)
+        html = render(path, base=up)
+        if html is None:
             raise HTTPException(404, "not one of the project's docs")
-        return HTMLResponse(page)
+        return HTMLResponse(html)
 
     @app.get("/favicon.ico", include_in_schema=False)
     def favicon():
@@ -502,7 +511,8 @@ def create_app(settings: Settings, region: str = "dev", allow_launch: bool = Fal
 
     @app.get("/deck")
     def deck():
-        return FileResponse(STATIC / "deck" / "index.html")
+        html = (STATIC / "deck" / "index.html").read_text()
+        return HTMLResponse(html.replace("<head>", '<head>\n  <base href="./">', 1))
 
     return app
 

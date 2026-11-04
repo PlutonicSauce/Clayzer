@@ -135,7 +135,7 @@ def files(store, batch_id: str, names: list[tuple[str, str]]) -> list[dict]:
             "name": name,
             "what": what,
             "exists": store.exists(key),
-            "href": f"/api/batches/{batch_id}/files/{name}",
+            "href": f"api/batches/{batch_id}/files/{name}",
             "store_url": store.url(key),
             "console_url": console_url(store, key),
         }

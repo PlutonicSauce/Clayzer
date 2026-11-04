@@ -107,7 +107,7 @@ function Demo() {
       </ol>
       <p>Fallback if the network fails: the recorded demo pack.</p>
     <//>
-    <p class="source">Live at this site: <a href="/">Overview</a> · <a href="/#/batches">Batches</a></p>
+    <p class="source">Live at this site: <a href="./">Overview</a> · <a href="./#/batches">Batches</a></p>
   </div>`;
 }
 

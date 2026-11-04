@@ -212,7 +212,7 @@ def test_how_it_works_links_point_at_real_doc_sections():
     from clayzer.ui.docs import allowed, anchors
 
     js = (Path(__file__).parents[1] / "src/clayzer/ui/static/app.js").read_text()
-    links = re.findall(r'href: "/docs/([^"#]+)(?:#([^"]+))?"', js)
+    links = re.findall(r'href: "docs/([^"#]+)(?:#([^"]+))?"', js)
     assert len(links) >= 20
     docs = allowed()
     for path, anchor in links:
@@ -225,7 +225,7 @@ def test_docs_are_served_and_nothing_else_is(client):
     c, _ = client
     plan = c.get("/docs/docs/caption-plan.md").text
     assert '<pre class="mermaid">' in plan and 'id="3-data"' in plan
-    assert 'href="/docs/docs/caption-design.md' in plan  # links between docs stay in the app
+    assert 'href="docs/docs/caption-design.md' in plan  # links between docs stay in the app
     assert (
         "ADR-0006"
         in c.get("/docs/docs/adr/0006-answer-keys-are-hidden-from-caption-inputs.md").text
@@ -238,3 +238,27 @@ def test_docs_are_served_and_nothing_else_is(client):
     ):
         assert c.get(bad).status_code == 404, bad
     assert c.get("/docs", follow_redirects=False).status_code in (302, 307)
+
+
+def test_pages_work_behind_a_path_prefix(client):
+    # Behind a proxy like /proxy/8770/ the page's own URL is the only prefix it knows, so every
+    # page names its way back to the root with a <base>, and nothing links to a root-absolute path.
+    import re
+
+    c, _ = client
+    pages = {
+        "/": "./",
+        "/deck": "./",
+        "/docs/docs/caption-plan.md": "../../",
+        "/docs/GLOSSARY.md": "../",
+    }
+    for path, base in pages.items():
+        html = c.get(path).text
+        assert f'<base href="{base}">' in html, path
+        assert not re.search(r'(?:href|src)="/(?:static|api|docs|deck)', html), path
+    # In-page anchors name their page, so the <base> doesn't send them to the root.
+    from clayzer.ui.docs import _rewrite_links
+
+    fixed = _rewrite_links('<a href="#3-data">x</a>', "docs/caption-plan.md", {})
+    assert fixed == '<a href="docs/docs/caption-plan.md#3-data">x</a>'
+    assert c.get("/docs", follow_redirects=False).headers["location"] == "docs/docs/caption-plan.md"

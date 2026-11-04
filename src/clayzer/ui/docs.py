@@ -46,13 +46,16 @@ def _rewrite_links(html: str, path: str, docs: dict[str, str]) -> str:
 
     def fix(m: re.Match) -> str:
         href = m.group(1)
-        if re.match(r"^[a-z]+:|^#|^/", href):
+        if href.startswith("#"):
+            # The page has a <base>, so a bare #anchor would leave the page: name the page.
+            return f'href="docs/{path}{href}"'
+        if re.match(r"^[a-z]+:|^/", href):
             return m.group(0)
         target, _, anchor = href.partition("#")
         resolved = posixpath.normpath(posixpath.join(base, target)) if target else path
         frag = f"#{anchor}" if anchor else ""
         if resolved in docs:
-            return f'href="/docs/{resolved}{frag}"'
+            return f'href="docs/{resolved}{frag}"'
         if (REPO / resolved).exists():
             return f'href="{GITHUB}{resolved}{frag}" target="_blank" rel="noopener"'
         return m.group(0)
@@ -60,8 +63,11 @@ def _rewrite_links(html: str, path: str, docs: dict[str, str]) -> str:
     return re.sub(r'href="([^"]+)"', fix, html)
 
 
-def render(path: str) -> str | None:
-    """The doc as a page, or None if it isn't a servable doc."""
+def render(path: str, base: str = "./") -> str | None:
+    """The doc as a page, or None if it isn't a servable doc.
+
+    `base` is the relative URL from the page back to the app's root, for the page's <base> tag.
+    """
     import markdown
 
     docs = allowed()
@@ -78,17 +84,18 @@ def render(path: str) -> str | None:
     )
     body = _rewrite_links(body, path, docs)
     nav = "".join(
-        f'<li><a href="/docs/{p}"{" aria-current=page" if p == path else ""}>{escape(t)}</a></li>'
+        f'<li><a href="docs/{p}"{" aria-current=page" if p == path else ""}>{escape(t)}</a></li>'
         for p, t in docs.items()
     )
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<base href="{base}">
 <title>{escape(docs[path])} · Clayzer</title>
-<link rel="icon" href="/static/favicon.ico">
-<link rel="stylesheet" href="/static/style.css"><link rel="stylesheet" href="/static/docs.css">
+<link rel="icon" href="static/favicon.ico">
+<link rel="stylesheet" href="static/style.css"><link rel="stylesheet" href="static/docs.css">
 </head><body>
-<header class="top"><div class="brand"><a href="/" class="home-link"><strong>Clayzer</strong></a></div>
-<nav><a href="/#/how">← How it works</a><a href="/">Overview</a></nav>
+<header class="top"><div class="brand"><a href="./" class="home-link"><strong>Clayzer</strong></a></div>
+<nav><a href="./#/how">← How it works</a><a href="./">Overview</a></nav>
 <div class="store mono">{escape(path)}</div></header>
 <div class="docs-layout"><aside class="docs-nav"><h3>Docs</h3><ul>{nav}</ul></aside>
 <article class="doc">{body}</article></div>
