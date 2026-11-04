@@ -25,12 +25,53 @@ from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_ecr_assets as ecr_assets
 from aws_cdk import aws_ecs as ecs
 from aws_cdk import aws_ecs_patterns as ecs_patterns
+from aws_cdk import aws_iam as iam
 from aws_cdk import aws_logs as logs
 from aws_cdk import aws_s3 as s3
 from constructs import Construct
 
 REPO = Path(__file__).resolve().parents[1]
 PORT = 8770
+
+# The default models each service role may invoke (AWS-01, AWS-02). A deploy overrides these with
+# -c caption_model=… / judge_model=… / embed_model=… to match the Batch's own configuration.
+DEFAULT_CAPTION_MODEL = "us.amazon.nova-pro-v1:0"
+DEFAULT_JUDGE_MODEL = "us.anthropic.claude-opus-5-5"
+DEFAULT_EMBED_MODEL = "amazon.titan-embed-text-v2:0"
+
+
+def _model_arns(region: str, account: str, model_id: str) -> list[str]:
+    """Every ARN Bedrock checks for one model id. A cross-region inference profile (the `us.`
+    prefix) is itself an ARN, and invoking it reaches the underlying foundation models in each
+    region the profile spans, so those are granted too."""
+    bare = model_id.removeprefix("us.").removeprefix("eu.").removeprefix("apac.")
+    foundation = [
+        f"arn:aws:bedrock:{r}::foundation-model/{bare}" for r in (region, "us-east-1", "us-west-2")
+    ]
+    if model_id == bare:
+        return sorted(set(foundation))
+    profile = f"arn:aws:bedrock:{region}:{account}:inference-profile/{model_id}"
+    return sorted({profile, *foundation})
+
+
+def _invoke_models(
+    scope: Construct, name: str, region: str, account: str, *model_ids: str
+) -> iam.Role:
+    """A service role that may invoke only the named Bedrock models, and nothing else (AWS-13)."""
+    arns = sorted({a for m in model_ids for a in _model_arns(region, account, m)})
+    role = iam.Role(
+        scope,
+        name,
+        assumed_by=iam.ServicePrincipal("bedrock.amazonaws.com"),
+        description=f"Clayzer {name}: invoke only its Bedrock models (AWS-13)",
+    )
+    role.add_to_policy(
+        iam.PolicyStatement(
+            actions=["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
+            resources=arns,
+        )
+    )
+    return role
 
 
 def build_options() -> dict:
@@ -48,6 +89,10 @@ class ClayzerStack(cdk.Stack):
     def __init__(self, scope: Construct, id: str, store: str | None, **kwargs) -> None:
         super().__init__(scope, id, **kwargs)
 
+        caption_model = self.node.try_get_context("caption_model") or DEFAULT_CAPTION_MODEL
+        judge_model = self.node.try_get_context("judge_model") or DEFAULT_JUDGE_MODEL
+        embed_model = self.node.try_get_context("embed_model") or DEFAULT_EMBED_MODEL
+
         if store:
             bucket_name, _, prefix = store.removeprefix("s3://").partition("/")
             bucket = s3.Bucket.from_bucket_name(self, "Store", bucket_name)
@@ -62,6 +107,16 @@ class ClayzerStack(cdk.Stack):
             )
             prefix = "caption"
         prefix = prefix.strip("/")
+
+        # A role per service (AWS-13), each with only what it needs. The captioner writes Chips,
+        # Captions, and Traces; the Judge reads a Chip and a Caption and writes its verdict; both
+        # invoke only their own model. The web app role is defined below, with the Fargate task.
+        captioner = _invoke_models(
+            self, "CaptionerRole", self.region, self.account, caption_model, embed_model
+        )
+        bucket.grant_read_write(captioner, f"{prefix}/*")
+        judge = _invoke_models(self, "JudgeRole", self.region, self.account, judge_model)
+        bucket.grant_read_write(judge, f"{prefix}/*")
 
         vpc = ec2.Vpc(
             self,
@@ -138,16 +193,23 @@ class ClayzerStack(cdk.Stack):
 
         cdk.CfnOutput(self, "Url", value=f"https://{distribution.distribution_domain_name}")
         cdk.CfnOutput(self, "StoreUrl", value=f"s3://{bucket.bucket_name}/{prefix}")
+        cdk.CfnOutput(self, "CaptionerRoleArn", value=captioner.role_arn)
+        cdk.CfnOutput(self, "JudgeRoleArn", value=judge.role_arn)
 
 
-app = cdk.App()
-ClayzerStack(
-    app,
-    "Clayzer",
-    store=app.node.try_get_context("store"),
-    env=cdk.Environment(
-        account=os.environ.get("CDK_DEFAULT_ACCOUNT"),
-        region=os.environ.get("CDK_DEFAULT_REGION", "us-west-2"),
-    ),
-)
-app.synth()
+def main() -> None:
+    app = cdk.App()
+    ClayzerStack(
+        app,
+        "Clayzer",
+        store=app.node.try_get_context("store"),
+        env=cdk.Environment(
+            account=os.environ.get("CDK_DEFAULT_ACCOUNT"),
+            region=os.environ.get("CDK_DEFAULT_REGION", "us-west-2"),
+        ),
+    )
+    app.synth()
+
+
+if __name__ == "__main__":
+    main()

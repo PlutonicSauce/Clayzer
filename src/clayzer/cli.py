@@ -9,6 +9,7 @@ clayzer batch --repeats 3 --label base      run every Case 3 times; writes a Bat
 clayzer batch --resume <batch-id>           finish a Batch (expired credentials, failures)
 clayzer batches                             list Batches
 clayzer report <batch-id>                   rebuild a Batch's report.md and report.html
+clayzer readiness [--no-account]            check no committed keys; every bucket blocks public access
 clayzer rescore <batch-id>                  replay a recorded Batch offline: rescore, rebuild reports
 clayzer trace <batch-id> <case-id> [-r N]   show one Run's summary and Trace, Step by Step
 clayzer summarize <batch-id>                rebuild every Run's summary from its Trace, offline
@@ -124,6 +125,12 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("batches", help="list Batches in the store")
     rp = sub.add_parser("report", help="rebuild a Batch's reports")
     rp.add_argument("batch_id")
+
+    rd = sub.add_parser(
+        "readiness",
+        help="check no credentials are committed and every bucket blocks public access (AWS-13)",
+    )
+    rd.add_argument("--no-account", action="store_true", help="repo checks only, skip AWS")
 
     rs = sub.add_parser(
         "rescore",
@@ -261,6 +268,13 @@ def main(argv: list[str] | None = None) -> int:
         write_reports(store, a.batch_id)
         print(f"open {_local_report(store, settings, a.batch_id)}")
         return 0
+
+    if a.cmd == "readiness":
+        from clayzer.readiness import check, render
+
+        findings = check(with_account=not a.no_account)
+        print(render(findings))
+        return 0 if all(f.ok for f in findings) else 1
 
     if a.cmd == "rescore":
         from clayzer.batch import rescore

@@ -70,6 +70,7 @@ Other options: `--caption-model`, `--only <case-id> ...`, `--no-judge`, `--no-na
 | `clayzer rescore <batch-id>` | replay a recorded Batch offline: score its stored Captions again with the current scorer, reuse its Judge verdicts (recovering lost ones from the Traces), rebuild every summary and report. Needs no model, credentials, or network; retrieval is kept as stored |
 | `clayzer trace <batch-id> <case-id> --repeat 1` | one Run, Step by Step (`--json` for the raw Trace) |
 | `clayzer summarize <batch-id>` | rebuild every Run's summary offline (`--narrate` writes missing narratives) |
+| `clayzer readiness` | check no long-lived keys are committed and every bucket in the account blocks public access (AWS-13); `--no-account` runs the repo checks only. Exit 0 if all pass, 1 otherwise |
 
 Each Run ends `ok`, `harness_fault` (no usable Caption: scored 0), or `sandbox_failure` (Bedrock,
 network, or credentials: no valid score, excluded). Results are saved after every Run. Expired
@@ -205,3 +206,16 @@ Leave out `-c store=...` to have the stack create a new bucket. With Podman, set
 `CDK_DOCKER=podman`. The hosted app never starts Batches, and its role can only read the store
 prefix. `npx aws-cdk@2 destroy` removes everything except the bucket. To build the image on its
 own: `docker build -t clayzer .` (see the [Dockerfile](../Dockerfile)).
+
+### Roles and access (AWS-13)
+
+The stack defines a role per service, each with only what it needs: the **captioner** and
+**Judge** roles may invoke their own Bedrock model and nothing else (the ARNs cover the
+inference profile and the foundation models it spans), and the **web app** task role can only
+read the store prefix. Any created bucket blocks all public access and enforces SSL. A deploy
+can point a role at a different model with `-c caption_model=…`, `-c judge_model=…`, or
+`-c embed_model=…`, which narrows the grant to that model.
+
+Access is short-lived: nothing in the repo holds a long-lived key, and local runs use the
+account's own temporary credentials from `.env`. `clayzer readiness` checks both: no committed
+keys, and every bucket in the account blocks public access.

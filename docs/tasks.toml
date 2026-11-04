@@ -1106,9 +1106,10 @@ step = "ship"
 title = "Least-privilege IAM roles; no credentials in the repo"
 area = "Platform"
 tier = "Must"
-status = "todo"
+status = "done"
 closes = ["AWS-13"]
 start = "caption-plan.md §7 AWS service tasks"
+notes = "Done 2026-11-04. infra/app.py now defines a role per service: a captioner and a Judge role that may invoke only their own Bedrock models (the grant covers the inference profile and the foundation models it spans, and -c caption_model/judge_model/embed_model narrows it), plus the web app's read-only task role. Any created bucket already blocked public access and enforces SSL. The new `clayzer readiness` command (src/clayzer/readiness.py) checks no long-lived AWS keys or a .env are committed, that .env is gitignored, and that every bucket in the account blocks public access; it ran clean against this repo and account (two buckets, both blocked). No long-lived keys anywhere: local runs use the account's temporary participant credentials from .env. The broader readiness task (licenses, disallowed services) is still `readiness`."
 context = "Least-privilege, short-lived access (AWS-13): no credentials in the repo, a role per service (captioner, Judge, web app), and public access blocked on every bucket. Today everything runs as the Workshop participant role from `.env`."
 done_when = [
   "Roles defined in the CDK app with only the actions each needs",
@@ -1118,6 +1119,15 @@ done_when = [
 refs = [
   "docs/caption-design.md §2.2 (AWS-13)",
   "docs/caption-plan.md §7 (AWS service tasks)",
+]
+see_it = "`clayzer readiness` prints a line per check and exits non-zero if any fails; `--no-account` runs the repo checks offline. The roles are in the synthesized CloudFormation and in docs/cli.md (Roles and access)."
+changes = [
+  "infra/app.py: a captioner and a Judge role, each scoped to its own Bedrock models; model ids overridable with -c; main() guarded so the stack imports cleanly for tests",
+  "src/clayzer/readiness.py: the AWS-13 readiness check (no committed keys, every bucket blocks public access)",
+  "src/clayzer/cli.py: the `clayzer readiness` command",
+  "docs/cli.md: the readiness command and a Roles and access section",
+  "tests/test_infra.py: the CDK roles and bucket, synthesized offline",
+  "tests/test_readiness.py: the repo and bucket checks against a throwaway repo and a fake S3",
 ]
 
 [[task]]
