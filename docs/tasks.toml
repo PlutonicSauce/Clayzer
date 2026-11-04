@@ -374,6 +374,7 @@ status = "blocked"
 closes = ["CAP-12", "AWS-04"]
 start = "caption-plan.md §7 AWS service tasks"
 notes = "Needs the GPU quota request first."
+after = ["gpu-quota"]
 context = "Clay wants cost in GPU time and GPU count and size, not tokens (CAP-12), and Bedrock can't report GPU time. Serve one open VLM on a SageMaker GPU endpoint behind the same model interface, caption the same Cases with the same prompt, and fill the Trace's `cost.gpu_seconds`. Delete the endpoint after each session."
 done_when = [
   "One open VLM captions through the same interface as Nova Pro",
@@ -612,6 +613,7 @@ done_when = [
   "A Workflow Score per Run from its Trace, deterministic",
   "Each component reports a reason; components that don't apply are left out",
   "Reported and gated next to the Output Score",
+  "Shown in each Run's report (run_report.py), which was built before it",
 ]
 refs = [
   "docs/caption-design.md §2.3 (REQ-06)",
@@ -692,6 +694,7 @@ status = "blocked"
 closes = ["CAP-07", "CAP-08"]
 start = "caption-plan.md §9"
 notes = "Waiting on Clay for the data; RSICD and Answer Key queries stand in meanwhile."
+after = ["questions-for-clay"]
 context = "The briefs say Clay has example captions and a retrieval evaluation set. When they arrive, add them as references: fidelity and style against the examples, recall@k on Clay's queries. RSICD and Answer Key queries stand in meanwhile."
 done_when = [
   "The data received and its format documented",
@@ -966,8 +969,9 @@ closes = ["AWS-05", "REQ-11"]
 start = "caption-plan.md §7 AWS service tasks; the OpenTelemetry sink from tracing-swap"
 notes = "The ops view: latency, failures, and tokens across Runs. Spans carry model, latency, tokens, retries, and error codes; the S3 Traces stay the record (ADR-0001). The participant role can write segments (checked 2026-11-04). Route: ADOT collector to X-Ray, which works as the account is; X-Ray's direct OTLP endpoint needs Transaction Search turned on first (an account setting)."
 after = ["tracing-swap", "aws-observability-check"]
-context = "The AWS ops view: the OpenTelemetry sink exports through the ADOT collector to X-Ray, one span per Step, so latency, failures, and tokens show across Runs. Faults and Soft Failures appear as errors. The S3 Traces stay the record."
+context = "The AWS ops view: the OpenTelemetry sink exports through the ADOT collector, which this task adds to the CDK app, to X-Ray, one span per Step, so latency, failures, and tokens show across Runs. Faults and Soft Failures appear as errors. The S3 Traces stay the record."
 done_when = [
+  "The ADOT collector created by the CDK app (infra/app.py)",
   "Spans for a Batch visible in X-Ray",
   "Faults and Soft Failures marked as errors",
   "No prompt text or outputs in spans",
@@ -976,6 +980,7 @@ refs = [
   "docs/caption-plan.md §7 (AWS service tasks)",
   "docs/caption-design.md §2.2 (AWS-05)",
   "docs/adr/0001-own-trace-format-otel-is-an-export.md",
+  "infra/app.py",
 ]
 
 [[task]]
@@ -987,8 +992,8 @@ tier = "Should"
 status = "doing"
 closes = ["AWS-07"]
 start = "infra/app.py"
-notes = "Hosting stack (bucket, roles, Fargate, CloudFront) synths; ADOT collector still to add."
-context = "One CDK app creates the whole stack in any teammate's account (AWS-07): the bucket, IAM roles, the ADOT collector, and the web app service. `cdk synth` works without an account, so it can be drafted early."
+notes = "The hosting stack (roles, Fargate, load balancer, CloudFront; the bucket imported or created) is deployed in one participant account. Waiting on a teammate deploying it in theirs, and on a checked `cdk destroy`. The ADOT collector moved to xray (2026-11-04)."
+context = "One CDK app creates the whole stack in any teammate's account (AWS-07): the bucket, IAM roles, and the web app service; xray adds the ADOT collector to it. `cdk synth` works without an account, so it can be drafted early."
 done_when = [
   "`cdk deploy` succeeds in one account and a teammate deploys the same app in theirs",
   "`cdk destroy` removes it",
@@ -1005,11 +1010,11 @@ step = "ship"
 title = "Run the web app on ECS Fargate behind CloudFront so the demo is a live URL"
 area = "Platform"
 tier = "Should"
-status = "doing"
+status = "done"
 closes = ["AWS-08"]
 start = "infra/app.py; README \"Hosting it on AWS\""
-notes = "App Runner is denied to the participant role (checked 2026-11-03), so Fargate it is."
-after = ["web-app", "cdk"]
+notes = "Live since 2026-11-03 and redeployed from commits since, built by infra/app.py. App Runner is denied to the participant role (checked 2026-11-03), so Fargate it is."
+after = ["web-app"]
 context = "The web app at a URL the judges can open (AWS-08): the container on ECS Fargate behind a load balancer, with CloudFront in front, read-only, reading that account's bucket."
 done_when = [
   "A public URL serving the app read-only",
@@ -1203,7 +1208,7 @@ status = "done"
 closes = ["REQ-08"]
 start = "src/clayzer/report_html.py"
 notes = "Done 2026-11-04: run_report.py writes runs/<case-id>--r<repeat>.html and .json for every Run, from stored files only (rebuilds offline): the verdict, both scores with their reasons, the Chip with Claims, the Caption, the narrative and facts, and every Step with its prompt and response. The web app shows them at #/runs/<batch>/<case>/<repeat>; the Batch report and the home page link to them."
-after = ["trace-summaries", "workflow-score"]
+after = ["trace-summaries"]
 context = "REQ-08: each scored Run gets a human-readable report (summary, scores with reasons, Steps, final answer) and a machine-readable one, from a live or a replayed Trace. Batch reports already show each Repeat's Caption, Claims, and Judge notes; missing are the Trace summary, the Steps, and the Workflow Score."
 done_when = [
   "A per-Run page in the web app, and HTML and JSON in the store",
@@ -1474,6 +1479,26 @@ refs = [
 ]
 
 [[task]]
+id = "embeddings-access"
+step = "case"
+title = "Read LGND embeddings for the dev and Texas regions, and join them to Chips"
+area = "Data and Cases"
+tier = "Could"
+status = "todo"
+closes = ["CAP-18"]
+start = "docs/caption-plan.md §3 (LGND embeddings row)"
+context = "Caption reuse and Claims from embeddings (design §8, ideas 13 and 14) both need embeddings for the Chips we score. LGND's are on Source Cooperative: anonymous, GeoParquet by geohash and month, CC BY 4.0. Query rows with DuckDB instead of downloading whole files (~340 MB each). They're Sentinel-2 based (10 m pixels, 1,280 m cells), so one cell covers several 307 m Chips."
+done_when = [
+  "Embedding rows for every dev and Texas Chip's cell, queried without downloading whole files",
+  "Each Chip joined to its cell, with the cell size and date recorded",
+  "The CC BY 4.0 attribution noted wherever they're used",
+]
+refs = [
+  "docs/caption-plan.md §3",
+  "docs/caption-design.md §8",
+]
+
+[[task]]
 id = "caption-reuse"
 step = "harness"
 title = "Reuse Captions across near-duplicate Chips found in embedding space"
@@ -1481,6 +1506,7 @@ area = "Captioning"
 tier = "Could"
 status = "todo"
 closes = ["CAP-18", "CAP-12", "CAP-13"]
+after = ["embeddings-access"]
 start = "docs/caption-design.md §8 (idea 13)"
 context = "For a Chip very close to an already-captioned one in Clay/LGND embedding space, reuse its class-level statements, recompute counts and positions cheaply, and verify. An error spreads to every neighbour, so the reuse error must be measured."
 done_when = [
@@ -1501,6 +1527,7 @@ area = "Captioning"
 tier = "Could"
 status = "todo"
 closes = ["CAP-18", "CAP-05"]
+after = ["embeddings-access"]
 start = "docs/caption-design.md §8 (idea 14)"
 context = "Small probes from embeddings to Claims, labelled by USGS on a seed set, turn billions of existing embeddings into Claims for the cost of a lookup. LGND embeddings are Sentinel-2 based (10 m), so start with a large class: solar."
 done_when = [
