@@ -23,6 +23,7 @@ MERMAID = "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"
 DOCS = [
     ("docs/caption-plan.md", "The plan"),
     ("docs/caption-design.md", "The design"),
+    ("docs/ontology-induction.md", "Design: ontology induction"),
     ("GLOSSARY.md", "Glossary"),
     ("README.md", "README: getting started"),
     ("docs/cli.md", "CLI and configuration reference"),
