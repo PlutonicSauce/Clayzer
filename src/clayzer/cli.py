@@ -106,6 +106,9 @@ def main(argv: list[str] | None = None) -> int:
     b.add_argument("--caption-model", help="override CLAYZER_CAPTION_MODEL")
     b.add_argument("--only", nargs="*", help="Case ids to run")
     b.add_argument("--no-judge", action="store_true", help="skip the fidelity Judge")
+    b.add_argument(
+        "--tools", nargs="+", metavar="SERVER", help="MCP servers the Harness may call, e.g. roda"
+    )
     b.add_argument("--resume", metavar="BATCH_ID", help="finish an existing Batch")
     b.add_argument("--no-narrate", action="store_true",
                    help="skip the model-written Trace summaries")  # fmt: skip
@@ -206,7 +209,7 @@ def main(argv: list[str] | None = None) -> int:
             batch_id = batches.start(
                 cases, settings, store, a.repeats, a.label, a.region, prompt,
                 str(a.prompt) if a.prompt else "built-in", judge=not a.no_judge,
-                narrate=not a.no_narrate,
+                narrate=not a.no_narrate, tools=a.tools,
             )  # fmt: skip
             summary = batches.load(store, batch_id)["summary"]
         print(f"Batch {batch_id} in {store.url(f'batches/{batch_id}/')}")

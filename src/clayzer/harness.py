@@ -1,8 +1,11 @@
 """The caption Harness: one Chip in, one Caption out (caption-plan.md §1.3, §5.2).
 
 It sees only the Chip's id and image, never the Case or its Reference Labels (ADR-0006).
-Walking-skeleton version: a single VLM call with structured output. Verify-then-write and the
-caption MCP server come next.
+
+Without tools it's a single VLM call with structured output. With a Toolbox of MCP servers
+(tools.py) it's a plain tool-use loop (ADR-0002): a model turn, its tool calls, their results,
+repeat, until the model calls `submit_caption` or the turn budget runs out. Every model turn is
+an `llm` Step and every tool call a `tool` Step in the Run's Trace (REQ-01).
 """
 
 import time
@@ -29,6 +32,16 @@ the submit_caption tool.
 - relations: how objects sit relative to each other, from: {relations}.
 - uncertain: anything you think may be there but would not assert.
 """
+
+TOOLS_NOTE = """
+You also have geospatial data tools (catalogs and open-data registries). You may call them to
+look things up before you write, for example to check what imagery or data covers this place.
+They don't show you this image, so describe only what the image itself shows. Call
+submit_caption exactly once, when you're done.
+"""
+
+MAX_TURNS = 8  # model turns per Caption in the tool-use loop
+MAX_TOOL_TEXT = 20_000  # characters of one tool result the model sees; the Trace keeps it all
 
 CAPTION_TOOL = {
     "toolSpec": {
@@ -96,18 +109,24 @@ def caption(
     prompt_template: str = PROMPT,
     tracer=None,
     image_key: str | None = None,
+    toolbox=None,
+    max_turns: int = MAX_TURNS,
 ) -> tuple[dict, dict]:
     """Caption one Chip. Returns the Caption (minus `case_id`) and a summary of the call.
 
     `prompt_template` may use {grid}, {objects}, and {relations}. With a `tracer`, the call is
     recorded as a Step in the Run's Trace: the full prompt and response, the image by key and
-    hash, timing, tokens, and retries.
+    hash, timing, tokens, and retries. With a `toolbox` that has tools, the model may call them
+    first (see the module docstring).
     """
     from clayzer.trace import image_ref
 
     prompt = prompt_template.format(
         grid=", ".join(GRID), objects=", ".join(OBJECTS), relations=", ".join(RELATIONS)
     )
+    if toolbox is not None and toolbox.specs:
+        ref = image_ref(image_key or f"chips/{chip_id}.png", png)
+        return _with_tools(client, model, chip_id, png, prompt, tracer, ref, toolbox, max_turns)
     request = {
         "modelId": model,
         "messages": [
@@ -151,6 +170,92 @@ def caption(
     if submitted is None:
         raise HarnessFault(f"{model} returned no submit_caption call for {chip_id}", step)
     return _clean(submitted), step
+
+
+def _with_tools(client, model, chip_id, png, prompt, tracer, image, toolbox, max_turns):
+    """The tool-use loop. The model chooses when to call tools (toolChoice auto: Opus 5.5
+    rejects a forced choice), and the Run ends at its `submit_caption` call."""
+    specs = [CAPTION_TOOL] + [
+        {"toolSpec": {"name": t.name, "description": t.description or t.name,
+                      "inputSchema": {"json": t.input_schema}}}
+        for t in toolbox.specs
+    ]  # fmt: skip
+    names = [t["toolSpec"]["name"] for t in specs]
+    messages = [{"role": "user", "content": [
+        {"image": {"format": "png", "source": {"bytes": png}}},
+        {"text": prompt + TOOLS_NOTE},
+    ]}]  # fmt: skip
+    usage = {"inputTokens": 0, "outputTokens": 0, "totalTokens": 0}
+    calls, started = 0, time.monotonic()
+
+    def summary(turn: int, stop_reason, ok: bool, exhausted: bool = False) -> dict:
+        step = {
+            "step": "caption", "chip_id": chip_id, "model": model,
+            "seconds": round(time.monotonic() - started, 2), "usage": dict(usage),
+            "stop_reason": stop_reason, "ok": ok, "turns": turn, "tool_calls": calls,
+        }  # fmt: skip
+        if tracer is not None:
+            tracer.run.tools = names
+            tracer.run.metadata["turn_budget"] = {"max_turns": max_turns, "turns": turn,
+                                                  "exhausted": exhausted}  # fmt: skip
+        return step
+
+    for turn in range(1, max_turns + 1):
+        request = {
+            "modelId": model,
+            "messages": messages,
+            "toolConfig": {"tools": specs, "toolChoice": {"auto": {}}},
+            "inferenceConfig": {"maxTokens": 1500},
+        }
+        if tracer is None:
+            resp = client.converse(**request)
+        else:
+            # The first turn records the prompt and image; later turns add only tool results,
+            # which are already in the Trace as tool Steps.
+            recorded = {"turn": turn, "tools": names, "tool_choice": "auto", "max_tokens": 1500}
+            if turn == 1:
+                recorded |= {"prompt": prompt + TOOLS_NOTE, "image": image}
+            resp = tracer.converse(client, "llm", "caption", request, recorded,
+                                   {"expects_tool": "submit_caption", "turn": turn})  # fmt: skip
+        for k in usage:
+            usage[k] += resp.get("usage", {}).get(k, 0) or 0
+        blocks = resp["output"]["message"]["content"]
+        uses = [b["toolUse"] for b in blocks if "toolUse" in b]
+        submitted = next((u["input"] for u in uses if u["name"] == "submit_caption"), None)
+        if submitted is not None:
+            return _clean(submitted), summary(turn, resp.get("stopReason"), True)
+        if not uses:
+            step = summary(turn, resp.get("stopReason"), False)
+            raise HarnessFault(
+                f"{model} stopped without calling submit_caption for {chip_id}", step
+            )
+
+        messages.append({"role": "assistant", "content": blocks})
+        results = []
+        for use in uses:
+            t0 = time.time()
+            r = toolbox.call(use["name"], use.get("input") or {})
+            calls += 1
+            if tracer is not None:
+                tracer.tool(use["name"], use.get("input") or {}, t0, time.time(), r.text,
+                            r.text[:1000] if r.is_error else None, {
+                                "tool_use_id": use["toolUseId"],
+                                "server": toolbox.server_for(use["name"]),
+                                "is_error": r.is_error, "error_code": r.error_code,
+                                "truncated": len(r.text) > MAX_TOOL_TEXT,
+                            })  # fmt: skip
+            results.append({"toolResult": {
+                "toolUseId": use["toolUseId"],
+                "content": [{"text": r.text[:MAX_TOOL_TEXT] or "(no output)"}],
+                "status": "error" if r.is_error else "success",
+            }})  # fmt: skip
+        messages.append({"role": "user", "content": results})
+
+    step = summary(max_turns, "turn_budget", False, exhausted=True)
+    raise HarnessFault(
+        f"{model} used its {max_turns}-turn budget without calling submit_caption for {chip_id}",
+        step,
+    )
 
 
 def _clean(c: dict) -> dict:
