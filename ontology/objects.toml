@@ -254,3 +254,18 @@ confusers = ["parking_lot", "field"]
 min_visible_m = 20
 rsicd_scenes = ["bareland", "desert"]
 land_cover = { nlcd = ["31 Barren Land"], worldcover = ["Bare / sparse vegetation"] }
+
+# Candidate raised 2026-11-04 for ontology-review: 13 of the 19 stored Captions of
+# fixed-dev-neg-1 call it a construction site or an excavation (no other Case's ever do), and
+# labelling has no class for it. Open questions: is it land use (here, beside field) or a built structure; can a Chip
+# show it reliably; which Answer Key could score it (OSM landuse=construction is one, so the
+# Harness must never read it, ADR-0006); and is it worth a class at all for Clay's captions.
+[[class]]
+id = "construction_site"
+name = "Construction site"
+parent = "land_cover"
+claimable = false
+osm_reference = [{ landuse = "construction" }]
+synonyms = ["building site", "excavation", "earthworks", "foundation"]
+confusers = ["bare_ground", "parking_lot", "storage_tank"]
+min_visible_m = 30

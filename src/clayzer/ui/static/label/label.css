@@ -1,0 +1,57 @@
+/* The /label page: the site's palette (../style.css), a working layout for labelling. */
+.lab { max-width: 1180px; margin: 0 auto; padding: 18px 28px 60px; }
+.lab-head { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap;
+  border-bottom: 1px solid var(--line); padding-bottom: 10px; }
+.lab-head h1 { margin: 0; }
+.lab-head a { text-decoration: none; }
+.lab-head progress { flex: 1; min-width: 160px; height: 8px; accent-color: var(--decision); }
+.lab .how { color: var(--muted); font-size: 14px; max-width: 900px; }
+.lab .warn { padding: 8px 12px; border-radius: 8px; background: var(--delivery);
+  border: 1px solid var(--delivery-line); }
+.lab-body { display: grid; grid-template-columns: 120px 1fr; gap: 24px; margin-top: 10px; }
+
+.items ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.items button { width: 100%; text-align: left; font: inherit; font-size: 13px; padding: 4px 8px;
+  border: 1px solid var(--line); border-radius: 6px; background: var(--paper); cursor: pointer; }
+.items button.cur { border-color: var(--decision); font-weight: 700; }
+
+.item .meta { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; color: var(--muted); }
+.caption { margin: 8px 0 18px; padding: 16px 20px; border-left: 4px solid var(--captions-line);
+  background: var(--captions); border-radius: 0 10px 10px 0; font-size: 18px; line-height: 1.55; }
+.item h2 { font-size: 16px; margin: 20px 0 8px; }
+.item h2 small { font-weight: 400; color: var(--muted); margin-left: 6px; }
+
+.row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 10px 12px;
+  border: 1px solid var(--line); border-radius: 10px; margin-bottom: 8px; background: #fff; }
+.row label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+.row select, .row input[type="text"], .row input[type="number"] { font: inherit; font-size: 14px;
+  padding: 5px 8px; border: 1px solid var(--data-line); border-radius: 6px; background: #fff; }
+.row.obj .cls select { min-width: 280px; max-width: 420px; }
+.row .cnt input[type="number"] { width: 72px; }
+.row .cnt span { display: flex; align-items: center; gap: 4px; }
+.oid { font-weight: 700; }
+.rm { margin-left: auto; border: none; background: none; font-size: 16px; cursor: pointer;
+  color: var(--muted); }
+.rm:hover { color: var(--hidden); }
+.row.unc input { flex: 1; }
+
+.pos { display: flex; align-items: center; gap: 10px; }
+.lab-cells { display: grid; grid-template-columns: repeat(3, 22px); gap: 3px; }
+.lab-cells button { width: 22px; height: 22px; padding: 0; border: 1px solid var(--data-line);
+  border-radius: 3px; background: var(--data); cursor: pointer; }
+.lab-cells button.on { background: var(--decision); border-color: var(--decision); }
+.pos .ns { font: inherit; font-size: 12px; padding: 3px 8px; border: 1px solid var(--data-line);
+  border-radius: 999px; background: #fff; cursor: pointer; }
+.pos .ns.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.pos small { color: var(--muted); min-width: 110px; }
+.pos small.unset, .cnt .unset { color: var(--hidden); font-weight: 600; }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--decision);
+  outline-offset: 2px; }
+
+.actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 22px; }
+.issues { color: var(--hidden); font-size: 14px; }
+.msg { min-height: 1.5em; color: var(--ok); }
+@media (max-width: 760px) { .lab-body { grid-template-columns: 1fr; } }
+.notice { margin: -6px 0 16px; padding: 10px 14px; border-radius: 8px; font-size: 14px; }
+.notice.proposed { background: var(--delivery); border: 1px solid var(--delivery-line); }
+.notice.blind { background: var(--evaluation); border: 1px solid var(--evaluation-line); }
