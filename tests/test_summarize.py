@@ -166,3 +166,28 @@ def test_the_digest_hides_the_judges_verdict(env):  # noqa: F811
     info_, steps = loads(env[0].get(trace_key(b["config"].batch_id, SOLAR["id"], 1)))
     text = digest(info_, steps)
     assert "submit_verdict" not in text and "its verdict isn't shown" in text
+
+
+def test_an_agentic_run_describes_its_tool_calls_and_counts_the_final_caption():
+    call = {"content": [{"toolUse": {"name": "search_datasets", "input": {"q": "naip"}}}]}
+    steps = [
+        step(0, "llm", "caption", call),
+        Step(
+            "c#1",
+            1,
+            "tool",
+            "search_datasets",
+            0,
+            1,
+            {"q": "naip"},
+            "3 datasets",
+            None,
+            {"latency_ms": 400.0},
+        ),
+        step(2, "llm", "caption", CAP, expects_tool="submit_caption"),
+    ]
+    s = finished(info(), steps)
+    assert s["verdict"] == "Captioned in 6.4 s: 2 Claims, 1 left uncertain."
+    assert "it called search_datasets" in s["did"][0]
+    assert s["did"][1].startswith("Called the tool search_datasets")
+    assert s["stats"]["tool_calls"] == 1

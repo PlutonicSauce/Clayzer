@@ -36,12 +36,21 @@ def _model(step: Step) -> str:
     return (step.attributes.get("model_id") or "the model").removeprefix("us.")
 
 
-def _submitted(step: Step) -> dict | None:
-    """The tool input a model step submitted (the Caption or the verdict), if any."""
+SUBMIT = {"caption": "submit_caption", "fidelity": "submit_verdict"}
+
+
+def _tool_calls(step: Step) -> list[dict]:
     out = step.output if isinstance(step.output, dict) else {}
-    for block in out.get("content", []):
-        if "toolUse" in block:
-            return block["toolUse"].get("input") or {}
+    return [b["toolUse"] for b in out.get("content", []) if "toolUse" in b]
+
+
+def _submitted(step: Step) -> dict | None:
+    """What a model step submitted through its final tool (submit_caption or submit_verdict).
+    Calls to other tools, such as MCP tools in an agentic Run, aren't submissions."""
+    want = SUBMIT.get(step.name)
+    for call in _tool_calls(step):
+        if call.get("name") == want:
+            return call.get("input") or {}
     return None
 
 
@@ -57,6 +66,9 @@ def _describe(step: Step) -> str:
         if step.error:
             return f"Asked {_model(step)} to caption {image}: the call failed{took}"
         cap = _submitted(step)
+        others = [c.get("name") for c in _tool_calls(step) if c.get("name") != SUBMIT["caption"]]
+        if cap is None and others:
+            return f"Asked {_model(step)} about {image}: it called {', '.join(others)}{took}"
         if cap is None:
             return f"Asked {_model(step)} to caption {image}: it answered without submitting a Caption{took}"
         n, unsure = len(cap.get("objects", [])), len(cap.get("uncertain", []))
@@ -102,7 +114,9 @@ def _struggles(info: RunInfo, steps: list[Step]) -> list[str]:
 def _verdict(info: RunInfo, harness: list[Step]) -> str:
     took = sum(s.attributes.get("latency_ms") or 0 for s in harness)
     if info.status == "ok":
-        cap = next((_submitted(s) for s in harness if s.name == "caption" and _submitted(s)), None)
+        # The last turn that submitted a Caption is the Run's answer.
+        cap = next((_submitted(s) for s in reversed(harness)
+                    if s.name == "caption" and _submitted(s) is not None), None)  # fmt: skip
         if cap is not None:
             n, unsure = len(cap.get("objects", [])), len(cap.get("uncertain", []))
             extra = f", {unsure} left uncertain" if unsure else ""

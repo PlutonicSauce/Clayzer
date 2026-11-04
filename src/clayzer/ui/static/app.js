@@ -63,9 +63,9 @@ const FLOW = [
   },
   {
     key: "harness", phase: "run", title: "Harness", sub: "an agent with geospatial tools", area: "Captioning",
-    what: `The ${term("Harness")} is the system under test: the model, its prompt, and its tools. Today it is one Nova Pro call that sees only the Chip and returns a Caption with ${term("Claim", "Claims")} on the 3×3 grid. The goal is an agent that calls geospatial tools over MCP before it writes: LGND Geo's imagery check and classifiers, STAC catalogs, RODA. Only tools on the ADR-0006 list are allowed.`,
+    what: `The ${term("Harness")} is the system under test: the model, its prompt, and its tools. It sees only the Chip and returns a Caption with ${term("Claim", "Claims")} on the 3×3 grid. By default it's one Nova Pro call; with \`--tools\` it's an agent in a plain tool-use loop that can call geospatial tools over MCP before it writes (RODA today; LGND Geo's imagery check and classifiers next), within an 8-turn budget. Only tools on the ADR-0006 list are allowed.`,
     why: "The briefs' first success criterion is a Harness that performs the task by calling geospatial tools via MCP, and tool calls are what give the Workflow Score something to judge. The model sits behind an abstraction so it can be swapped (Nova Pro, Opus 5.5, an open VLM on a GPU).",
-    code: ["src/clayzer/harness.py", "caption-plan.md §1.3 (verify, then write)", "caption-plan.md §3 (allowed and forbidden MCP servers)"],
+    code: ["src/clayzer/harness.py", "src/clayzer/tools.py (MCP servers behind a Toolbox)", "uv run clayzer batch --tools roda", "caption-plan.md §3 (allowed and forbidden MCP servers)"],
   },
   {
     key: "capture", phase: "observe", title: "Capture", sub: "record every Step in a Trace", area: "Platform",
