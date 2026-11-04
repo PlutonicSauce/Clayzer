@@ -1,0 +1,41 @@
+# Which verifier checks each object class's Claims in verify-then-write: a memory of what works.
+#
+# LGND found that the right tool depends on the concept (Clay beats FarSLIP on linear features,
+# FarSLIP wins on compact facilities), so they keep a record of which to use for which. This is
+# Clayzer's: one route per class, with the evidence it was chosen on. verify.py reads it.
+#
+#   default        the method for a class with no route
+#   [classifier]   an LGND classifier built from these text examples (NAIP), one label per
+#                  claimable class. Its name in LGND is "clayzer-objects-" plus a hash of the
+#                  examples, so every teammate's account builds the same one on first use, and
+#                  changing an example builds a new one. Give 5 or more per label: LGND then
+#                  trains a linear SVM per label instead of averaging. Phrases describe what an
+#                  aerial photo shows, as common nouns (LGND's advice for `text`).
+#   [[route]]      class, method, and why. Methods:
+#                    imagery_check  LGND's image model looks at the cell (reasoning_imagery_check)
+#                    classifier     the cell's NAIP image takes the class's label (toolbox_classifier_apply)
+#                    none           not checked: the Claim stays, marked skipped
+#                  `clayzer verifier calibrate --write` rewrites the routes from development
+#                  Cases: kept = true Claims kept, removed = false Claims removed.
+#
+# The verifier reads imagery only, never an Answer Key (ADR-0006); calibration reads the
+# development region's Answer Keys to choose a route, never the test region's (CAP-16).
+
+version = "0.1"
+default = "imagery_check"
+
+[classifier]
+index = "naip"
+
+[classifier.examples]
+solar_array = ["solar farm", "solar panels", "rows of solar panels", "photovoltaic array", "solar park"]
+wind_turbine = ["wind turbine", "wind farm", "wind turbine pad", "wind turbine with gravel pad", "wind turbines on a ridge"]
+road = ["road", "paved road", "highway", "dirt road", "street"]
+railroad = ["railroad", "railway tracks", "train tracks", "rail line", "rail yard"]
+parking_lot = ["parking lot", "car park", "parked cars", "paved parking area", "large parking lot"]
+building = ["building", "houses", "rooftops", "warehouse", "barn"]
+greenhouse = ["greenhouse", "greenhouses", "white plastic greenhouses", "glasshouse", "polytunnels"]
+water = ["water", "pond", "reservoir", "lake", "canal"]
+field = ["farm field", "cropland", "irrigated field", "plowed field", "pasture"]
+vegetation = ["trees", "woodland", "shrubs", "scrub", "grassland"]
+bare_ground = ["bare ground", "bare soil", "dirt", "sand", "barren desert"]

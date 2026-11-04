@@ -61,7 +61,12 @@ def _describe(step: Step) -> str:
         args = ", ".join(f"{k}={json.dumps(v)[:40]}" for k, v in (step.input or {}).items())
         result = "failed" if step.error else "returned"
         return f"Called the tool {step.name}({args}): {result}{took}"
-    image = (step.input or {}).get("image", {}).get("key", "the Chip")
+    image = (step.input or {}).get("image") or {}
+    # A Change Case's Step records its Chip Pair as a list, earlier first.
+    if isinstance(image, list):
+        image = "the Chip Pair " + " → ".join(i.get("key", "?") for i in image)
+    else:
+        image = image.get("key", "the Chip")
     if step.name == "caption":
         if step.error:
             return f"Asked {_model(step)} to caption {image}: the call failed{took}"

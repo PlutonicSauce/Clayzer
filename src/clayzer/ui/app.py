@@ -95,7 +95,9 @@ class Launch(BaseModel):
     only: list[str] | None = None
 
 
-def create_app(settings: Settings, region: str = "dev", allow_launch: bool = False) -> FastAPI:
+def create_app(
+    settings: Settings, region: str = "dev", allow_launch: bool = False, calibrate: bool = False
+) -> FastAPI:
     store = settings.store()
     app = FastAPI(title="Clayzer", docs_url=None, redoc_url=None)
     jobs: dict[str, dict] = {}
@@ -153,6 +155,7 @@ def create_app(settings: Settings, region: str = "dev", allow_launch: bool = Fal
             "store": store.url("").rstrip("/"),
             "region": region,
             "allow_launch": allow_launch,
+            "calibrate": calibrate,
             "caption_model": settings.caption_model,
             "judge_model": settings.judge_model,
             "embed_model": settings.embed_model,
@@ -188,7 +191,7 @@ def create_app(settings: Settings, region: str = "dev", allow_launch: bool = Fal
             ]  # fmt: skip
             right = sum(c["verdict"] == "matched" and c["position_score"] == 1.0 for c in claims)
             out.append({
-                "case_id": case_id, "run_id": r["run_id"], "chip": case["chips"][0],
+                "case_id": case_id, "run_id": r["run_id"], "chip": case["chips"][-1],
                 "text": cap["text"], "claims": claims,
                 "labels": [{"object": lb["object"], "cells": lb["cells"]} for lb in case["reference_labels"]],
                 "missed": g.get("missed", []), "unscored": g.get("unscored", []),
@@ -302,7 +305,9 @@ def create_app(settings: Settings, region: str = "dev", allow_launch: bool = Fal
             {
                 "id": c["id"],
                 "kind": c.get("kind", "fixed"),
-                "chip": c["chips"][0],
+                # A Change Case's labels sit on its later Chip; `chips` keeps the pair.
+                "chip": c["chips"][-1],
+                "chips": c["chips"],
                 "labels": c["reference_labels"],
                 "prep_seconds": c.get("prep_seconds"),
             }
@@ -387,6 +392,16 @@ def create_app(settings: Settings, region: str = "dev", allow_launch: bool = Fal
                 "chip_uri": chip["uri"],
                 "chip_store_url": store.url(chip["uri"]),
                 "chip_sha256": chip_shas.get(chip["uri"]),
+                # Every Chip the Run was given: one, or a Change Case's pair, earlier first.
+                "chips": [
+                    {
+                        "uri": c["uri"],
+                        "date": c.get("date"),
+                        "store_url": store.url(c["uri"]),
+                        "sha256": chip_shas.get(c["uri"]),
+                    }
+                    for c in case["chips"]
+                ],
             },
             "files": provenance.run_files(store, bid, case_id, repeat),
         }
@@ -509,12 +524,20 @@ def create_app(settings: Settings, region: str = "dev", allow_launch: bool = Fal
     def deck():
         return FileResponse(STATIC / "deck" / "index.html")
 
+    from clayzer.ui.labels import router as label_router
+
+    app.include_router(label_router(calibrate, STATIC))
+
     return app
 
 
-def serve(settings: Settings, region: str, allow_launch: bool, host: str, port: int) -> None:
+def serve(
+    settings: Settings, region: str, allow_launch: bool, host: str, port: int,
+    calibrate: bool = False,
+) -> None:  # fmt: skip
     import uvicorn
 
     uvicorn.run(
-        create_app(settings, region, allow_launch), host=host, port=port, log_level="warning"
-    )
+        create_app(settings, region, allow_launch, calibrate), host=host, port=port,
+        log_level="warning",
+    )  # fmt: skip

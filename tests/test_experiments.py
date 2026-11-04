@@ -170,3 +170,38 @@ def test_candidate_prompt_runs_through_the_whole_loop(env):  # noqa: F811
     record = json.loads(store.get(key + ".json"))
     assert record["decision"] == "kept"
     assert record["baseline"]["prompt_sha"] != record["candidate"]["prompt_sha"]
+
+
+def test_legacy_baseline_without_workflow_rows_is_inconclusive(env):  # noqa: F811
+    from clayzer.gate import gate
+
+    _, settings, _ = setup(env)
+    path = settings.baselines_dir / "default" / "results.jsonl"
+    rows = [json.loads(line) for line in path.read_text().splitlines()]
+    for row in rows:
+        row.pop("workflow")
+    path.write_text("".join(json.dumps(row) + "\n" for row in rows))
+    result = gate(load_baseline(settings.baselines_dir), run(env, "candidate"))
+    assert result.exit_code == 2
+    assert any("Baseline has incomplete metric samples" in reason for reason in result.reasons)
+
+
+def test_missing_workflow_in_a_full_batch_remains_an_input_error(env):  # noqa: F811
+    from clayzer.gate import gate
+
+    _, settings, _ = setup(env)
+    candidate = run(env, "candidate")
+    for row in candidate["results"]:
+        row.pop("workflow")
+    with pytest.raises(ValueError, match="summary disagrees"):
+        gate(load_baseline(settings.baselines_dir), candidate)
+
+
+@pytest.mark.parametrize("setting", ["change_prompt_sha", "verifiers_sha"])
+def test_experiments_record_new_captioner_settings_from_main(env, setting):  # noqa: F811
+    store, settings, _ = setup(env)
+    candidate = run(env, "candidate")
+    candidate["config"] = replace(candidate["config"], **{setting: "new"})
+    _, key = record_experiment(candidate, store, settings.baselines_dir, "One captioner setting")
+    record = json.loads(store.get(key + ".json"))
+    assert any(s["setting"] == setting for s in record["comparison"]["settings"])

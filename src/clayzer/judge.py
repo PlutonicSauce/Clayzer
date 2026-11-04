@@ -24,6 +24,14 @@ or vague; 0.25 mostly inaccurate; 0.0 wrong or unrelated.
 List each concrete error or important omission. Submit with the submit_verdict tool.
 """
 
+# A Change Case: the caption describes what changed between two images of one place.
+CHANGE_NOTE = """\
+There are two images of the same place: the first is the earlier date, the second the later.
+The caption describes what changed between them; each structured claim says whether its object
+appeared, disappeared, or was unchanged. Judge the account of the change, as well as each image.
+
+"""
+
 VERDICT_TOOL = {
     "toolSpec": {
         "name": "submit_verdict",
@@ -47,19 +55,19 @@ def fidelity(
 ) -> tuple[dict, dict]:
     """Judge one Caption. With a `tracer`, the call is recorded as a `judge` Step (scoring,
     not Harness activity)."""
+    from clayzer.harness import _image_blocks, _image_refs
     from clayzer.trace import image_ref
 
     claims = json.dumps({"objects": caption["objects"], "relations": caption["relations"]})
     prompt = PROMPT.format(text=caption["text"], claims=claims)
+    if isinstance(png, list):  # a Chip Pair
+        prompt = CHANGE_NOTE + prompt
     request = {
         "modelId": model,
         "messages": [
             {
                 "role": "user",
-                "content": [
-                    {"image": {"format": "png", "source": {"bytes": png}}},
-                    {"text": prompt},
-                ],
+                "content": [*_image_blocks(png), {"text": prompt}],
             }
         ],
         "toolConfig": {"tools": [VERDICT_TOOL]},
@@ -71,7 +79,9 @@ def fidelity(
     else:
         recorded = {
             "prompt": prompt,
-            "image": image_ref(image_key or "chip", png),
+            "image": _image_refs(png, image_key, "chip")
+            if isinstance(png, list)
+            else image_ref(image_key or "chip", png),
             "tools": ["submit_verdict"],
             "max_tokens": 1000,
         }

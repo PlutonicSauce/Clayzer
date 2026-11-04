@@ -28,6 +28,7 @@ DOCS = [
     ("docs/cli.md", "CLI and configuration reference"),
     ("docs/regression-gate.md", "Regression gate: prompt experiments"),
     ("docs/regression-gate-audit.md", "Regression gate: tests and limitations"),
+    ("labels/extraction/README.md", "Labelling Claims from free text"),
     ("docs/tech-hackathon.md", "Brief: technical"),
     ("docs/vision-hackathon.md", "Brief: vision"),
 ]

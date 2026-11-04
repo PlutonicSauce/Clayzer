@@ -1,5 +1,7 @@
 # Clayzer
 
+[![CI](https://github.com/PlutonicSauce/Clayzer/actions/workflows/ci.yml/badge.svg)](https://github.com/PlutonicSauce/Clayzer/actions/workflows/ci.yml)
+
 Caption generation and evaluation for the text-native Clay v2 model, built for the Clay Earth
 Dataset Foundry hackathon.
 
@@ -127,13 +129,20 @@ tests/              offline tests: no AWS needed
 
 1. Pick a task, put your name in its `owner` field in [docs/tasks.toml](docs/tasks.toml), and work
    on a branch for that task.
-2. Before opening a PR, run the lint, format, and test checks:
+2. Before opening a PR, run the checks CI ([.github/workflows/ci.yml](.github/workflows/ci.yml))
+   runs on every PR and every push to main:
 
    ```sh
    uv run ruff check src tests
    uv run ruff format --check src tests
-   uv run pytest
+   uv run vulture
+   uv run --extra ui --extra tools pytest --cov
+   node tests/deck_smoke.mjs
+   npx --yes jscpd@5.4.2 src --min-tokens 50 --threshold 3 --ignore "**/vendor/**"
    ```
+
+   Ruff also caps function complexity at 15. Vulture flags dead code, coverage must stay at or
+   above 75%, and duplicated code must stay under 3%.
 
 3. In the PR, update the task's `status`. Done tasks also get `see_it` and `changes`.
 

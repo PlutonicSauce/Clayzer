@@ -1,0 +1,132 @@
+name: CI
+
+on:
+  # Branches get their checks from their PR, so a PR branch doesn't run CI twice.
+  push:
+    branches: [main]
+  pull_request:
+  # Deploy a branch by hand: Actions > CI > Run workflow.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  # Never cancel a run on main: it may be mid-deploy.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+# Only the deploy job gets AWS credentials: the tests use a fake Bedrock and local MCP servers.
+# uv.lock is gitignored (a laptop one records a private index), so uv resolves from public PyPI.
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          python-version: "3.12"
+      - name: Ruff check (style, bugbear, complexity)
+        run: uv run ruff check src tests
+      - name: Ruff format
+        run: uv run ruff format --check src tests
+      - name: Dead code
+        run: uv run vulture
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          python-version: "3.12"
+      - name: Pytest with coverage
+        run: uv run --extra ui --extra tools pytest --cov --cov-report=term
+      - name: Coverage summary
+        if: always()
+        run: uv run coverage report --format=markdown >> "$GITHUB_STEP_SUMMARY"
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - name: Deck smoke test
+        run: node tests/deck_smoke.mjs
+      - name: Duplication (Python and JS)
+        run: npx --yes jscpd@5.4.2 src --min-tokens 50 --threshold 3 --ignore "**/vendor/**" --reporters consoleFull
+
+  infra:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - name: OIDC trust policy regression tests
+        run: uv run --group infra pytest infra/tests -q
+      - name: CDK synth (no account needed)
+        working-directory: infra
+        run: |
+          npx --yes aws-cdk@2 synth -q -c store=s3://example-bucket/caption -c cloudfront_prefix_list=pl-00000000
+          npx --yes aws-cdk@2 --app "uv run --group infra python github_oidc.py" synth -q
+
+  # Pushes to main and manual runs deploy into the account behind the `aws` environment.
+  # Set up once: deploy infra/github_oidc.py, then give the environment the AWS_DEPLOY_ROLE_ARN
+  # secret and the AWS_REGION and CLAYZER_STORE variables (docs/deploy.md, "What's left").
+  deploy:
+    needs: [lint, test, frontend, infra]
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    # The task image is ARM64, so build it on an ARM runner instead of under emulation.
+    runs-on: ubuntu-24.04-arm
+    environment:
+      name: aws
+      url: ${{ steps.deploy.outputs.url }}
+    concurrency:
+      group: deploy-aws
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          # The repo is public, and so are its logs.
+          mask-aws-account-id: true
+      - name: CDK deploy
+        id: deploy
+        working-directory: infra
+        env:
+          CDK_DEFAULT_REGION: ${{ vars.AWS_REGION }}
+          CLAYZER_STORE: ${{ vars.CLAYZER_STORE }}
+        # Without a store the stack would create a new bucket instead of reading the live one.
+        run: |
+          if [ -z "$CLAYZER_STORE" ]; then
+            echo "::error::Set the aws environment's CLAYZER_STORE variable (s3://<bucket>/<prefix>)"
+            exit 1
+          fi
+          npx --yes aws-cdk@2 deploy Clayzer --require-approval never \
+            -c store="$CLAYZER_STORE" --outputs-file outputs.json
+          echo "url=$(jq -r '.Clayzer.Url' outputs.json)" >> "$GITHUB_OUTPUT"
+      - name: Smoke test the live URL
+        run: |
+          for _ in $(seq 1 12); do
+            curl -fsS "${{ steps.deploy.outputs.url }}/api/config" > /dev/null && exit 0
+            sleep 10
+          done
+          echo "::error::${{ steps.deploy.outputs.url }}/api/config did not answer after 2 minutes"
+          exit 1

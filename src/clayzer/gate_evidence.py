@@ -105,16 +105,7 @@ def check_stats(saved, values, label):
     )
 
 
-def validate_rows(batch):
-    """Check identities, counts and scores if raw results are available.
-
-    Light web views contain summaries only. Full CLI Batches and accepted Baselines also have
-    result rows, so they can be checked for stale summaries and partial metric samples.
-    Returns sample counts per Case and metric. Does not re-judge captions or re-read imagery.
-    """
-    if "results" not in batch or batch["summary"] is None:
-        return {}
-    cfg, summary, rows = batch["config"], batch["summary"], batch["results"]
+def _rows_by_case(rows, cfg):
     by_case = {cid: [] for cid in cfg.case_ids}
     seen = set()
     for row in rows:
@@ -135,6 +126,38 @@ def validate_rows(batch):
                 raise ValueError(f"invalid {section} score object in Run results")
         seen.add((cid, repeat))
         by_case[cid].append(row)
+    return by_case
+
+
+def _metric_samples(saved, scored, label, *, legacy_scores_only=False):
+    counts = {}
+    for metric, (section, key) in METRIC_PATHS.items():
+        values = [(r.get(section) or {}).get(key) for r in scored]
+        # Earlier Baseline exports stripped the Workflow Score from every result row.
+        # Preserve the recorded summary for display, but zero samples make the gate
+        # inconclusive. An explicit null in a current row must still be validated.
+        stripped_workflow = (
+            legacy_scores_only
+            and metric == "workflow"
+            and all(section not in row for row in scored)
+        )
+        if not stripped_workflow:
+            check_stats(saved.get(metric), values, label + " " + metric)
+        counts[metric] = sum(v is not None for v in values)
+    return counts
+
+
+def validate_rows(batch):
+    """Check identities, counts and scores if raw results are available.
+
+    Light web views contain summaries only. Full CLI Batches and accepted Baselines also have
+    result rows, so they can be checked for stale summaries and partial metric samples.
+    Returns sample counts per Case and metric. Does not re-judge captions or re-read imagery.
+    """
+    if "results" not in batch or batch["summary"] is None:
+        return {}
+    cfg, summary, rows = batch["config"], batch["summary"], batch["results"]
+    by_case = _rows_by_case(rows, cfg)
     if set(summary["cases"]) != set(by_case):
         raise ValueError("summary Case ids differ from configuration/results")
     for status, field in (
@@ -153,11 +176,9 @@ def validate_rows(batch):
             (SANDBOX_FAILURE, "sandbox_failures"),
         ):
             _equal(saved[field], sum(r["status"] == status for r in case_rows), cid + " " + field)
-        counts[cid] = {}
-        for metric, (section, key) in METRIC_PATHS.items():
-            values = [(r.get(section) or {}).get(key) for r in scored]
-            check_stats(saved.get(metric), values, cid + " " + metric)
-            counts[cid][metric] = sum(v is not None for v in values)
+        counts[cid] = _metric_samples(
+            saved, scored, cid, legacy_scores_only=batch.get("baseline_scores_only", False)
+        )
     tokens = [r.get("caption_tokens") for r in rows if r["status"] != SANDBOX_FAILURE]
     for value in tokens:
         number(value, "Run tokens")

@@ -24,8 +24,10 @@ Use development Cases only. Freeze the same Cases, Chips, Judge, rubric, embeddi
 ontology, scorer, and Repeats for both Batches. A prompt experiment changes only the prompt;
 leave the caption model, tool list, turn budget, and verifier unchanged.
 
-The committed Baseline predates some provenance fields and uses four Cases. After loading
-the current development fixtures, run a fresh control and accept it before testing changes:
+The committed Baseline now contains 63 development Cases. Its older score-only export omitted
+Workflow Scores from individual Run records, so the gate cannot verify those summary values
+and reports incomplete evidence. Re-accept it from the original complete Batch, or run a fresh
+control on the current fixtures and accept that before testing changes:
 
 ```sh
 uv run clayzer push --from fixtures/caption

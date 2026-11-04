@@ -47,8 +47,9 @@ uv run --extra ui --extra tools pytest \
 4. **Model accuracy is unverified here.** The fake Judge and captions check plumbing. These
    tests do not validate the real Judge, Reference Labels, imagery alignment, the proposed
    coverage prompt, or benefits to Clay v2 training. Classes with no Answer Key remain unscored.
-5. **Coverage is limited to the Cases evaluated.** The committed Baseline has four Cases and
-   predates essential provenance; it needs replacement. The current development fixtures have
+5. **Coverage is limited to the Cases evaluated.** The committed Baseline now has 63 Cases,
+   but its older export omitted per-Run Workflow Scores, preventing verification of those
+   means. Re-accept it from a complete source Batch. The current development fixtures have
    not been evaluated in this offline task. Held-out geographical Cases must remain separate
    from prompt tuning, with independently checked examples of omissions and hallucinations.
 6. **Files remain editable.** Consistency checks detect stale or mismatched artifacts, not
