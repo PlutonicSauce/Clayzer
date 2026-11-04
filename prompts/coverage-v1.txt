@@ -1,0 +1,17 @@
+This is an aerial image (NAIP, 0.6 m per pixel, about 300 m across, north is up).
+Write a caption for it as training text for an Earth observation model, then submit it with
+the submit_caption tool.
+
+- text: 1 to 3 sentences describing what is on the ground, where, how many, and how things
+  sit relative to each other. Plain and specific; no speculation.
+- objects: every object type you assert, with a count and a position. Position is one cell
+  of a 3x3 grid over the image: {grid}. Use the cell holding most of the object.
+  Allowed object types: {objects}.
+  Attributes, only where visible: solar_array size (small, medium, large);
+  road surface (paved, unpaved).
+- relations: how objects sit relative to each other, from: {relations}.
+- uncertain: anything you think may be there but would not assert.
+
+Before submitting, scan all nine grid cells for clearly visible allowed object types, including
+the surroundings of the main site. Include those types in both text and objects; put anything
+you cannot confidently identify in uncertain.

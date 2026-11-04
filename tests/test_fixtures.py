@@ -136,3 +136,15 @@ def test_the_texas_test_set_is_held_apart_from_development():
         assert -106.7 < w and e < -93.5 and 25.8 < s and n < 36.6, case["id"]  # Texas
     kinds = [case["id"].split("-")[2] for case in TEST_CASES]
     assert kinds.count("neg") >= 15 and kinds.count("uspvdb") + kinds.count("uswtdb") >= 35
+
+
+def test_a_correction_can_give_the_corrected_count():
+    from clayzer.cases import apply_corrections
+
+    labels = [{"object": "wind_turbine", "count": 17, "position": "north", "cells": ["north"],
+               "attributes": {}, "source": "uswtdb", "source_ids": []}]  # fmt: skip
+    fix = [{"case": "c", "object": "wind_turbine", "action": "add", "cells": ["south_east"],
+            "count": 18}]  # fmt: skip
+    once = apply_corrections("c", labels, fix)
+    assert once[0]["count"] == 18 and once[0]["cells"] == ["north", "south_east"]
+    assert once[0]["source"] == "uswtdb+manual" and apply_corrections("c", once, fix) == once

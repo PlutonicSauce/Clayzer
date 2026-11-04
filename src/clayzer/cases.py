@@ -40,12 +40,12 @@ def apply_corrections(case_id: str, labels: list[dict], corrections: list[dict])
             raise ValueError(f"bad label correction for {case_id}: {c}")
         lb = next((lb for lb in out if lb["object"] == c["object"]), None)
         if lb is None:
-            out.append({"object": c["object"], "count": None, "position": c["cells"][0],
+            out.append({"object": c["object"], "count": c.get("count"), "position": c["cells"][0],
                         "cells": [g for g in GRID if g in c["cells"]], "attributes": {},
                         "source": "manual", "source_ids": []})  # fmt: skip
         else:  # applying twice changes nothing
             lb["cells"] = [g for g in GRID if g in set(lb["cells"]) | set(c["cells"])]
-            lb["count"] = None
+            lb["count"] = c.get("count")
             if not lb["source"].endswith("manual"):
                 lb["source"] += "+manual"
     return out

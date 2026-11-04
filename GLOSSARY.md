@@ -63,6 +63,16 @@ One checkable statement inside a Caption, such as an object, its count, its posi
 relation to another object.
 _Avoid_: assertion, fact
 
+**Grid**:
+The 3×3 division of a Chip into nine equal cells, used to locate Claims and compare their
+positions with Reference Labels. With north up, the cells read left to right:
+north-west, north, north-east (top row); west, centre, east (middle row); south-west, south,
+south-east (bottom row). For example, "in the north-west" means the upper-left cell.
+A Claim names at most one cell: a Harness uses the cell holding most of the object; Claims
+extracted from text use the first cell named.
+_Avoid_: quadrant, sector, region; bounding box (the Grid gives a coarse position, not an
+object's exact outline)
+
 **Reference Label**:
 A known fact about a Chip, taken from an Answer Key, that a Caption is graded against.
 _Avoid_: label (ambiguous with Caption), ground truth, annotation

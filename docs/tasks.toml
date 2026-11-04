@@ -445,9 +445,16 @@ step = "case"
 title = "Check the ontology's NLCD and WorldCover crosswalks against the published legends"
 area = "Data and Cases"
 tier = "Could"
-status = "todo"
+status = "done"
 closes = []
 start = "ontology/objects.toml"
+notes = "Done 2026-11-04 against the MRLC NLCD legend and ESA WorldCover's v2.0 user manual. water was right. bare_ground had the wrong NLCD name: it's 31 Barren Land (Rock/Sand/Clay). vegetation was missing NLCD 51, 72 to 74 (Alaska only), 90 and 95 (wetlands), and WorldCover's Herbaceous wetland, Mangroves, and Moss and lichen. field is only partly covered by WorldCover's Cropland, which is annual crops only: WorldCover maps pasture as Grassland, orchards as Tree cover, and vineyards as Shrubland. Each partial match has a `note`. Before land cover is scored: most Mojave desert is NLCD 52 Shrub/Scrub, not 31 Barren Land, so NLCD would call vegetation what our Captions call bare ground."
+see_it = "ontology/objects.toml: the land_cover line and its note on water, field, vegetation, and bare_ground."
+changes = [
+  "ontology/objects.toml: bare_ground's NLCD name corrected, vegetation's missing classes added, and a note on each partial match",
+  "tests/test_ontology.py: every crosswalk name is a real NLCD or WorldCover class, and no legend class is listed under two Object Classes",
+  "docs/caption-design.md: §3.5 says the crosswalks were checked, and where they only partly match",
+]
 context = "The ontology maps land-cover classes to NLCD and WorldCover classes from general knowledge. Check them against the published legends before land cover is scored."
 done_when = [
   "Each crosswalk entry checked against the official legend",
@@ -461,32 +468,36 @@ refs = [
 [[task]]
 id = "dataset-corroboration"
 step = "case"
-title = "Corroborate and enrich Case Reference Labels with SkyScript and MegaEarth"
+title = "Corroborate the USGS labels with OSM's power mapping, and list OSM's candidate classes"
 area = "Data and Cases"
 tier = "Could"
-status = "todo"
+status = "done"
 closes = []
-start = "fixtures/caption/cases/caption-dev.jsonl; then the SkyScript repo and the MegaEarth dataset card"
+start = "uv run clayzer corroborate fixtures/caption/cases/*.jsonl fixtures/caption-lookalike/cases/*.jsonl"
 after = ["dev-cases"]
-context = "Our Reference Labels come from USGS and OSM, and nothing outside them checks those labels today. Two public datasets could. SkyScript (wangzhecheng/skyscript) pairs remote-sensing images, including a NAIP subset, with captions templated from OSM tags. MegaEarth (Mead0w1ark/megaearth-osm-sentinel2 on Hugging Face) pairs Sentinel-2 windows with OSM labels over 485 classes, split by geography. For each Case, find any image that overlaps its Chip and compare their labels with ours. Both label from OSM, so agreeing on an OSM class mostly shows the OSM snapshots match. The useful checks are USGS-labelled solar and wind (an outside source agreeing), and disagreement in either direction, which marks a Case to look at by eye. The second aim is enrichment: their labels can add objects our Answer Keys miss in a Chip, and their samples can suggest new Case locations for classes we have few of. An added label has to map to an ontology class (a missing class goes through ontology-review first), records which dataset it came from, and is checked by eye before it becomes a Reference Label. Sentinel-2 is 10 m against NAIP's 0.6 m, so only large objects compare. Neither dataset's captions are gold (caption-plan.md §3). Check each license first; download at run time, never commit."
+notes = "Done 2026-11-04 over all 134 fixed Cases (dev, Texas, look-alikes). Reshaped first: SkyScript and MegaEarth both label from OSM, our own Answer Key for everything but solar and wind, so they can't corroborate it; MegaEarth covers only 7 of our Cases at 2.56 km (its two solar windows agree with USPVDB), and SkyScript's overlap would cost 2.8 GB to find (both recorded in docs/sources.toml as unused). The independent check is OSM's own power mapping. Solar agrees on 45 of 58 Cases with solar; the 13 USGS-only Cases all show panels, so OSM just doesn't map those plants. No negative or look-alike has OSM solar or wind, so nothing suggests USGS missed a site. Wind agrees on 25 of 26: OSM and the Chip show an 18th turbine in uswtdb-3073564's south-east cell, now a hand correction with its count; OSM also has exactly one turbine on uswtdb-3036765 and uswtdb-3044325, settling dev-cases' open question. OSM maps none of the candidate classes in our Chips except 3 substations, so it can't key them either. The dev label change goes into the next dev Baseline (water-relabel)."
+see_it = "uv run clayzer corroborate fixtures/caption/cases/caption-dev.jsonl --json corroboration.json"
+changes = [
+  "src/clayzer/corroborate.py: OSM's power mapping and candidate classes per Chip, compared with the USGS labels; one Overpass query per 20 Chips, resumable",
+  "src/clayzer/cli.py: the corroborate command",
+  "src/clayzer/cases.py: a hand correction can give the corrected count",
+  "fixtures/caption/cases/label-corrections.toml: uswtdb-3073564's 18th turbine",
+  "fixtures/caption/cases/caption-dev.jsonl: the correction applied",
+  "docs/sources.toml: MegaEarth and SkyScript, checked and not used; corroborate under OSM",
+  "tests/test_corroborate.py: plants around the Chip, multipolygons, turbine counts, candidates, each disagreement, batching, and resuming",
+]
+context = "Our Reference Labels come from USGS (solar and wind) and OSM (everything else), and nothing outside them checked the labels. OSM's own power tags (power=plant and power=generator with a solar or wind source, the ontology's osm_reference, which the Answer Keys never use) are an independent record of the same sites. For each Case, compare them with the USGS labels, and send each disagreement to an eye check: USGS listed RE Gaskell West 5 and Samson Solar III years before their panels show in NAIP. The same query lists OSM's features of the ontology's candidate classes (substation, storage tank, well pad, construction site) as evidence for making one claimable, never as Reference Labels. OSM is read only to prepare Cases (ADR-0006)."
 done_when = [
-  "Each dataset's license and coverage checked and added to docs/sources.toml",
-  "A script that, for each development Case, finds overlapping SkyScript or MegaEarth samples and lists where their labels agree or disagree with our Reference Labels",
-  "Disagreements reviewed by eye; any wrong Reference Label fixed or the Case replaced",
-  "Labels they add that our Answer Keys miss mapped to ontology classes, checked by eye, and added to the Cases with their source recorded",
-  "Candidate Case locations from their samples listed for classes with few Cases",
-  "Nothing from either dataset in git",
+  "A command that compares every Case's USGS labels with OSM's power mapping and lists OSM's candidate classes",
+  "Every disagreement checked by eye; any wrong Reference Label fixed or the Case replaced",
+  "SkyScript and MegaEarth checked and recorded in docs/sources.toml",
 ]
 refs = [
-  "docs/caption-plan.md §3 (What scores what; SkyScript not gold)",
-  "docs/caption-design.md §1 (Auxiliary datasets row)",
-  "docs/tech-hackathon.md (datasets table)",
-  "docs/sources.toml",
+  "ontology/objects.toml (osm_reference)",
   "src/clayzer/answer_keys.py",
-  "ontology/objects.toml",
+  "fixtures/caption/cases/label-corrections.toml",
+  "docs/sources.toml (megaearth, skyscript)",
 ]
-
-# ── Captioning ──────────────────────────────────────────────────────────────────────────
 
 [[task]]
 id = "skeleton"
@@ -654,7 +665,8 @@ step = "gate"
 title = "Improve the caption prompt through the loop: one change per Batch, gated"
 area = "Captioning"
 tier = "Must"
-status = "todo"
+status = "doing"
+notes = "Local implementation ready: clayzer experiment records each labelled, single-change development Batch with a hypothesis, gate result and comparison as JSON and Markdown; --accept promotes only a passing, comparable candidate. Offline tests cover keep, reject and incomplete attempts. prompts/coverage-v1.txt is an untested candidate. Real development Batches, measured prompt improvement and accepted results still pending; see docs/regression-gate.md."
 closes = ["CAP-01", "CAP-06"]
 start = "uv run clayzer batch --prompt <file> --label <change>; clayzer gate"
 after = ["grounding-fix", "gate-rule"]
@@ -1415,10 +1427,10 @@ step = "ship"
 title = "CDK app for the stack, deployable into any teammate's account"
 area = "Platform"
 tier = "Should"
-status = "doing"
+status = "done"
 closes = ["AWS-07"]
 start = "infra/app.py"
-notes = "The hosting stack (roles, Fargate, load balancer, CloudFront; the bucket imported or created) is deployed in one participant account. Waiting on a teammate deploying it in theirs, and on a checked `cdk destroy`. The ADOT collector moved to xray (2026-11-04)."
+notes = "Deployed in two participant accounts. In the second (2026-11-04), `cdk destroy` removed everything but the retained bucket, a fresh deploy came back, and CI now deploys main into it. A redeploy after destroy creates a new bucket, so pass `-c store=` once a store holds data. The ADOT collector moved to xray (2026-11-04)."
 context = "One CDK app creates the whole stack in any teammate's account (AWS-07): the bucket, IAM roles, and the web app service; xray adds the ADOT collector to it. `cdk synth` works without an account, so it can be drafted early."
 done_when = [
   "`cdk deploy` succeeds in one account and a teammate deploys the same app in theirs",
@@ -1428,6 +1440,12 @@ done_when = [
 refs = [
   "docs/caption-design.md §2.2 (AWS-07)",
   "docs/caption-plan.md §7 (AWS service tasks)",
+]
+see_it = "docs/deploy.md: the manual deploy step by step; the stack's Url output is the hosted site."
+changes = [
+  "infra/app.py: credential-free synth (`-c cloudfront_prefix_list=`), ClusterName and ServiceName outputs, and a project=clayzer tag on every resource",
+  "infra/github_oidc.py: the role CI deploys with, trusting only this repo's `aws` environment",
+  "docs/deploy.md: the manual deploy, what each step becomes in CI, and what to watch",
 ]
 
 [[task]]
@@ -1731,7 +1749,7 @@ step = "ship"
 title = "GitHub Actions CI: lint, format, tests, and the deck smoke test on every push and PR"
 area = "Platform"
 tier = "Should"
-status = "doing"
+status = "done"
 start = ".github/workflows/ci.yml (new)"
 context = "Six people push to one public repo, and today nothing checks a PR before it merges. A GitHub Actions workflow runs on every push and pull request: `uv run ruff check src tests`, `uv run ruff format --check src tests`, `uv run pytest` with the `ui` and `tools` extras, and `node tests/deck_smoke.mjs`. The tests already run offline (fake Bedrock, local MCP servers), so CI needs no AWS credentials and gets none. uv.lock is gitignored because a local one records a private package index, so CI resolves from public PyPI; decide whether to commit a lock generated against public PyPI so CI and laptops install the same versions. Once the readiness check exists, run its leak scan here too."
 done_when = [
@@ -1745,6 +1763,13 @@ refs = [
   "tests/deck_smoke.mjs",
   "README.md",
   ".gitignore",
+]
+notes = "Pushes run CI only on main; branches get their checks from their PR. The deploy job runs on pushes to main and by hand, in the `aws` environment, which still needs a branch rule limiting it to main (repo admin). uv.lock stays uncommitted."
+see_it = "The CI badge at the top of the README, and Actions → CI: the five jobs on every push to main."
+changes = [
+  ".github/workflows/ci.yml: lint (ruff, bugbear, complexity, vulture), tests with 75% coverage, the deck smoke test and duplication, credential-free cdk synth and OIDC trust tests, and a deploy job over GitHub's OIDC with a check of the live URL",
+  ".nvmrc: Node 24 for CI and laptops",
+  "README.md: the CI badge and the checks to run before a PR",
 ]
 
 # ── Demo and delivery ───────────────────────────────────────────────────────────────────
@@ -1986,9 +2011,19 @@ step = "case"
 title = "Read LGND embeddings for the dev and Texas regions, and join them to Chips"
 area = "Data and Cases"
 tier = "Could"
-status = "todo"
+status = "done"
 closes = ["CAP-18"]
 start = "docs/caption-plan.md §3 (LGND embeddings row)"
+notes = "Done 2026-11-04, read anonymously from Source Cooperative with DuckDB (the embeddings extra). Dev: 62 of 64 Chips joined to a cell; the other 2 are from 2014 and 2016, before the embeddings start. Texas: all 61. 5 Chips had no row in their NAIP month and took the month before. The Sentinel-2 scene is a median of 7 days from the NAIP date in dev and 11 in Texas (at most 55). Each Chip has its own cell, since they're at least 1 km apart. A geohash-month is one file of several GB in ~240 MB row groups; the bbox filter reads only the row groups around the Chips: about 4.5 minutes for dev and 17 for Texas through the laptop's proxy."
+see_it = "`uv sync --extra embeddings`, then `uv run clayzer embeddings` (and `--region test`): embeddings/caption-<region>.jsonl in the store, one row per Chip with its cell, date, and the CC BY 4.0 attribution."
+changes = [
+  "src/clayzer/embeddings.py: one bbox-filtered query per geohash-month, each Chip joined to the cell holding its centre, the nearest month within two when its own has none",
+  "src/clayzer/cli.py: `clayzer embeddings`, writing embeddings/caption-<region>.jsonl",
+  "pyproject.toml: the embeddings extra (duckdb); the web app's image doesn't need it",
+  "docs/cli.md: how to run it, what it costs, and the attribution",
+  "docs/sources.toml: LGND embeddings now used, by embeddings.py",
+  "tests/test_embeddings.py: geohashes, partitions, the cell a Chip joins, the month fallback, and Chips from before 2017",
+]
 context = "Caption reuse and Claims from embeddings (design §8, ideas 13 and 14) both need embeddings for the Chips we score. LGND's are on Source Cooperative: anonymous, GeoParquet by geohash and month, CC BY 4.0. Query rows with DuckDB instead of downloading whole files (~340 MB each). They're Sentinel-2 based (10 m pixels, 1,280 m cells), so one cell covers several 307 m Chips."
 done_when = [
   "Embedding rows for every dev and Texas Chip's cell, queried without downloading whole files",

@@ -68,6 +68,8 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
+      - name: OIDC trust policy regression tests
+        run: uv run --group infra pytest infra/tests -q
       - name: CDK synth (no account needed)
         working-directory: infra
         run: |

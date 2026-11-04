@@ -77,7 +77,12 @@ from the USGS APIs (`https://energy.usgs.gov/api/uspvdb/v1/projects`,
 
 Where a Chip clearly contradicts its labels (houses OSM never mapped, a dry wash mapped as
 water), record the fix in `fixtures/caption/cases/label-corrections.toml`. Every build applies
-it, so the fix survives a rebuild; hand-added labels have `source = "manual"` and no count.
+it, so the fix survives a rebuild; hand-added labels have `source = "manual"` and no count unless
+the correction gives one.
+
+`uv run clayzer corroborate <cases.jsonl> ... --json out.json` checks the Cases' USGS solar and
+wind labels against OSM's own power mapping and lists each disagreement to check by eye; it also
+counts OSM features of the ontology's candidate classes in each Chip. Reruns resume from `--json`.
 
 **Setting spread.** A gate can only see what its Cases show. `clayzer spread` labels each
 Case's surroundings (one cell of its Chip without its subject) with an LGND settings classifier
@@ -103,9 +108,14 @@ uv run clayzer baseline accept <batch-id>              # writes baselines/defaul
 uv run clayzer batch --repeats 3 --label terse --prompt my-prompt.txt
 uv run clayzer compare <baseline-batch-id> <candidate-batch-id>
 uv run clayzer gate <candidate-batch-id>               # exit 0 pass, 1 fail, 2 inconclusive
+uv run clayzer experiment <candidate-batch-id> --hypothesis "Expected improvement"
+# Add --accept to promote a passing, comparable development Batch and record it as kept.
 ```
 
 Other options: `--caption-model`, `--only <case-id> ...`, `--no-judge`, `--no-narrate`.
+
+See [the regression-gate guide](regression-gate.md) for the one-change prompt workflow,
+saved JSON and Markdown experiment logs, and an untested coverage prompt to evaluate.
 
 | Command | What it does |
 |---|---|
@@ -158,10 +168,22 @@ narrative is saved with a hash of its Trace, so replays never call a model.
 
 **The regression gate.** A Case's score regresses when its mean drops by more than max(0.05, the
 Baseline's Spread). Any regression, or a Baseline Case missing from the candidate, fails the gate;
-Sandbox Failures make it inconclusive. It warns when a measurement setting differs (Judge, Judge
-rubric, embedding model, Cases, Chips, ontology, scorer version), when there are fewer than 3
-Repeats, and when tokens per Caption rise more than 25% (`--max-token-increase 0.5` makes that
-fail instead).
+Sandbox Failures make it inconclusive. Changed or missing measurement provenance (Judge, Judge
+rubric, embedding model, Cases, Chips, ontology, scorer version), changed region, different
+Repeats, and unknown changed pipeline settings also prevent a pass. It warns when there are
+fewer than 3 Repeats and when tokens per Caption rise more than 25%
+(`--max-token-increase 0.5` makes that fail instead). A requested token cap with missing usage
+is inconclusive. Invalid numbers or stale summaries are rejected with an input error.
+
+An unfinished Batch is also inconclusive if its completed Run count or per-Case Repeats are
+short, even without a stop marker. A known regression still fails an incomplete Batch. Drops
+exactly at the allowed threshold pass. Tolerance and token caps must be finite and non-negative.
+
+Baseline replacement stages complete files, locks local readers and writers, and checks that
+the Baseline used by an experiment has not changed before promotion. A kept experiment's
+receipt is saved with the Baseline. If its store log fails after promotion, restore the store
+and run `clayzer experiment-recover --baseline <name>` to reconstruct the JSON and Markdown log.
+See the [adversarial audit](regression-gate-audit.md) for tested failure paths and remaining limits.
 
 ## Tools
 
@@ -247,6 +269,27 @@ uv run clayzer import data/rsicd-test.jsonl --name rsicd-test
 
 The captions file is downloaded once into `~/.cache/clayzer/rsicd/`. RSICD states no license:
 never commit its captions or images, and cite Lu et al. 2017.
+
+## Embeddings for the Chips
+
+LGND's Clay v1.5 embeddings (256 numbers per 1,280 m Sentinel-2 cell per month, from 2017) are
+open data on Source Cooperative, read anonymously: no LGND sign-in or quota, no AWS charge.
+`clayzer embeddings` joins each of the region's Chips to the cell holding its centre, in the
+month of its NAIP date (or the nearest within two months), and saves one row per Chip to
+`embeddings/caption-<region>.jsonl` in the store:
+
+```sh
+uv sync --extra embeddings
+uv run clayzer embeddings                 # the dev Chips
+uv run clayzer --region test embeddings   # the Texas Chips
+```
+
+It reads only the row groups around the Chips, never whole files (a geohash-month is one file
+of several GB). One cell covers several Chips, so nearby Chips can share an embedding. A Chip
+from before 2017 has none.
+
+**Attribution (CC BY 4.0):** LGND embeddings (Clay v1.5), https://source.coop/clay/lgnd-embeddings.
+Every row carries it; anything built on them must credit it too.
 
 ## Claims from free text
 
