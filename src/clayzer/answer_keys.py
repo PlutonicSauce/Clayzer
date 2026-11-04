@@ -226,7 +226,11 @@ def osm_object(tags: dict) -> str | None:
         return "railroad"
     if tags.get("amenity") == "parking":
         return "parking_lot"
-    if tags.get("natural") == "water" or "waterway" in tags:
+    # Only water that is there all year: in the desert OSM maps dry washes as intermittent
+    # streams, and a ditch or drain is usually dry from above.
+    if tags.get("intermittent") != "yes" and (
+        tags.get("natural") == "water" or tags.get("waterway") in {"river", "canal"}
+    ):
         return "water"
     if tags.get("landuse") in {"farmland", "meadow", "orchard", "vineyard"}:
         return "field"

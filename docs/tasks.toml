@@ -323,10 +323,19 @@ step = "case"
 title = "Review the ontology's classes, look-alikes, and minimum sizes; add any class a Case or benchmark needs"
 area = "Data and Cases"
 tier = "Must"
-status = "todo"
+status = "done"
 closes = ["CAP-10"]
 start = "ontology/objects.toml"
-notes = "Raised 2026-11-04: construction_site, added as a candidate (claimable = false) at the end of ontology/objects.toml. 13 of the 19 stored Captions of fixed-dev-neg-1 call the scene a construction site or an excavation, and no other Case's ever do (LGND also called that Chip's false solar arrays a storage yard), and the extraction labels have no class for it. To decide: land use or built structure; whether NAIP Chips show it reliably; whether an Answer Key can score it (OSM landuse=construction, never readable by the Harness); and whether Clay's captions need it. Making it claimable changes the Claim vocabulary for every functional area (ADR-0007, ADR-0008)."
+notes = "Reviewed 2026-11-04 against the eye check of all 124 Cases, the OSM tags behind the labels it dropped, and dev63-base's 189 Captions. Water: the code mapped any waterway to water, and 17 of the 25 OSM water ways in our Cases are intermittent streams, ditches, or intermittent water (dry desert washes); now only natural=water and waterway=river|canal, never intermittent=yes. The committed Cases keep their old labels until water-relabel. Field: 26 of 38 field Claims are on Chips with no farmland (the prompt shows only the id); every class now has a definition, and showing it in the prompt belongs to lookalike-prompt. construction_site stays a candidate (6 of 189 Captions mention it; OSM landuse=construction goes stale fastest) and is a look-alike of solar_array; well_pad added as a candidate."
+see_it = "ontology/objects.toml (version 0.2), and uv run pytest tests/test_ontology.py"
+changes = [
+  "ontology/objects.toml: version 0.2, a definition per class, road and building rules matching the code, construction_site evidence, and the well_pad candidate",
+  "src/clayzer/answer_keys.py: osm_object maps only water there all year",
+  "src/clayzer/ontology.py: classes carry a definition",
+  "tests/test_ontology.py: every class has a definition, the road rules match the code, and dry washes and ditches aren't water",
+  "tests/test_provenance.py: reads the ontology version instead of hard-coding it",
+  "docs/caption-design.md: §3.5 describes version 0.2",
+]
 context = "ADR-0008: every class a Claim can name is defined once, in ontology/objects.toml (v0.1: 11 claimable classes under five roots, plus candidates). tests/test_ontology.py fails if the code's lists drift from it. Review it as a team: are the look-alikes and minimum visible sizes right, and does any Case or benchmark need a class that's missing?"
 done_when = [
   "Reviewed with the contracts on Day 1",
@@ -337,6 +346,28 @@ refs = [
   "docs/adr/0008-object-classes-live-in-one-ontology-file.md",
   "ontology/objects.toml",
   "tests/test_ontology.py",
+]
+
+[[task]]
+id = "water-relabel"
+step = "case"
+title = "Relabel water in the committed Cases: only water there all year"
+area = "Data and Cases"
+tier = "Should"
+status = "todo"
+closes = ["CAP-10"]
+start = "src/clayzer/answer_keys.py osm_object; fixtures/caption/cases/"
+after = ["ontology-review", "lookalike-negatives"]
+context = "ontology-review changed osm_object so intermittent streams, ditches, and intermittent water no longer count as water: in the desert they are dry washes, and their labels counted as misses against coverage though no Caption claims water there. The committed Cases still carry the old labels: 11 lose their water label (8 of them dev turbines in dry hills) and 2 shrink. Relabel the OSM labels of the dev and Texas Cases with the new rule, keep the hand corrections applied, and add water back by hand where an intermittent pond is wet in the image (Texas neg-10). The dev Baseline then needs a new Batch: do it with the one lookalike-negatives needs, so the team re-baselines once."
+done_when = [
+  "OSM labels of the committed Cases rebuilt with the new water rule, hand corrections still applied",
+  "Texas neg-10's wet pond added back as a hand correction",
+  "One new dev Baseline covering this and lookalike-negatives",
+]
+refs = [
+  "ontology/objects.toml (water)",
+  "fixtures/caption/cases/label-corrections.toml",
+  "docs/caption-plan.md §3",
 ]
 
 [[task]]
@@ -656,7 +687,7 @@ status = "todo"
 closes = ["CAP-01"]
 start = "src/clayzer/harness.py (PROMPT); ontology/objects.toml"
 after = ["ontology-in-code"]
-context = "The ontology records each class's look-alikes (confusers) and minimum visible size at 0.6 m. Putting them in the prompt should cut confusions such as greenhouses called solar arrays, and Claims about things NAIP can't show. Test it as a prompt change through the gate."
+context = "The ontology records each class's definition, look-alikes (confusers), and minimum visible size at 0.6 m. Putting them in the prompt should cut confusions such as greenhouses called solar arrays, open desert called a field (26 of 38 field Claims in dev63-base are on Chips with no farmland), and Claims about things NAIP can't show. Test it as a prompt change through the gate."
 done_when = [
   "The prompt built from the ontology's look-alikes and sizes",
   "Run as a Batch and gated against the Baseline",
