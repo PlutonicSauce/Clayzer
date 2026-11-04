@@ -94,6 +94,31 @@ def test_hierarchy_gives_distances_for_partial_credit():
     assert ONT.distance("solar_array", "water") is None  # different roots
 
 
+def test_every_class_says_what_it_covers():
+    for cls in ONT.classes.values():
+        assert cls.definition, f"{cls.id} has no definition"
+
+
+def test_the_road_rules_list_every_highway_type_the_code_maps():
+    listed = {rule["highway"] for rule in ONT.classes["road"].osm}
+    assert listed == answer_keys.ROAD_TYPES
+
+
+@pytest.mark.parametrize(
+    "tags",
+    [
+        {"waterway": "stream", "intermittent": "yes"},  # a dry desert wash
+        {"waterway": "stream"},
+        {"waterway": "ditch"},
+        {"waterway": "drain"},
+        {"natural": "water", "intermittent": "yes"},  # a playa or seasonal pond
+        {"waterway": "canal", "intermittent": "yes"},
+    ],
+)
+def test_water_is_only_water_there_all_year(tags):
+    assert answer_keys.osm_object(tags) is None
+
+
 def test_land_cover_crosswalks_use_the_published_legend_names():
     legends = {"nlcd": NLCD_CLASSES, "worldcover": WORLDCOVER_CLASSES}
     seen = {"nlcd": [], "worldcover": []}

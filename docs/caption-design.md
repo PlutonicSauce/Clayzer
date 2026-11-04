@@ -272,21 +272,24 @@ and AWS-08 (a reproducible stack and a live URL), then AWS-09, AWS-10, and AWS-1
 
 Every Object Class a Claim can name is defined once, in
 [`ontology/objects.toml`](../ontology/objects.toml)
-([ADR-0008](adr/0008-object-classes-live-in-one-ontology-file.md)). Version 0.1 has the 11
+([ADR-0008](adr/0008-object-classes-live-in-one-ontology-file.md)). Version 0.2 has the 11
 claimable classes the code uses today under five roots (energy infrastructure, transportation,
 built structures, water features, land cover), plus candidate classes for later (substation,
-transmission tower, runway, storage tank).
+transmission tower, well pad, runway, storage tank, construction site). Each class has a
+one-line definition of what a Claim of it asserts. Water is only water there all year: OSM's
+intermittent streams and ditches, dry washes in the desert, don't count.
 
 ```mermaid
 flowchart TB
     EN["Energy infrastructure"] --> SOL["solar_array"] & WT["wind_turbine"]
-    EN -.-> SUB["substation"] & TT["transmission_tower"]
+    EN -.-> SUB["substation"] & TT["transmission_tower"] & WP["well_pad"]
     TR["Transportation"] --> RD["road"] & RR["railroad"] & PK["parking_lot"]
     TR -.-> RW["runway"]
     BS["Built structure"] --> BLD["building"] --> GH["greenhouse"]
     BS -.-> ST["storage_tank"]
     HY["Water features"] --> WA["water"]
     LC["Land cover"] --> FLD["field"] & VEG["vegetation"] & BG["bare_ground"]
+    LC -.-> CS["construction_site"]
 
     classDef root fill:#252323,stroke:#252323,color:#ffffff
     classDef keyed fill:#dfe9df,stroke:#c9d7c9,color:#252323
@@ -295,7 +298,7 @@ flowchart TB
     class EN,TR,BS,HY,LC root
     class SOL,WT,RD,RR,PK,BLD,GH,WA,FLD keyed
     class VEG,BG unscored
-    class SUB,TT,RW,ST candidate
+    class SUB,TT,WP,RW,ST,CS candidate
 ```
 
 Green classes have an Answer Key; amber classes are claimable but unscored (no Answer Key);

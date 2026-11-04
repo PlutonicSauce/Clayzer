@@ -7,8 +7,10 @@
 #   id, name          the Claim value and a readable name
 #   parent            the class it is a kind of ("" for a root); gives partial credit in grounding
 #   claimable         true if a Caption's Claims may use it today; false = candidate for later
+#   definition        what the class covers in a Chip, in one line: what a Claim of it asserts
 #   keyed_by          Answer Keys that can verify it (empty = Claims about it are unscored)
-#   osm               OSM tag rules the code maps to this class (tested against answer_keys.osm_object)
+#   osm               OSM tag rules the code maps to this class (tested against answer_keys.osm_object);
+#                     "*" is any value, and no rule matches a way tagged intermittent=yes
 #   osm_reference     OSM tags for the class that the code does NOT use (e.g. power features come
 #                     from USGS); documentation for Answer Keys outside the US
 #   synonyms          other words people use; for retrieval queries and prompt wording
@@ -24,8 +26,11 @@
 #
 # Version 0.1 (2026-11-03): matches the classes in harness.OBJECTS, grounding.KEYED,
 # answer_keys.osm_object, and retrieval.QUERIES as they were on that date.
+# Version 0.2 (2026-11-04, ontology-review): a definition per class; water is only water there
+# all year (OSM mapped dry desert washes as intermittent streams); the road and building rules
+# list everything the code maps; construction_site stays a candidate; well_pad added as one.
 
-version = "0.1"
+version = "0.2"
 
 # ── roots ───────────────────────────────────────────────────────────────────────────────
 
@@ -34,30 +39,35 @@ id = "energy_infrastructure"
 name = "Energy infrastructure"
 parent = ""
 claimable = false
+definition = "Facilities that generate or carry electricity, or extract fuel."
 
 [[class]]
 id = "transportation"
 name = "Transportation"
 parent = ""
 claimable = false
+definition = "Ways and surfaces for moving or parking vehicles."
 
 [[class]]
 id = "built_structure"
 name = "Built structure"
 parent = ""
 claimable = false
+definition = "Roofed or man-made structures standing on the ground."
 
 [[class]]
 id = "hydrography"
 name = "Water features"
 parent = ""
 claimable = false
+definition = "Surface water features."
 
 [[class]]
 id = "land_cover"
 name = "Land cover"
 parent = ""
 claimable = false
+definition = "What covers open ground: crops, plants, or bare earth."
 
 # ── energy ──────────────────────────────────────────────────────────────────────────────
 
@@ -66,10 +76,11 @@ id = "solar_array"
 name = "Solar array"
 parent = "energy_infrastructure"
 claimable = true
+definition = "Ground-mounted rows of photovoltaic panels; not racks without panels, and not rooftop panels."
 keyed_by = ["uspvdb", "grw"]
 osm_reference = [{ power = "plant", "plant:source" = "solar" }, { power = "generator", "generator:source" = "solar" }]
 synonyms = ["solar farm", "solar park", "PV plant", "photovoltaic array", "solar panels"]
-confusers = ["greenhouse", "parking_lot", "water"]
+confusers = ["greenhouse", "parking_lot", "water", "construction_site"]
 min_visible_m = 10
 attributes = { size = ["small", "medium", "large"] }
 queries = ["find solar farms"]
@@ -80,6 +91,7 @@ id = "wind_turbine"
 name = "Wind turbine"
 parent = "energy_infrastructure"
 claimable = true
+definition = "A wind turbine tower with its rotor, one per tower."
 keyed_by = ["uswtdb", "grw"]
 osm_reference = [{ power = "generator", "generator:source" = "wind" }]
 synonyms = ["wind farm", "wind generator", "turbine"]
@@ -93,6 +105,7 @@ id = "substation"
 name = "Electrical substation"
 parent = "energy_infrastructure"
 claimable = false
+definition = "A fenced yard of electrical switchgear and transformers."
 osm_reference = [{ power = "substation" }]
 synonyms = ["switchyard"]
 confusers = ["building", "parking_lot"]
@@ -103,6 +116,7 @@ id = "transmission_tower"
 name = "Transmission tower"
 parent = "energy_infrastructure"
 claimable = false
+definition = "A lattice or pole tower carrying high-voltage power lines."
 osm_reference = [{ power = "tower" }]
 synonyms = ["pylon", "power line tower"]
 confusers = ["wind_turbine"]
@@ -115,8 +129,14 @@ id = "road"
 name = "Road"
 parent = "transportation"
 claimable = true
+definition = "A paved or unpaved road or track a vehicle can drive, including dirt tracks."
 keyed_by = ["osm"]
-osm = [{ highway = "primary" }, { highway = "residential" }, { highway = "service" }, { highway = "track" }]
+osm = [
+  { highway = "motorway" }, { highway = "trunk" }, { highway = "primary" }, { highway = "secondary" },
+  { highway = "tertiary" }, { highway = "unclassified" }, { highway = "residential" },
+  { highway = "service" }, { highway = "track" }, { highway = "motorway_link" },
+  { highway = "trunk_link" }, { highway = "primary_link" }, { highway = "secondary_link" },
+]
 synonyms = ["street", "highway", "track", "dirt road"]
 confusers = ["railroad"]
 min_visible_m = 3
@@ -129,6 +149,7 @@ id = "railroad"
 name = "Railroad"
 parent = "transportation"
 claimable = true
+definition = "Railway track."
 keyed_by = ["osm"]
 osm = [{ railway = "rail" }]
 synonyms = ["railway", "rail line", "train tracks"]
@@ -142,6 +163,7 @@ id = "parking_lot"
 name = "Parking lot"
 parent = "transportation"
 claimable = true
+definition = "A paved or gravel area marked or used for parking vehicles."
 keyed_by = ["osm"]
 osm = [{ amenity = "parking" }]
 synonyms = ["car park", "parking area"]
@@ -155,6 +177,7 @@ id = "runway"
 name = "Runway"
 parent = "transportation"
 claimable = false
+definition = "An airport runway or airstrip."
 osm_reference = [{ aeroway = "runway" }]
 synonyms = ["airstrip"]
 confusers = ["road"]
@@ -168,8 +191,9 @@ id = "building"
 name = "Building"
 parent = "built_structure"
 claimable = true
+definition = "A roofed structure: house, barn, shed, warehouse, or other building."
 keyed_by = ["osm"]
-osm = [{ building = "yes" }, { building = "house" }, { building = "industrial" }]
+osm = [{ building = "*" }]  # any building value; greenhouse is matched first
 synonyms = ["house", "warehouse", "structure", "barn"]
 confusers = ["greenhouse", "substation"]
 min_visible_m = 4
@@ -181,6 +205,7 @@ id = "greenhouse"
 name = "Greenhouse"
 parent = "building"
 claimable = true
+definition = "A glass or plastic-covered structure for growing plants."
 keyed_by = ["osm"]
 osm = [{ building = "greenhouse" }, { landuse = "greenhouse_horticulture" }]
 synonyms = ["glasshouse", "hothouse", "polytunnel"]
@@ -194,6 +219,7 @@ id = "storage_tank"
 name = "Storage tank"
 parent = "built_structure"
 claimable = false
+definition = "A cylindrical tank for liquids or gas, seen from above as a circle."
 osm_reference = [{ man_made = "storage_tank" }]
 synonyms = ["oil tank", "silo"]
 confusers = ["building"]
@@ -207,6 +233,7 @@ id = "water"
 name = "Water"
 parent = "hydrography"
 claimable = true
+definition = "Standing or flowing water visible in the Chip: pond, lake, reservoir, river, or canal; not a dry wash or a dry basin."
 keyed_by = ["osm"]
 osm = [{ natural = "water" }, { waterway = "river" }, { waterway = "canal" }]
 synonyms = ["pond", "lake", "reservoir", "river", "canal"]
@@ -223,6 +250,7 @@ id = "field"
 name = "Farm field"
 parent = "land_cover"
 claimable = true
+definition = "Cultivated or irrigated cropland, or managed pasture, with field edges; not open desert, scrub, or grassland."
 keyed_by = ["osm"]
 osm = [{ landuse = "farmland" }, { landuse = "meadow" }, { landuse = "orchard" }, { landuse = "vineyard" }]
 synonyms = ["farmland", "cropland", "agricultural field", "pasture"]
@@ -237,6 +265,7 @@ id = "vegetation"
 name = "Vegetation"
 parent = "land_cover"
 claimable = true
+definition = "Trees, shrubs, scrub, or grass that isn't a farm field."
 keyed_by = []
 synonyms = ["trees", "shrubs", "scrub", "woodland"]
 confusers = ["field"]
@@ -249,24 +278,40 @@ id = "bare_ground"
 name = "Bare ground"
 parent = "land_cover"
 claimable = true
+definition = "Open ground with little or no vegetation: desert, dry lake bed, bare soil, or sand."
 keyed_by = []
-synonyms = ["bare soil", "desert", "dirt", "sand"]
+synonyms = ["bare soil", "desert", "dirt", "sand", "dry lake bed", "playa"]
 confusers = ["parking_lot", "field"]
 min_visible_m = 20
 rsicd_scenes = ["bareland", "desert"]
 land_cover = { nlcd = ["31 Barren Land (Rock/Sand/Clay)"], worldcover = ["Bare / sparse vegetation"], note = "NLCD's Barren Land has under 15% vegetation; WorldCover's Bare / sparse vegetation never has more than 10% at any time of year. Desert scrub above those is vegetation in both." }
 
-# Candidate raised 2026-11-04 for ontology-review: 13 of the 19 stored Captions of
-# fixed-dev-neg-1 call it a construction site or an excavation (no other Case's ever do), and
-# labelling has no class for it. Open questions: is it land use (here, beside field) or a built structure; can a Chip
-# show it reliably; which Answer Key could score it (OSM landuse=construction is one, so the
-# Harness must never read it, ADR-0006); and is it worth a class at all for Clay's captions.
+# Candidate, kept as one by ontology-review (2026-11-04). For: Captions call fixed-dev-neg-1 a
+# construction site in 13 of its 19 stored Captions, and Chips show it (a graded site, racks
+# not yet panelled, a turbine foundation being repowered). Against: in dev63-base only 6 of 189
+# Captions mention it, on 3 Cases, and its only Answer Key, OSM landuse=construction, goes out of
+# date fastest of any tag (and the Harness must never read it, ADR-0006). It is a look-alike of
+# solar_array, for racks without panels. Revisit if Clay's captions need it.
 [[class]]
 id = "construction_site"
 name = "Construction site"
 parent = "land_cover"
 claimable = false
+definition = "Ground being graded, excavated, or built on, with equipment or unfinished structures."
 osm_reference = [{ landuse = "construction" }]
 synonyms = ["building site", "excavation", "earthworks", "foundation"]
 confusers = ["bare_ground", "parking_lot", "storage_tank"]
+min_visible_m = 30
+
+# Candidate added by ontology-review (2026-11-04): oil and gas well pads, cleared caliche pads
+# with a pumpjack or tanks, on 2 of the 7 Texas rangeland negatives. No Answer Key scores it.
+[[class]]
+id = "well_pad"
+name = "Well pad"
+parent = "energy_infrastructure"
+claimable = false
+definition = "A cleared pad around an oil or gas well, often with a pumpjack, tanks, or a lease road."
+osm_reference = [{ man_made = "petroleum_well" }]
+synonyms = ["oil well", "gas well", "pumpjack", "drill pad", "lease pad"]
+confusers = ["construction_site", "bare_ground", "parking_lot"]
 min_visible_m = 30
