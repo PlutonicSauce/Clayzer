@@ -84,7 +84,32 @@ small { color: var(--muted); }
 body.hide-claims .claims, body.hide-refs .refs, body.hide-grid .grid { display: none; }
 """
 
+REPORT_A11Y_STYLE = """
+/* Public reports retain their self-contained, offline format. */
+:root { --paper: #f8f7f2; --ink: #183b32; --muted: #465b50; --line: #cbd3c8; }
+body { font-size: 16px; line-height: 1.65; }
+h1 { font-size: clamp(24px, 4vw, 36px); overflow-wrap: anywhere; }
+h2 { font-size: 24px; } h3 { font-size: 17px; text-transform: none; }
+main, section, .chip, .meta { min-width: 0; overflow-wrap: anywhere; }
+summary, nav a, .bar label { min-height: 44px; padding-top: 10px; padding-bottom: 10px; }
+input[type=checkbox] { width: 20px; height: 20px; }
+:focus-visible { outline: 3px solid #8c3c24; outline-offset: 3px; }
+.badge { white-space: normal; } .b-na { color: #465b50; background: #eceee7; }
+table { display: block; overflow-x: auto; max-width: 100%; }
+th { font-size: 14px; } .legend { flex-wrap: wrap; }
+@media (max-width: 480px) { main, header { padding-left: 16px; padding-right: 16px; } }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+.steps .judge { opacity: 1; }
+"""
+STYLE += REPORT_A11Y_STYLE
+
+
 SCRIPT = """
+for (const table of document.querySelectorAll('table')) {
+  table.tabIndex = 0;
+  table.setAttribute('aria-label', 'Recorded evaluation details');
+  table.querySelectorAll('th').forEach(th => th.scope = 'col');
+}
 for (const box of document.querySelectorAll('input[data-hide]')) {
   box.addEventListener('change', () =>
     document.body.classList.toggle(box.dataset.hide, !box.checked));
