@@ -16,7 +16,7 @@ function Title() {
     <h1>Clayzer</h1>
     <p class="lede">Give us your caption set, and we tell you how much of it you can trust, where
       it fails, and what it costs to make better.</p>
-    <p class="team">Team names · date</p>
+    <p class="team">Team Clayzer · Clay Earth Dataset Foundry hackathon · November 2026</p>
   </div>`;
 }
 
@@ -114,7 +114,7 @@ function Architecture() {
     <div class="legend">
       <span><i class="live"></i> Deployed: this deck is served by it</span>
       <span><i class="planned"></i> Planned next</span>
-      <span>A role per service; the web app can only read its own prefix of the store</span>
+      <span>A role per service, no long-lived keys, every bucket private — <code>clayzer readiness</code> checks it</span>
     </div>
   </div>`;
 }
