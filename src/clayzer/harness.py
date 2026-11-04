@@ -44,6 +44,12 @@ They don't show you this image, so describe only what the image itself shows. Ca
 submit_caption exactly once, when you're done.
 """
 
+# Models that refuse a forced tool choice. Bedrock answers `tool_choice: type "tool" and "any" are
+# not supported for this model`, so the Run fails before it starts. For them the prompt asks for
+# the tool and the choice is left to the model, as the Judge does (judge.py). Matched as a
+# substring of the model id, which may carry a region prefix (us.anthropic.claude-opus-5-5).
+NO_FORCED_TOOL = ("claude-opus-5",)
+
 MAX_TURNS = 8  # model turns per Caption in the tool-use loop
 MAX_TOOL_TEXT = 20_000  # characters of one tool result the model sees; the Trace keeps it all
 
@@ -110,6 +116,19 @@ CAPTION_TOOL = {
 }
 
 
+def forces_caption_tool(model: str) -> bool:
+    """Whether a call to this model can force `submit_caption`, rather than only ask for it."""
+    return not any(name in model.lower() for name in NO_FORCED_TOOL)
+
+
+def caption_tool_config(model: str) -> dict:
+    """The toolConfig for a single-call caption: the tool, forced where the model allows it."""
+    config = {"tools": [CAPTION_TOOL]}
+    if forces_caption_tool(model):
+        config["toolChoice"] = {"tool": {"name": "submit_caption"}}
+    return config
+
+
 class HarnessFault(Exception):
     """The Harness produced no usable Caption: the system under test's fault, scored as 0."""
 
@@ -160,14 +179,15 @@ def _rewrite(client, model: str, cap: dict, step: dict, tracer) -> str:
     request = {
         "modelId": model,
         "messages": [{"role": "user", "content": [{"text": prompt}]}],
-        "toolConfig": {"tools": [CAPTION_TOOL], "toolChoice": {"tool": {"name": "submit_caption"}}},
+        "toolConfig": caption_tool_config(model),
         "inferenceConfig": {"maxTokens": 800},
     }
     if tracer is None:
         resp = client.converse(**request)
     else:
+        choice = "submit_caption" if forces_caption_tool(model) else "auto"
         recorded = {"prompt": prompt, "tools": ["submit_caption"],
-                    "tool_choice": "submit_caption", "max_tokens": 800}  # fmt: skip
+                    "tool_choice": choice, "max_tokens": 800}  # fmt: skip
         resp = tracer.converse(client, "llm", "rewrite", request, recorded,
                                {"expects_tool": "submit_caption"})  # fmt: skip
     for k, v in resp.get("usage", {}).items():
@@ -217,7 +237,7 @@ def _draft(
                 ],
             }
         ],
-        "toolConfig": {"tools": [CAPTION_TOOL], "toolChoice": {"tool": {"name": "submit_caption"}}},
+        "toolConfig": caption_tool_config(model),
         "inferenceConfig": {"maxTokens": 1500},
     }
     started = time.monotonic()
@@ -228,7 +248,7 @@ def _draft(
             "prompt": prompt,
             "image": image_ref(image_key or f"chips/{chip_id}.png", png),
             "tools": ["submit_caption"],
-            "tool_choice": "submit_caption",
+            "tool_choice": "submit_caption" if forces_caption_tool(model) else "auto",
             "max_tokens": 1500,
         }
         resp = tracer.converse(

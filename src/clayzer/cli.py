@@ -26,6 +26,7 @@ Everything is read from and written to the store: local folders, or CLAYZER_STOR
 
 import argparse
 import json
+import os
 import sys
 from dataclasses import replace
 from pathlib import Path
@@ -117,6 +118,14 @@ def main(argv: list[str] | None = None) -> int:
         "--verify", action="store_true",
         help="check each drafted Claim with LGND Geo before writing (needs `clayzer login lgnd`)",
     )  # fmt: skip
+    b.add_argument(
+        "--harness", choices=["local", "agentcore"], default="local",
+        help="where the Harness runs: in this process, or in an AgentCore Runtime",
+    )  # fmt: skip
+    b.add_argument(
+        "--runtime", metavar="ARN",
+        help="the AgentCore Runtime for --harness agentcore (default: CLAYZER_AGENTCORE_RUNTIME)",
+    )  # fmt: skip
     b.add_argument("--resume", metavar="BATCH_ID", help="finish an existing Batch")
     b.add_argument("--no-narrate", action="store_true",
                    help="skip the model-written Trace summaries")  # fmt: skip
@@ -168,9 +177,20 @@ def main(argv: list[str] | None = None) -> int:
     tl.add_argument("--call", metavar="TOOL", help="call this tool")
     tl.add_argument("--args", default="{}", help="the tool's arguments as JSON")
 
+    ac = sub.add_parser("agentcore", help="run the Harness on Amazon Bedrock AgentCore")
+    ac_sub = ac.add_subparsers(dest="action", required=True)
+    al = ac_sub.add_parser(
+        "login",
+        help="keep an MCP server's sign-in in AgentCore Identity, so any caller can use it "
+        "(once per AWS account; needs a browser)",
+    )
+    al.add_argument("server", nargs="?", default="lgnd")
+
     a = p.parse_args(argv)
     if a.cmd in ("login", "tools"):
         return _tools_command(a)
+    if a.cmd == "agentcore":
+        return _agentcore_command(a)
     store = settings.store()
     key = cases_key(a.region)
 
@@ -223,12 +243,17 @@ def main(argv: list[str] | None = None) -> int:
                 settings = replace(settings, caption_model=a.caption_model)
             prompt = a.prompt.read_text() if a.prompt else PROMPT
             print(f"{len(cases)} Cases × {a.repeats} Repeats")
-            batch_id = batches.start(
-                cases, settings, store, a.repeats, a.label, a.region, prompt,
-                str(a.prompt) if a.prompt else "built-in", judge=not a.no_judge,
-                narrate=not a.no_narrate, tools=a.tools,
-                verify="lgnd" if a.verify else None,
-            )  # fmt: skip
+            try:
+                batch_id = batches.start(
+                    cases, settings, store, a.repeats, a.label, a.region, prompt,
+                    str(a.prompt) if a.prompt else "built-in", judge=not a.no_judge,
+                    narrate=not a.no_narrate, tools=a.tools,
+                    verify="lgnd" if a.verify else None, harness=a.harness,
+                    runtime=a.runtime or os.environ.get("CLAYZER_AGENTCORE_RUNTIME"),
+                )  # fmt: skip
+            except ValueError as e:  # a forbidden or unknown MCP server: nothing was written
+                print(f"refused to start the Batch: {e}", file=sys.stderr)
+                return 2
             summary = batches.load(store, batch_id)["summary"]
         print(f"Batch {batch_id} in {store.url(f'batches/{batch_id}/')}")
         _print_summary(summary)
@@ -402,6 +427,26 @@ def _tools_command(a) -> int:
     except ValueError as e:
         print(e, file=sys.stderr)
         return 2
+
+
+def _agentcore_command(a) -> int:
+    from clayzer.tools import SERVERS
+
+    if a.action == "login":
+        server = SERVERS.get(a.server)
+        if server is None or not server.oauth or not server.url:
+            known = sorted(n for n, s in SERVERS.items() if s.oauth)
+            print(f"{a.server!r} has no sign-in to keep; servers that do: {known}", file=sys.stderr)
+            return 2
+        from clayzer.agentcore.identity import login
+
+        try:
+            ok = login(a.server, server.url, lambda: input("Paste the address here: ").strip())
+        except (ValueError, RuntimeError) as e:
+            print(e, file=sys.stderr)
+            return 1
+        return 0 if ok else 1
+    return 2
 
 
 if __name__ == "__main__":

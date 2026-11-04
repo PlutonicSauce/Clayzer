@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Literal
 
 from clayzer.batch import SANDBOX_FAILURE, BatchConfig, config_from
-from clayzer.provenance import RECORDED_SINCE  # None there means "not recorded", not "off"
+from clayzer.provenance import RECORDED_SINCE, self_graded  # None in RECORDED_SINCE: not "off"
 
 Verdict = Literal["pass", "fail", "inconclusive"]
 EXIT_CODES: dict[Verdict, int] = {"pass": 0, "fail": 1, "inconclusive": 2}
@@ -37,7 +37,8 @@ METRICS = ("correctness", "coverage", "fidelity", "workflow")
 MEASUREMENT = ("judge_model", "judge_prompt_sha", "embed_model", "cases_sha", "chips_sha",
                "ontology_version", "ontology_sha", "scorer_version")  # fmt: skip
 # Settings a change to the captioner is expected to vary.
-CAPTIONER = ("caption_model", "prompt_sha", "prompt_source", "tools", "max_turns")
+CAPTIONER = ("caption_model", "prompt_sha", "prompt_source", "tools", "max_turns", "verify",
+             "harness", "runtime", "runtime_build", "tool_servers", "tool_versions")  # fmt: skip
 # The code itself: a change can move either, so it's shown but not warned about.
 CODE = ("code_commit", "code_dirty")
 
@@ -149,9 +150,14 @@ def compare(a: dict, b: dict) -> dict:
         "a": a["config"].batch_id,
         "b": b["config"].batch_id,
         "settings": setting_changes(a["config"], b["config"]),
+        "self_graded": {"a": _self_graded(a["config"]), "b": _self_graded(b["config"])},
         "batch": batch_rows,
         "cases": case_rows,
     }
+
+
+def _self_graded(cfg: BatchConfig) -> bool:
+    return self_graded(cfg.caption_model, cfg.judge_model)
 
 
 def render_compare(c: dict) -> str:
@@ -168,6 +174,14 @@ def render_compare(c: dict) -> str:
             lines += ["", "A measurement setting changed, so the scores may not be comparable."]
     else:
         lines.append("No settings changed: the difference is run-to-run variation.")
+    graded = c.get("self_graded") or {}
+    for side in ("a", "b"):
+        if graded.get(side):
+            note = (
+                f"Batch {side.upper()} is self-graded: its Fidelity is a model rating its own "
+                "Captions, so compare Fidelity across Batches with care."
+            )
+            lines += ["", note]
     lines += ["", "## Batch", "", "| Metric | A | B | Change | Spread |", "|---|---|---|---|---|"]
     for r in c["batch"]:
         lines.append(
@@ -300,6 +314,12 @@ def gate(
         for s in changes
         if s["kind"] == "measurement"
     ]
+    if _self_graded(baseline["config"]) != _self_graded(candidate["config"]):
+        which = "candidate" if _self_graded(candidate["config"]) else "Baseline"
+        warnings.append(
+            f"the {which} is self-graded (the captioner is also the Judge), so its Fidelity "
+            "is not like-for-like with the other side's"
+        )
     unrecorded = [s["setting"] for s in changes if s["kind"] == "not recorded"]
     if unrecorded:
         warnings.append(

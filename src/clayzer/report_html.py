@@ -8,6 +8,7 @@ every piece of text is escaped.
 import base64
 from html import escape
 
+from clayzer import provenance
 from clayzer.grid import GRID
 
 CELL = 512 / 3
@@ -398,6 +399,8 @@ def render_html(b: dict, store) -> str:
             f"<p class='badge b-warn'>Stopped early: {escape(s['stopped'])}. Resume with "
             f"clayzer batch --resume {escape(cfg.batch_id)}</p>"
         )
+    if provenance.self_graded(cfg.caption_model, cfg.judge_model):
+        html.append(f"<p class='badge b-warn'>{escape(provenance.SELF_GRADED_NOTE)}</p>")
     html += ["</header><main><div class='cards'>"]
     for title, big, note, cls in cards:
         html.append(

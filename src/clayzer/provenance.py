@@ -28,7 +28,13 @@ SETTINGS = [
     ("caption_model", "Caption model", "What was tested"),
     ("prompt_sha", "Caption prompt", "What was tested"),
     ("prompt_source", "Prompt source", "What was tested"),
+    ("harness", "Where the Harness ran", "What was tested"),
+    ("runtime", "AgentCore Runtime", "What was tested"),
+    ("runtime_build", "Runtime image build", "What was tested"),
     ("tools", "MCP servers", "What was tested"),
+    ("tool_servers", "MCP server pins", "What was tested"),
+    ("tool_versions", "MCP server versions reported", "What was tested"),
+    ("verify", "Claim verifier", "What was tested"),
     ("max_turns", "Turn budget", "What was tested"),
     ("judge_model", "Judge model", "What it was judged with"),
     ("judge_prompt_sha", "Judge rubric", "What it was judged with"),
@@ -47,7 +53,8 @@ SETTINGS = [
 ]
 # Recorded only by Batches since this module: None means "not recorded".
 RECORDED_SINCE = {"judge_prompt_sha", "chips_sha", "ontology_version", "ontology_sha",
-                  "code_commit", "code_dirty", "summary_model"}  # fmt: skip
+                  "code_commit", "code_dirty", "summary_model", "tool_versions",
+                  "runtime_build"}  # fmt: skip
 
 # A Batch's stored files, in the order the Provenance panel lists them: (name, what it is).
 BATCH_FILES = [
@@ -76,6 +83,27 @@ _RUN_FILE = re.compile(r"^(traces/[A-Za-z0-9_.-]+--r\d+(\.summary|\.narrative)?\
 def sha(data: bytes) -> str:
     """The short hash used in configurations: the first 12 hex digits of SHA-256."""
     return hashlib.sha256(data).hexdigest()[:12]
+
+
+# Bedrock's cross-region inference profiles prefix a model id: us.anthropic.claude-opus-5-5 is
+# the same model as anthropic.claude-opus-5-5.
+_PROFILE_PREFIX = re.compile(r"^(us|eu|apac|jp|au|ca|global|us-gov)\.")
+
+SELF_GRADED_NOTE = (
+    "Self-graded: the same model wrote the Captions and judged them, so Fidelity is a model "
+    "marking its own work and is not comparable with Batches judged by a different model (REQ-19)."
+)
+
+
+def same_model(a: str | None, b: str | None) -> bool:
+    """Whether two Bedrock model ids name the same model, ignoring the inference-profile prefix."""
+    return bool(a and b) and _PROFILE_PREFIX.sub("", a) == _PROFILE_PREFIX.sub("", b)
+
+
+def self_graded(caption_model: str | None, judge_model: str | None) -> bool:
+    """Whether the model that wrote the Captions also judged them (REQ-19). Every report that
+    shows Fidelity says so, since a model tends to rate its own writing well."""
+    return same_model(caption_model, judge_model)
 
 
 def judge_prompt() -> str:

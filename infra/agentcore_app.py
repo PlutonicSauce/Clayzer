@@ -1,0 +1,206 @@
+"""The Harness on Amazon Bedrock AgentCore, deployable into a teammate's own account (AWS-07, AWS-11).
+
+Creates the AgentCore Runtime that runs the Clayzer Harness, the ARM64 image it runs, an IAM role
+with only what a Run needs, and the workload identity that names who asks AgentCore Identity for
+the LGND sign-in. It is a separate CDK app from app.py (the web app), so neither's `cdk deploy`
+changes the other.
+
+    cd infra
+    npx aws-cdk@2 bootstrap                       # once per account and region
+    npx aws-cdk@2 --app "uv run --group infra python agentcore_app.py" deploy
+    uv run clayzer agentcore login lgnd           # once per account: the LGND sign-in, in a browser
+    export CLAYZER_AGENTCORE_RUNTIME=<the RuntimeArn output>
+    uv run clayzer batch --harness agentcore --verify ...
+
+`cdk destroy` removes everything this creates. Two things are not CDK's to create, because they
+need a person: the LGND sign-in itself, and the OAuth client behind it (registering it needs the
+callback address that only exists once Identity has made the client record). `clayzer agentcore
+login` does both, and is safe to run again.
+
+Options, as `-c name=value`: `workload` (the Identity workload name, default `clayzer`), `provider`
+(the OAuth client name, default `clayzer-lgnd`), `user` (the shared team identity, default
+`clayzer-team`), `models` (comma-separated Bedrock model ids the Runtime may call, default Nova
+Pro and Opus 5.5), `return_url`. Behind a private package mirror or TLS-intercepting proxy, set
+CLAYZER_BUILD_BASE_IMAGE, CLAYZER_BUILD_PIP_INDEX (a file holding the index URL) and
+CLAYZER_BUILD_CA_BUNDLE (a .pem file), as for app.py.
+"""
+
+import os
+import subprocess
+from pathlib import Path
+
+import aws_cdk as cdk
+from aws_cdk import aws_bedrockagentcore as agentcore
+from aws_cdk import aws_ecr_assets as ecr_assets
+from aws_cdk import aws_iam as iam
+from constructs import Construct
+
+REPO = Path(__file__).resolve().parents[1]
+DEFAULT_MODELS = ["amazon.nova-pro-v1:0", "anthropic.claude-opus-5-5"]
+DEFAULT_RETURN_URL = "http://localhost:8765/callback"
+RUNTIME_NAME = "clayzer_harness"  # letters, digits and underscores only
+
+
+def git_build() -> str:
+    """Which commit the image was built from, so a Batch records which Harness answered."""
+    try:
+        sha = subprocess.run(["git", "-C", str(REPO), "rev-parse", "--short", "HEAD"],
+                             capture_output=True, text=True, check=True, timeout=10).stdout.strip()  # fmt: skip
+        dirty = subprocess.run(["git", "-C", str(REPO), "status", "--porcelain",
+                                "--untracked-files=no"], capture_output=True, text=True,
+                               check=True, timeout=10).stdout.strip()  # fmt: skip
+        return sha + ("-dirty" if dirty else "")
+    except (OSError, subprocess.SubprocessError):
+        return "unknown"
+
+
+def build_options() -> dict:
+    args, secrets = {}, {}
+    if base := os.environ.get("CLAYZER_BUILD_BASE_IMAGE"):
+        args["BASE_IMAGE"] = base
+    if index := os.environ.get("CLAYZER_BUILD_PIP_INDEX"):
+        secrets["pip_index"] = cdk.DockerBuildSecret.from_src(index)
+    if ca := os.environ.get("CLAYZER_BUILD_CA_BUNDLE"):
+        secrets["ca_bundle"] = cdk.DockerBuildSecret.from_src(ca)
+    return {"build_args": args, "build_secrets": secrets or None}
+
+
+class AgentCoreStack(cdk.Stack):
+    def __init__(
+        self,
+        scope: Construct,
+        id: str,
+        *,
+        workload: str = "clayzer",
+        provider: str = "clayzer-lgnd",
+        user: str = "clayzer-team",
+        models: list[str] | None = None,
+        return_url: str = DEFAULT_RETURN_URL,
+        build: str = "unknown",
+        **kwargs,
+    ) -> None:
+        super().__init__(scope, id, **kwargs)
+        models = models or DEFAULT_MODELS
+        options = build_options()
+
+        # The image: only the Harness, built for ARM64 (infra/agentcore/Dockerfile).
+        image = ecr_assets.DockerImageAsset(
+            self, "RuntimeImage", directory=str(REPO), file="infra/agentcore/Dockerfile",
+            platform=ecr_assets.Platform.LINUX_ARM64,
+            build_args={**options["build_args"], "BUILD": build},
+            build_secrets=options["build_secrets"],
+        )  # fmt: skip
+
+        # Who is asking Identity for the sign-in, and where the browser may be sent afterwards.
+        # `clayzer agentcore login` leaves this alone when the return address is already allowed.
+        identity = agentcore.CfnWorkloadIdentity(
+            self, "Workload", name=workload,
+            allowed_resource_oauth2_return_urls=[return_url],
+        )  # fmt: skip
+
+        arn = f"arn:aws:bedrock-agentcore:{self.region}:{self.account}"
+        role = iam.Role(
+            self, "RuntimeRole",
+            description="Runs the Clayzer Harness in AgentCore: Bedrock models, the LGND sign-in, logs",
+            assumed_by=iam.ServicePrincipal(
+                "bedrock-agentcore.amazonaws.com",
+                conditions={
+                    "StringEquals": {"aws:SourceAccount": self.account},
+                    "ArnLike": {"aws:SourceArn": f"{arn}:*"},
+                },
+            ),
+        )  # fmt: skip
+        image.repository.grant_pull(role)
+        # Models the Harness (and its rewrite) may call. Cross-region profiles route to other
+        # regions, so the foundation-model ARN is region-wildcarded; the profile's is not.
+        role.add_to_policy(iam.PolicyStatement(
+            sid="Models", actions=["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
+            resources=[
+                *[f"arn:aws:bedrock:*::foundation-model/{m}" for m in models],
+                *[f"arn:aws:bedrock:{self.region}:{self.account}:inference-profile/us.{m}"
+                  for m in models],
+            ],
+        ))  # fmt: skip
+        role.add_to_policy(iam.PolicyStatement(
+            sid="Logs",
+            actions=["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents",
+                     "logs:DescribeLogStreams"],
+            resources=[f"arn:aws:logs:{self.region}:{self.account}:log-group:/aws/bedrock-agentcore/runtimes/*"],
+        ))  # fmt: skip
+        # Fetch the LGND token held in Identity: this workload, this OAuth client, nothing else.
+        role.add_to_policy(iam.PolicyStatement(
+            sid="LgndSignIn",
+            actions=["bedrock-agentcore:GetWorkloadAccessTokenForUserId",
+                     "bedrock-agentcore:GetResourceOauth2Token"],
+            resources=[
+                f"{arn}:workload-identity-directory/default",
+                f"{arn}:workload-identity-directory/default/workload-identity/{workload}",
+                f"{arn}:token-vault/default",
+                f"{arn}:token-vault/default/oauth2credentialprovider/{provider}",
+            ],
+        ))  # fmt: skip
+        # Identity keeps the OAuth client's secret in a Secrets Manager secret it creates.
+        client_secret = (
+            f"arn:aws:secretsmanager:{self.region}:{self.account}:secret:"
+            f"bedrock-agentcore-identity!default/oauth2/{provider}*"
+        )
+        role.add_to_policy(iam.PolicyStatement(
+            sid="OAuthClientSecret", actions=["secretsmanager:GetSecretValue"],
+            resources=[client_secret],
+        ))  # fmt: skip
+
+        runtime = agentcore.CfnRuntime(
+            self, "Runtime", agent_runtime_name=RUNTIME_NAME,
+            description="The Clayzer caption Harness (draft, verify, rewrite) and its tools",
+            role_arn=role.role_arn,
+            agent_runtime_artifact=agentcore.CfnRuntime.AgentRuntimeArtifactProperty(
+                container_configuration=agentcore.CfnRuntime.ContainerConfigurationProperty(
+                    container_uri=image.image_uri
+                )
+            ),
+            network_configuration=agentcore.CfnRuntime.NetworkConfigurationProperty(
+                network_mode="PUBLIC"
+            ),
+            protocol_configuration="HTTP",
+            environment_variables={
+                "AWS_REGION": self.region,
+                "CLAYZER_TOKEN_SOURCE": "agentcore",  # the LGND sign-in comes from Identity
+                "CLAYZER_AGENTCORE_WORKLOAD": workload,
+                "CLAYZER_AGENTCORE_USER_ID": user,
+                "CLAYZER_AGENTCORE_PROVIDER": provider,
+                "CLAYZER_AGENTCORE_RETURN_URL": return_url,
+                "CLAYZER_BUILD": build,
+            },
+        )  # fmt: skip
+        runtime.node.add_dependency(role)  # the role's policy must exist before the first Run
+        runtime.node.add_dependency(identity)
+
+        cdk.CfnOutput(self, "RuntimeArn", value=runtime.attr_agent_runtime_arn,
+                      description="Set CLAYZER_AGENTCORE_RUNTIME to this")  # fmt: skip
+        cdk.CfnOutput(self, "RuntimeRoleArn", value=role.role_arn)
+        cdk.CfnOutput(self, "Build", value=build)
+
+
+def main() -> None:
+    app = cdk.App()
+    ctx = app.node.try_get_context
+    models = ctx("models")
+    AgentCoreStack(
+        app,
+        "ClayzerAgentCore",
+        workload=ctx("workload") or os.environ.get("CLAYZER_AGENTCORE_WORKLOAD", "clayzer"),
+        provider=ctx("provider") or os.environ.get("CLAYZER_AGENTCORE_PROVIDER", "clayzer-lgnd"),
+        user=ctx("user") or os.environ.get("CLAYZER_AGENTCORE_USER_ID", "clayzer-team"),
+        models=[m.strip() for m in models.split(",") if m.strip()] if models else None,
+        return_url=ctx("return_url") or DEFAULT_RETURN_URL,
+        build=ctx("build") or git_build(),
+        env=cdk.Environment(
+            account=os.environ.get("CDK_DEFAULT_ACCOUNT"),
+            region=os.environ.get("CDK_DEFAULT_REGION", "us-west-2"),
+        ),
+    )
+    app.synth()
+
+
+if __name__ == "__main__":
+    main()
