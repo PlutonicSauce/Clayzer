@@ -581,6 +581,22 @@ v0.1 of [`ontology/objects.toml`](../ontology/objects.toml) matches the code's l
 | Prompt: list each class's look-alikes and minimum visible size; pick negative Cases from look-alikes | Captioning, Data and Cases | Should | Day 2 afternoon |
 | Check the NLCD and WorldCover crosswalks against the published legends | Data and Cases | Could | When land cover is scored |
 
+**Data-driven ontology (ADR-0010, [docs/ontology-data-driven.md](ontology-data-driven.md)).**
+The ontology now also feeds the captioner, in three layers (A look-alikes, C caption exemplars, B
+embedding prototypes). Implemented on branch `feat/ontology-data-driven`; opt-in per Batch
+(`ontology_context`, default off).
+
+| Task | Area | Tier | Status |
+|---|---|---|---|
+| Layer A + C in the prompt: look-alike note and caption exemplars (`ontology.prompt_context`, `objects.toml` v0.2) | Captioning | Should | Done on branch |
+| Layer B: class prototypes, nearest-class hint, cost and circularity guards (`prototypes.py`) | Captioning, Data and Cases | Could | Done on branch |
+| Embedding seam + three sources: Clay model (`scripts/clay_embed.py`), precomputed file, Titan multimodal (`embeddings.py`) | Data and Cases | Could | Done on branch |
+| Attach embeddings to Cases and build prototypes from them (`clayzer ontology embed-cases`, `build-prototypes`) | Data and Cases | Could | Done on branch |
+| Run Clay on a GPU box for real embeddings; build + commit a prototype file under `ontology/prototypes/` | Data and Cases | Could | To do (needs GPU + Clay weights) |
+| S3 Vectors bucket and index in the CDK app; load prototypes into it (AWS-03) | Platform | Could | To do |
+| Measure A, A+C, A+C+B as Batches on a held-out region; record grounding/retrieval and cost deltas | Evaluation | Should | To do (the headline pitch number) |
+| Co-occurrence priors (typical counts, class co-occurrence) in the build step | Data and Cases | Could | Documented, not built |
+
 ### AWS service tasks
 
 | Task | Requirement | Area | Tier | When |
@@ -613,6 +629,9 @@ runtimes yet).
 | Risk | Mitigation |
 |---|---|
 | Grounding becomes circular (the Harness sees the Answer Key) | ADR-0006; the region split; the Evaluation owner reviews the Harness's tool list before each Batch |
+| The data-driven ontology leaks the answer into captioning (ADR-0010) | Guidance is class-level only, built from a disjoint dev region and from Clay/LGND embeddings (not a scored Answer Key); `prototypes.guard_scoring_region` refuses to caption the build region |
+| Layer B hints are wrong for small objects (Clay/LGND is Sentinel-2 10 m; NAIP is 0.6 m) | `LAYER_B_CLASSES` limits Layer B to classes discriminable at 10 m; a hint is emitted only above a similarity floor |
+| The ontology feature adds cost a nonprofit can't justify | Layer B adds no model call (reuses published embeddings, one dot product); Layer A+C is a token-bounded, cacheable prefix; the feature is default-off and kept only if the gate shows it helps |
 | GPU cost needs a GPU instance (AWS work not yet done) | Cost is a Should; Must uses Bedrock VLMs and marks cost as partial |
 | NAIP Requester-Pays cost | Planetary Computer for preparation; pre-stage Chips once in S3 and reuse |
 | RSICD has no license | Run-time download only; never committed; cite; confirm with Clay |

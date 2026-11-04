@@ -7,7 +7,7 @@ change both together.
 import pytest
 
 from clayzer import answer_keys, grounding, harness, retrieval
-from clayzer.ontology import load
+from clayzer.ontology import load, prompt_context
 
 ONT = load()
 
@@ -75,3 +75,29 @@ def test_hierarchy_gives_distances_for_partial_credit():
     assert ONT.distance("greenhouse", "building") == 1
     assert ONT.distance("road", "railroad") == 2  # siblings under transportation
     assert ONT.distance("solar_array", "water") is None  # different roots
+
+
+# ── Layer C exemplars and the prompt context (ADR-0010) ───────────────────────────────────
+
+
+def test_every_keyed_class_has_caption_exemplars():
+    for cid in ONT.keyed():
+        assert ONT.classes[cid].caption_exemplars, f"{cid} has no Layer C exemplar"
+
+
+def test_prompt_context_has_lookalikes_and_bounded_exemplars():
+    ctx = prompt_context(ONT, max_total=4)
+    assert "look-alikes" in ctx
+    assert ctx.count('\n- "') <= 4  # exemplar lines are capped by max_total
+
+
+def test_prompt_context_focus_narrows_to_those_classes():
+    ctx = prompt_context(ONT, focus=["solar_array", "greenhouse"], max_total=4)
+    assert "Solar array vs Greenhouse" in ctx or "Greenhouse vs Solar array" in ctx
+    # An exemplar from a class outside the focus must not appear.
+    assert "wind turbines" not in ctx.lower()
+
+
+def test_prompt_context_is_empty_when_nothing_applies():
+    # A focus of classes with no confusers and no exemplars yields no block.
+    assert prompt_context(ONT, focus=["vegetation"], include_confusers=False) == ""

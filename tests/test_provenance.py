@@ -26,7 +26,7 @@ def test_a_batch_records_its_rubric_chips_ontology_and_commit(env):  # noqa: F81
         for c in (SOLAR, WIND)
     }
     assert cfg.chips_sha == provenance.sha(store.get(f"batches/{bid}/chips.json"))
-    assert cfg.ontology_version == "0.1" and len(cfg.ontology_sha) == 12
+    assert cfg.ontology_version == "0.2" and len(cfg.ontology_sha) == 12
     assert cfg.code_commit is None or len(cfg.code_commit) == 40
     assert cfg.summary_model
 

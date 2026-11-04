@@ -84,6 +84,10 @@ class BatchConfig:
     max_turns: int = harness.MAX_TURNS
     # The MCP server that verifies drafted Claims (verify.py), or None for no verification.
     verify: str | None = None
+    # Feed the captioner class-level ontology guidance (ADR-0010): look-alikes, exemplars, and,
+    # where prototypes and a Chip embedding exist, an embedding-nearest-class hint. Default off,
+    # so cost and behaviour are unchanged until a Batch opts in.
+    ontology_context: bool = False
     # Provenance (provenance.py). None means the Batch predates recording it.
     judge_prompt_sha: str | None = None
     ontology_version: str | None = None
@@ -156,6 +160,28 @@ def _classify(e: Exception) -> str:
     return SANDBOX_FAILURE
 
 
+def _ontology_context(cfg: BatchConfig, chip: dict) -> str | None:
+    """Class-level ontology guidance for one Chip (ADR-0010), or None when there's nothing to add.
+
+    Layers A + C always apply (look-alikes, exemplars). Layer B applies only when a prototype
+    file exists for this ontology version AND the Chip carries a Clay/LGND `embedding`: then the
+    nearest-class hint is added, with the circularity guard against the Batch's region. The
+    prototype file is read once per Batch (prototypes.load_local is cached); there is no model
+    call."""
+    from clayzer import prototypes as proto
+    from clayzer.ontology import load
+
+    ont = load()
+    protos = None
+    embedding = chip.get("embedding")
+    if embedding and cfg.ontology_version:
+        path = proto.default_path(cfg.ontology_version)
+        if path.exists():
+            protos = proto.load_local(str(path))
+    context = proto.caption_context(ont, protos, embedding, scoring_region=cfg.region)
+    return context or None
+
+
 def _run_one(
     client, cfg: BatchConfig, prompt: str, case: dict, repeat: int, store, toolbox=None,
     verifier=None, chip_shas: dict[str, str] | None = None,
@@ -190,9 +216,10 @@ def _run_one(
         try:
             # The verifier, not the model, gets the Chip's footprint (ADR-0009).
             footprint = {"bbox": chip["bbox"], "date": chip.get("date")} if verifier else None
+            onto_ctx = _ontology_context(cfg, chip) if cfg.ontology_context else None
             cap, step = harness.caption(
                 client, cfg.caption_model, chip["id"], png, prompt, tracer, chip["uri"],
-                toolbox, cfg.max_turns, verifier, footprint,
+                toolbox, cfg.max_turns, verifier, footprint, onto_ctx,
             )  # fmt: skip
         except harness.HarnessFault as e:
             empty = {"text": "", "objects": [], "relations": [], "uncertain": []}
@@ -257,11 +284,12 @@ def start(
     narrate: bool = True,
     tools: list[str] | None = None,
     verify: str | None = None,
+    ontology_context: bool = False,
 ) -> str:
     """Create a Batch and run it. Returns the Batch id."""
     batch_id = create(
         cases, settings, store, repeats, label, region, prompt, prompt_source, judge, tools,
-        verify,
+        verify, ontology_context,
     )  # fmt: skip
     resume(batch_id, settings, store, progress, narrate)
     return batch_id
@@ -279,6 +307,7 @@ def create(
     judge: bool = True,
     tools: list[str] | None = None,
     verify: str | None = None,
+    ontology_context: bool = False,
 ) -> str:
     """Write a new Batch's configuration, prompt, and frozen Cases. Returns the Batch id."""
     # Labels become part of store keys, so only letters, digits, dashes and underscores.
@@ -306,6 +335,7 @@ def create(
         prompt_source=prompt_source,
         tools=list(tools or []),
         verify=verify,
+        ontology_context=ontology_context,
         judge_prompt_sha=_sha(judge_prompt) if judge else None,
         ontology_version=onto_version,
         ontology_sha=onto_sha,

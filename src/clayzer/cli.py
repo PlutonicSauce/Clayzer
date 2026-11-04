@@ -65,6 +65,86 @@ def _push(store, src: Path) -> int:
     return n
 
 
+def _ontology_command(a, settings) -> int:
+    """`clayzer ontology embed-cases | build-prototypes | show`: the Layer B index (ADR-0010)."""
+    from clayzer import prototypes as proto
+    from clayzer.ontology import load
+
+    version = load().version
+
+    if a.action == "show":
+        path = proto.default_path(version)
+        if not path.exists():
+            print(f"no prototype index at {path}; build one with "
+                  "`clayzer ontology build-prototypes`", file=sys.stderr)  # fmt: skip
+            return 1
+        p = proto.LocalPrototypes(path).load()
+        print(f"prototypes v{p.ontology_version}  dim {p.dim}  built on region "
+              f"{p.build_region!r} from {p.source} ({p.embedding_model})")  # fmt: skip
+        for cid in sorted(p.centroids):
+            conf = ", ".join(p.learned_confusers.get(cid, [])) or "—"
+            print(f"  {cid:14s} n={p.counts.get(cid, 0):<4d} nearest: {conf}")
+        return 0
+
+    store = settings.store()
+    key = cases_key(a.region)
+
+    if a.action == "embed-cases":
+        from clayzer import embeddings as emb
+
+        cases = load_cases(store, key)
+        if not cases:
+            print(f"no Cases in {store.url(key)}; build some with `clayzer case`", file=sys.stderr)
+            return 1
+        if a.source == "file":
+            if not a.emb_file:
+                print("--source file needs --from <jsonl|parquet>", file=sys.stderr)
+                return 1
+            source = emb.load_precomputed(a.emb_file)
+        else:
+            from clayzer.config import bedrock
+
+            source = emb.TitanImageEmbedding(bedrock(settings), a.model)
+        n = emb.attach_to_cases(cases, source, store)
+        store.put(key, to_jsonl(cases), "application/x-ndjson")  # one write, not one per Case
+        print(f"embedded {n} Chips in {len(cases)} Cases of region {a.region!r} → {store.url(key)}")
+        print("  next: `clayzer ontology build-prototypes --build-region "
+              f"{a.region}` (on a region you will NOT score)")  # fmt: skip
+        return 0
+
+    # build-prototypes: from an exemplar JSONL, or from --region's embedded Cases
+    from clayzer import embeddings as emb
+
+    build_region = a.build_region or a.region
+    if a.embeddings:
+        pairs = []
+        for line in a.embeddings.read_text().splitlines():
+            if line.strip():
+                rec = json.loads(line)
+                pairs.append((rec["class_id"], [float(x) for x in rec["embedding"]]))
+    else:
+        cases = load_cases(store, key)
+        pairs = emb.pairs_from_cases(cases)
+        if not pairs:
+            print(f"no embedded Cases in {store.url(key)}; run `clayzer ontology embed-cases` "
+                  "first, or pass an exemplar JSONL", file=sys.stderr)  # fmt: skip
+            return 1
+    protos = proto.build(
+        pairs, ontology_version=version, build_region=build_region,
+        source=a.source, embedding_model=a.embedding_model,
+    )  # fmt: skip
+    out = a.out or proto.default_path(version)
+    proto.LocalPrototypes(out).save(protos)
+    kept = ", ".join(f"{c}×{protos.counts[c]}" for c in sorted(protos.centroids))
+    dropped = sorted({c for c, _ in pairs} - set(protos.centroids))
+    print(f"built {len(protos.centroids)} class prototypes (dim {protos.dim}) → {out}")
+    print(f"  kept (10 m-discriminable): {kept}")
+    if dropped:
+        print(f"  dropped (too small at 10 m or not a Layer B class): {', '.join(dropped)}")
+    print(f"  CIRCULARITY: built on region {build_region!r}; do NOT score this region with it")
+    return 0
+
+
 def _print_summary(summary: dict) -> None:
     b = summary["batch"]
     r = b["runs"]
@@ -120,6 +200,11 @@ def main(argv: list[str] | None = None) -> int:
     b.add_argument("--resume", metavar="BATCH_ID", help="finish an existing Batch")
     b.add_argument("--no-narrate", action="store_true",
                    help="skip the model-written Trace summaries")  # fmt: skip
+    b.add_argument(
+        "--ontology-context", action="store_true",
+        help="feed the captioner class-level ontology guidance: look-alikes, exemplars, and an "
+             "embedding-nearest-class hint where prototypes exist (ADR-0010)",
+    )  # fmt: skip
 
     sub.add_parser("batches", help="list Batches in the store")
     rp = sub.add_parser("report", help="rebuild a Batch's reports")
@@ -161,6 +246,39 @@ def main(argv: list[str] | None = None) -> int:
     ui.add_argument("--host", default="127.0.0.1")
     ui.add_argument("--port", type=int, default=8770)
 
+    on = sub.add_parser("ontology", help="the data-driven Object Ontology (ADR-0010)")
+    on_sub = on.add_subparsers(dest="action", required=True)
+
+    ec = on_sub.add_parser(
+        "embed-cases",
+        help="attach a Clay/LGND embedding to every Chip in --region's Cases (one-time, prep step)",
+    )
+    ec.add_argument("--source", choices=["file", "titan"], default="file",
+                    help="file: reuse published Clay/LGND vectors; titan: Bedrock multimodal")  # fmt: skip
+    ec.add_argument("--from", dest="emb_file", type=Path,
+                    help="for --source file: a JSONL/Parquet of {chip_id, embedding}")  # fmt: skip
+    ec.add_argument("--model", default="amazon.titan-embed-image-v1",
+                    help="for --source titan: the Bedrock image embedding model")  # fmt: skip
+
+    bp = on_sub.add_parser(
+        "build-prototypes",
+        help="build Layer B class prototypes from embedded Cases, or an exemplar embeddings file",
+    )
+    bp.add_argument(
+        "embeddings", type=Path, nargs="?",
+        help="JSONL of exemplars: one {\"class_id\": ..., \"embedding\": [...]} per line. Omit to "
+             "build from --region's embedded Cases (run embed-cases first)",
+    )  # fmt: skip
+    bp.add_argument(
+        "--build-region",
+        help="provenance name for the region the exemplars come from; MUST differ from any scored "
+             "region. Defaults to --region",
+    )  # fmt: skip
+    bp.add_argument("--source", default="lgnd-embeddings", help="where the embeddings came from")
+    bp.add_argument("--embedding-model", default="clay-v1", help="the embedding model id")
+    bp.add_argument("--out", type=Path, help="output path (default ontology/prototypes/vN.json)")
+    on_sub.add_parser("show", help="print the current prototype index, if built")
+
     lg = sub.add_parser("login", help="sign in to an MCP server that needs it (opens a browser)")
     lg.add_argument("server")
     tl = sub.add_parser("tools", help="list an MCP server's tools, or call one")
@@ -171,6 +289,8 @@ def main(argv: list[str] | None = None) -> int:
     a = p.parse_args(argv)
     if a.cmd in ("login", "tools"):
         return _tools_command(a)
+    if a.cmd == "ontology":
+        return _ontology_command(a, settings)
     store = settings.store()
     key = cases_key(a.region)
 
@@ -228,6 +348,7 @@ def main(argv: list[str] | None = None) -> int:
                 str(a.prompt) if a.prompt else "built-in", judge=not a.no_judge,
                 narrate=not a.no_narrate, tools=a.tools,
                 verify="lgnd" if a.verify else None,
+                ontology_context=a.ontology_context,
             )  # fmt: skip
             summary = batches.load(store, batch_id)["summary"]
         print(f"Batch {batch_id} in {store.url(f'batches/{batch_id}/')}")

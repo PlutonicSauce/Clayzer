@@ -317,6 +317,20 @@ file, add partial credit to grounding, expand retrieval with synonyms, and put l
 prompt (plan §7). Land-cover crosswalks come from general knowledge and need checking against the
 published NLCD and WorldCover legends.
 
+**Data-driven extension (the team's differentiator; [ADR-0010](adr/0010-the-ontology-is-data-driven-and-feeds-the-captioner.md),
+[docs/ontology-data-driven.md](ontology-data-driven.md)).** The ontology now also flows *into*
+captioning, as class-level guidance in three layers: **A** look-alikes and minimum sizes (in the
+file), **C** caption exemplars (new `caption_exemplars` field, version 0.2), and **B** embedding
+prototypes — the centroid of a few confirmed example Chips' Clay/LGND embeddings per class, built
+from a disjoint development region and stored as a generated sidecar
+(`ontology/prototypes/<version>.json`). At caption time the Chip's own already-published
+embedding is matched against the centroids and the nearest classes become a one-line prompt hint,
+disambiguating look-alikes with no second vision call. It is a Batch option (`ontology_context`,
+default off), so its effect is measured by the loop (Batches, Compare, the gate). Two constraints
+are built into the code: **circularity** (class-level only, disjoint region, built from Clay/LGND
+which is not a scored Answer Key; `guard_scoring_region`) and **cost** (no model call per caption;
+`LAYER_B_CLASSES` restricts B to classes discriminable at Sentinel-2's 10 m).
+
 ### 3.6 Evaluating caption data from any source
 
 The business driver is that **Clay v2 is trained on synthetic captions nobody has tested, and
@@ -501,6 +515,14 @@ Each idea is mapped to the rubric criterion it serves.
 **Recommended combination:** 1 + 2 + 7, plus 5 if a GPU instance is available. It attacks
 grounding and label-preparation cost directly, and every step is measured by the same
 evaluation loop.
+
+**Ontology-grounded captioning** (Grounding, Retrieval, Fidelity; on branch
+`feat/ontology-data-driven`). Feed the captioner class-level ontology knowledge — look-alikes,
+house-style exemplars, and an embedding-nearest-class hint from Clay/LGND prototypes — to cut the
+look-alike confusions (greenhouse vs solar array) and generic text that overhead VLMs produce.
+It reuses Clay's own embeddings, adds no model call, and is measured by the loop like idea 7. See
+[ADR-0010](adr/0010-the-ontology-is-data-driven-and-feeds-the-captioner.md) and
+[docs/ontology-data-driven.md](ontology-data-driven.md).
 
 ### Stretch goals: cost and quality at scale
 
