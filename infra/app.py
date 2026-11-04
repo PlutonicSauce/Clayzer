@@ -141,9 +141,14 @@ class ClayzerStack(cdk.Stack):
 
         cdk.CfnOutput(self, "Url", value=f"https://{distribution.distribution_domain_name}")
         cdk.CfnOutput(self, "StoreUrl", value=f"s3://{bucket.bucket_name}/{prefix}")
+        # Physical names stay generated; outputs are how people and scripts find them.
+        cdk.CfnOutput(self, "ClusterName", value=cluster.cluster_name)
+        cdk.CfnOutput(self, "ServiceName", value=service.service.service_name)
 
 
 app = cdk.App()
+# Groups the stack's resources in the console, Cost Explorer, and Resource Groups.
+cdk.Tags.of(app).add("project", "clayzer")
 ClayzerStack(
     app,
     "Clayzer",

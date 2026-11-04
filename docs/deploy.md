@@ -75,8 +75,14 @@ npx aws-cdk@2 deploy -c store=s3://<bucket>/<prefix>
 already uses. Leaving it out makes the stack create a new, empty bucket, and the app then
 shows nothing.
 
-The deploy prints `Url` (the CloudFront address) and `StoreUrl`. To check it: open
-`<Url>/api/config`, which is also the load balancer's health check.
+The deploy prints `Url` (the CloudFront address), `StoreUrl`, and the generated `ClusterName`
+and `ServiceName` for `aws ecs` commands. To check it: open `<Url>/api/config`, which is also the
+load balancer's health check. (The `WebLoadBalancerDNS` and `WebServiceURL` outputs come from the
+CDK pattern; the load balancer only accepts CloudFront, so use `Url`.)
+
+Physical names are generated, not fixed, so the stack can replace resources and deploy more than
+once per account. Find resources through these outputs, or by the `project=clayzer` tag on
+everything both stacks create.
 
 ## The same steps in CI
 

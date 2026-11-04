@@ -53,6 +53,7 @@ class GitHubDeployStack(cdk.Stack):
 
 
 app = cdk.App()
+cdk.Tags.of(app).add("project", "clayzer")
 GitHubDeployStack(
     app,
     "ClayzerGitHubDeploy",
