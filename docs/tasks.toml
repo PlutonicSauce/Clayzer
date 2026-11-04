@@ -384,9 +384,16 @@ step = "case"
 title = "Check the ontology's NLCD and WorldCover crosswalks against the published legends"
 area = "Data and Cases"
 tier = "Could"
-status = "todo"
+status = "done"
 closes = []
 start = "ontology/objects.toml"
+notes = "Done 2026-11-04 against the MRLC NLCD legend and ESA WorldCover's v2.0 user manual. water was right. bare_ground had the wrong NLCD name: it's 31 Barren Land (Rock/Sand/Clay). vegetation was missing NLCD 51, 72 to 74 (Alaska only), 90 and 95 (wetlands), and WorldCover's Herbaceous wetland, Mangroves, and Moss and lichen. field is only partly covered by WorldCover's Cropland, which is annual crops only: WorldCover maps pasture as Grassland, orchards as Tree cover, and vineyards as Shrubland. Each partial match has a `note`. Before land cover is scored: most Mojave desert is NLCD 52 Shrub/Scrub, not 31 Barren Land, so NLCD would call vegetation what our Captions call bare ground."
+see_it = "ontology/objects.toml: the land_cover line and its note on water, field, vegetation, and bare_ground."
+changes = [
+  "ontology/objects.toml: bare_ground's NLCD name corrected, vegetation's missing classes added, and a note on each partial match",
+  "tests/test_ontology.py: every crosswalk name is a real NLCD or WorldCover class, and no legend class is listed under two Object Classes",
+  "docs/caption-design.md: §3.5 says the crosswalks were checked, and where they only partly match",
+]
 context = "The ontology maps land-cover classes to NLCD and WorldCover classes from general knowledge. Check them against the published legends before land cover is scored."
 done_when = [
   "Each crosswalk entry checked against the official legend",
