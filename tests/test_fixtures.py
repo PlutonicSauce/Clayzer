@@ -12,10 +12,12 @@ from clayzer.store import LocalStore
 
 ROOT = REPO / "fixtures" / "caption"
 CASES = parse_jsonl((ROOT / "cases" / "caption-dev.jsonl").read_bytes())
+# The held-out Texas set: scored once at the end, never tuned on (caption-plan.md §3).
+TEST_CASES = parse_jsonl((ROOT / "cases" / "caption-test.jsonl").read_bytes())
 
 
 def test_every_case_has_its_chip_and_no_chip_is_orphaned():
-    uris = {chip["uri"] for case in CASES for chip in case["chips"]}
+    uris = {chip["uri"] for case in CASES + TEST_CASES for chip in case["chips"]}
     assert all(u.startswith("chips/") for u in uris)
     on_disk = {f"chips/{f.name}" for f in (ROOT / "chips").glob("*.png")}
     assert uris == on_disk
@@ -69,7 +71,7 @@ def test_no_chip_is_partly_blank():
 
     from clayzer.chips import MAX_BLANK, blank_share
 
-    for case in CASES:
+    for case in CASES + TEST_CASES:
         img = np.asarray(Image.open(ROOT / case["chips"][0]["uri"]).convert("RGB"))
         assert blank_share(np.moveaxis(img, -1, 0)) <= MAX_BLANK, case["id"]
 
@@ -78,9 +80,9 @@ def test_the_committed_cases_carry_every_hand_correction():
     from clayzer.cases import apply_corrections, load_corrections
 
     corrections = load_corrections()
-    ids = {case["id"] for case in CASES}
+    ids = {case["id"] for case in CASES + TEST_CASES}
     assert corrections and all(c["case"] in ids for c in corrections)
-    for case in CASES:
+    for case in CASES + TEST_CASES:
         labels = case["reference_labels"]
         assert apply_corrections(case["id"], labels, corrections) == labels, case["id"]
 
@@ -114,3 +116,12 @@ def test_label_corrections_drop_add_and_merge_once():
             "c", [], [{"case": "c", "object": "x", "action": "add", "cells": ["middle"]}]
         )
 
+
+def test_the_texas_test_set_is_held_apart_from_development():
+    assert TEST_CASES and all(c["region"] == "test" for c in TEST_CASES)
+    assert all(c["region"] == "dev" for c in CASES)
+    for case in TEST_CASES:
+        w, s, e, n = case["chips"][0]["bbox"]
+        assert -106.7 < w and e < -93.5 and 25.8 < s and n < 36.6, case["id"]  # Texas
+    kinds = [case["id"].split("-")[2] for case in TEST_CASES]
+    assert kinds.count("neg") >= 15 and kinds.count("uspvdb") + kinds.count("uswtdb") >= 35

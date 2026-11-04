@@ -149,7 +149,14 @@ step = "case"
 title = "Build the ~60 Texas test Cases, held out: scored once at the end, never tuned on"
 area = "Data and Cases"
 tier = "Must"
-status = "todo"
+status = "doing"
+notes = "61 Cases built and checked 2026-11-04, held out: no Batch has run on them. Left: score them once, at the end, next to the development results. Texas solar doesn't cluster like Mojave/Tehachapi (large sites in West Texas, small ones around San Antonio), so the region is the whole state, picked with seed 2026: 28 solar (8 under 5 MW, 10 at 5 to 50 MW, 10 over 50 MW; at most 2 per county), 13 turbines from 13 projects in 13 counties, and 20 negatives (6 near towns, 7 High Plains farmland, 7 open rangeland), every Chip at least 1 km from the others. Checked by eye: Samson Solar III (no panels yet in 2022) and a Brazos Wind turbine being repowered were replaced by the next picks; 18 Cases got hand corrections (unmapped houses, farmland, ponds, and dirt tracks)."
+see_it = "fixtures/caption/cases/caption-test.jsonl, or the Cases page after `uv run clayzer push --from fixtures/caption`"
+changes = [
+  "fixtures/caption/cases/caption-test.jsonl: the 61 Texas Cases, region test",
+  "fixtures/caption/cases/label-corrections.toml: hand corrections for 18 Texas Cases",
+  "tests/test_fixtures.py: the Texas set is in Texas, region test, the planned mix, and checked like the dev set",
+]
 closes = ["CAP-16"]
 start = "uv run clayzer --region test case ..."
 context = "Development Cases get tuned on; the test region shows whether improvements generalize. Build about 60 Cases in Texas the same way, as a separate region (`--region test`), and score them once at the end. Nobody tunes prompts on them, and the Proposer never sees them. LEVIR covers Texas too but has academic-only imagery: benchmark only, never tuning."
