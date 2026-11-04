@@ -721,10 +721,18 @@ step = "output"
 title = "Stop \"centre\" earning half credit for position on every Case"
 area = "Evaluation"
 tier = "Must"
-status = "decide"
+status = "done"
 closes = ["CAP-10"]
 start = "src/clayzer/grounding.py _position_score; caption-plan.md §8"
-notes = "The centre cell neighbours all 8 others, so a Claim at centre always scores at least 0.5. Options: no neighbour credit, or only along a row or column."
+notes = "Decided and done 2026-11-04: exact cell only, no neighbour credit. Row-and-column credit still left centre the safest blind guess (0.33 against 0.22 at a corner); exact cell gives 1/9 for every cell. With labels listing every cell an object covers, a near miss is a wrong cell. All 8 Batches rescored and base-v2 re-accepted as the Baseline (its position scores fall, e.g. 0.58 to 0.17 on one Case)."
+see_it = "uv run clayzer rescore <batch-id>: position counts only the cells the object covers"
+changes = [
+  "src/clayzer/grounding.py: _position_score gives 1 for a covered cell and 0 otherwise",
+  "src/clayzer/batch.py: SCORER_VERSION grounding-4, so the gate warns when comparing across the change",
+  "tests/test_grounding.py: neighbouring cells score 0, and guessing any cell earns 1/9",
+  "docs/caption-plan.md: the §8 risk resolved and a Position credit row in §10",
+  "baselines/default/: base-v2 re-accepted under the new scorer",
+]
 context = "A Claim one cell away from its label gets 0.5 for position. The centre cell neighbours all eight others, so a Claim at centre always earns at least 0.5: a safe guess the Proposer would learn to exploit. Options: no neighbour credit, or credit only along a row or column (not diagonally). This is a team decision first."
 done_when = [
   "The decision recorded in caption-plan.md §10",

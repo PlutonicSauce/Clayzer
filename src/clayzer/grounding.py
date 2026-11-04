@@ -3,7 +3,8 @@
 The formula is the walkthrough's proposal (prototype/flow-walkthrough.html), with two changes
 for real Answer Keys:
 - Position is right if the Claim's cell is any cell the object covers (a road crosses several);
-  a neighbouring cell scores 0.5.
+  any other cell scores 0. Neighbour credit was dropped (decided 2026-11-04): the centre cell
+  neighbours all eight others, so "centre" was a safe guess worth at least 0.5.
 - Relations are scored as precision only: each directional relation the Caption asserts between
   two labelled types is checked against the labels' positions. Real OSM labels imply many
   relations, so recall would punish every Caption for not listing them all.
@@ -40,7 +41,7 @@ def _count_score(claimed: int, ref: int) -> float:
 
 def _position_score(claimed: str, cells: list[str]) -> float:
     d = min(cell_distance(claimed, c) for c in cells)
-    return 1.0 if d == 0 else 0.5 if d == 1 else 0.0
+    return 1.0 if d == 0 else 0.0
 
 
 def grounding(caption: dict, labels: list[dict]) -> dict:

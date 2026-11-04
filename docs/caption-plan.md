@@ -623,7 +623,7 @@ runtimes yet).
 | A dataset verdict from ~100 items is over-read | Every rate carries a 95% interval, per stratum; the card says where estimates are thin |
 | Grounding rewarded Captions that say less (seen 2026-11-04: a vague one-Claim prompt raised two solar Cases from 0.43 and 0.67 to 0.88) | Resolved 2026-11-04: positives' Chips are offset so the site lands in any of the 9 cells (it was always in the centre), and grounding is two numbers, correctness and coverage. The vague prompt now fails the gate on coverage (0.67 → 0.27 overall) |
 | A noisy candidate relaxed its own regression gate (seen 2026-11-04: drops of 0.31 and 0.32 passed) | Resolved 2026-11-04: the allowed drop uses the Baseline's Spread only, and a Case whose Spread grows sharply is warned about. A Batch-level statistical check is still to come once the ~60 Cases exist |
-| "Centre" always earns half credit for position, because the centre cell neighbours every other cell | Open: drop neighbour credit, or give it only along a row or column; decide before the prompt work starts |
+| "Centre" always earns half credit for position, because the centre cell neighbours every other cell | Resolved 2026-11-04: position scores only an exact cell (any cell the object covers), so a blind guess earns 1/9 whichever cell it names |
 | SageMaker GPU quota is zero in a new account | Request it before kickoff; if it isn't granted, cost stays Partial on Bedrock (CAP-12) |
 | A GPU endpoint left running runs up cost | Delete the endpoint at the end of each session; `cdk destroy` tears down the stack |
 | Teammates' accounts drift apart | One CDK app (AWS-07); each account deploys the same stack |
@@ -683,6 +683,7 @@ decisions is in ADR-0006 and ADR-0007.
 | Caption Runs and the loop | Verify-then-write over MCP with LGND Geo's imagery check as the verifier, so caption Runs get Traces, summaries, a Workflow Score, and replay (REQ-01, REQ-04 to REQ-09) |
 | Order of work | The evaluation loop (Repeats, Batches, Compare, gate) before caption quality; verify-then-write after |
 | Grounding | Two numbers, correctness and coverage, reported and gated separately; positives' Chips offset so the site can be in any cell (decided 2026-11-04) |
+| Position credit | Exact cell only, no neighbour credit: with labels listing every cell an object covers, a near miss is a wrong cell (decided 2026-11-04) |
 | Regression gate | A drop regresses when it exceeds max(0.05, the Baseline's Spread); a sharp rise in Spread warns (decided 2026-11-04) |
 | Tracing | Hybrid (ADR-0001, confirmed 2026-11-04): JSONL Traces in S3 are the record and feed scoring, replay, and the Clayzer app; an OpenTelemetry export goes through ADOT to X-Ray, with CloudWatch metrics per Run, for the ops view; spans carry no prompt text or outputs |
 | Harness tools | Allowed and forbidden MCP servers listed in section 3 (ADR-0006); a verifier is never a scorer |
