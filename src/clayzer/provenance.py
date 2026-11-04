@@ -42,6 +42,7 @@ SETTINGS = [
     ("judge_prompt_sha", "Judge rubric", "What it was judged with"),
     ("embed_model", "Embedding model", "What it was judged with"),
     ("cases_sha", "Cases and Reference Labels", "What it was judged with"),
+    ("retrieval_queries_sha", "Frozen retrieval queries", "What it was judged with"),
     ("chips_sha", "Chip images", "What it was judged with"),
     ("ontology_version", "Ontology version", "What it was judged with"),
     ("ontology_sha", "Ontology file", "What it was judged with"),
@@ -54,7 +55,7 @@ SETTINGS = [
     ("created", "Started", "The run"),
 ]
 # Recorded only by Batches since this module: None means "not recorded".
-RECORDED_SINCE = {"judge_prompt_sha", "chips_sha", "ontology_version", "ontology_sha",
+RECORDED_SINCE = {"retrieval_queries_sha", "judge_prompt_sha", "chips_sha", "ontology_version", "ontology_sha",
                   "code_commit", "code_dirty", "summary_model", "tool_versions",
                   "runtime_build"}  # fmt: skip
 
@@ -67,8 +68,10 @@ BATCH_FILES = [
     ("chips.json", "a SHA-256 of every Chip image"),
     ("results.jsonl", "one row per Run: outcome and scores"),
     ("captions.jsonl", "one Caption per Run"),
+    ("retrieval-queries.jsonl", "frozen text queries and reference relevance"),
     ("retrieval.jsonl", "retrieval over each Repeat's Captions"),
     ("summary.json", "per-Case means and Spreads"),
+    ("replay.json", "offline replay provenance and input hashes, when replayed"),
     ("report.md", "the report, as Markdown"),
 ]
 # A Run's stored files, as suffixes of <case-id>--r<repeat>.

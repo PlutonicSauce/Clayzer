@@ -38,7 +38,7 @@ METRICS = tuple(METRIC_PATHS)
 # Settings that change the measuring stick itself: a difference makes scores less comparable.
 MEASUREMENT = ("judge_model", "judge_prompt_sha", "embed_model", "cases_sha", "chips_sha",
                "ontology_version", "ontology_sha", "scorer_version", "region", "extra",
-               "repeats")  # fmt: skip
+               "repeats", "retrieval_queries_sha")  # fmt: skip
 # Settings a change to the captioner is expected to vary.
 CAPTIONER = ("caption_model", "prompt_sha", "change_prompt_sha", "prompt_source", "tools",
              "max_turns", "verify", "verifiers_sha", "harness", "runtime", "runtime_build",

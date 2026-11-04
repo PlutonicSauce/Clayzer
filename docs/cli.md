@@ -475,3 +475,27 @@ CI ([.github/workflows/ci.yml](../.github/workflows/ci.yml)) can deploy the same
 push to main, assuming a role through GitHub's OIDC so no AWS keys are stored in GitHub.
 [deploy.md](deploy.md) walks through the manual deploy, what each step becomes in CI, and the
 one-time setup the CI deploy needs.
+
+## Imported caption Output Score (offline)
+
+`uv run clayzer evaluate captions.jsonl --cases cases.jsonl --output /tmp/output-score`
+scores normalized imported captions without running the Harness or a model. Missing images,
+Claims, references and measurements remain explicitly unavailable. `--queries` accepts a frozen
+query/relevance JSON array; `--recording` accepts matching saved text embeddings for offline
+retrieval. Provider-enabled extraction/judging and benchmark/calibration adapters are Python APIs.
+See [Output Score handoff](output-score.md) for exact contracts, demo commands and limitations.
+## Non-destructive local Report replay
+
+`uv run clayzer replay /path/to/batches/<id> --data /path/to/data --output /tmp/fresh-replay`
+rebuilds a recorded Batch in a new directory, without models, credentials, MCP or network.
+It recomputes deterministic metrics, retains recorded Judge/retrieval evidence and identifies
+missing evidence and evaluator changes. It refuses existing or overlapping output paths.
+Omit `--output` for a fresh temporary directory. Existing `rescore` still writes into the
+original Batch.
+
+`uv run clayzer ui --local-root /tmp/fresh-replay` opens that isolated local store read-only,
+ignoring `.env` and S3. Imported `evaluate` reports now include linked JSON/HTML dataset cards;
+save them under `<local-root>/data/datasets/<set-id>/` to list them in the app.
+
+For the one-command offline demo, current development-Case reference gallery, artifact layout and limits,
+see [Report handoff](report-handoff.md).

@@ -734,6 +734,24 @@ decisions is in ADR-0006 and ADR-0007.
 | Traceability | CAP-01 to CAP-19 for caption requirements, REQ-01 to REQ-19 ([caption-design.md §2.3](caption-design.md#23-evaluation-loop-requirements)) for the loop; section 11 maps both |
 | Vocabulary | Chip, Chip Pair, Fixed Case, Change Case, Caption, Claim, Reference Label, Answer Key, Reference Caption |
 
+### Output Score decisions (2026-11-04)
+
+Position earns credit only for a cell actually covered by the Reference Label; neighbour credit
+is removed because centre otherwise earns half credit everywhere. Missing USGS/OSM records are
+unknown, and incomplete map counts are lower bounds. Only independently verified absence may
+contradict presence. Correctness and coverage remain separate. Direct parent generalization may
+receive partial credit; sibling similarity cannot establish presence.
+
+Legacy `prep_seconds` measures full Case building, including imagery and reference queries;
+it is not isolated annotation time. Explicit reference-only preparation and caption-generation
+pipeline time are reported separately, with units, methods and measured denominators. This is
+our stated assumption pending Clay's definition. Missing timings and GPU hardware metrics are
+unavailable. See [Output Score handoff](output-score.md) for interfaces, tests and blockers.
+
+Scorer/rubric/query changes are versioned. Historical Batches and the accepted Baseline are
+preserved; they have not been silently rescored or re-accepted. A new comparable real evaluation
+requires separately authorized model calls. Synthetic provider results establish contracts only.
+
 ## 11. Traceability
 
 Every caption and evaluation requirement in the two source documents, and where this plan meets
