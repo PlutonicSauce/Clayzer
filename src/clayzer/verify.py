@@ -136,8 +136,8 @@ def verify(caption: dict, footprint: dict, toolbox, tracer=None, routes=None) ->
                 c |= {"verdict": verdict, "reason": reason}
 
     keep = {SUPPORTED, "unverified", "skipped"}
-    kept = [o for o, c in zip(caption["objects"], checks) if c["verdict"] in keep]
-    moved = [o for o, c in zip(caption["objects"], checks) if c["verdict"] not in keep]
+    kept = [o for o, c in zip(caption["objects"], checks, strict=True) if c["verdict"] in keep]
+    moved = [o for o, c in zip(caption["objects"], checks, strict=True) if c["verdict"] not in keep]
     gone = {o["id"] for o in moved}
     doubts = [
         f"{o['count']} × {names.get(o['object'], o['object']).lower()} at {o['position']}"

@@ -27,7 +27,7 @@ def parse(text: str) -> dict | None:
 def table(value) -> list[dict]:
     """Rows of an LGND table as dicts; a list of dicts passes through."""
     if isinstance(value, dict) and "columns" in value:
-        return [dict(zip(value["columns"], row)) for row in value.get("rows") or []]
+        return [dict(zip(value["columns"], row, strict=False)) for row in value.get("rows") or []]
     if isinstance(value, list):
         return [v for v in value if isinstance(v, dict)]
     return []
