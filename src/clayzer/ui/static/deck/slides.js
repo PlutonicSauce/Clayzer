@@ -69,13 +69,16 @@ function Approach() {
       <div class="criterion"><b>Hidden answer keys</b><p>The captioner never sees the ground truth
         (USGS, OpenStreetMap), so a high score is earned. Grounding is two numbers, so a terse
         caption can't win by saying less.</p></div>
-      <div class="criterion"><b>A verdict on any set</b><p>Point it at anyone's captions and get
-        trust, failure modes, and cost — a dataset card and a gate, not just a number.</p></div>
+      <div class="criterion"><b>An ontology that feeds the model</b><p>The object vocabulary — its
+        look-alikes and house phrasings — is <i>learned from captions</i> and fed back into the
+        prompt, so the model confuses a greenhouse for a solar array less often.</p></div>
     </div>
     <p class="big">The brief asked for an evaluation sandbox. We built one that also makes the
-      captions better and proves it with a regression gate — the loop, not a one-off score.</p>
+      captions better — and closes the loop: the ontology scores captions <i>and</i> teaches the
+      next ones, proven by the regression gate, not asserted.</p>
     <p class="source">Captions on Bedrock (Nova Pro); fidelity judged by Opus 5.5; retrieval by
-      Titan embeddings. Clay's five criteria, each reported on its own.</p>
+      Titan embeddings. The ontology is data-driven (ADR-0010), induced from a caption corpus
+      (ADR-0011).</p>
   </div>`;
 }
 
@@ -126,12 +129,12 @@ function Scale() {
         Chips; no server to outgrow</p></div>
       <div class="criterion"><b>Cheap checks first</b><p>grounding and duplication run on the whole
         set; the costly LLM judge only on a sample</p></div>
-      <div class="criterion"><b>~99 MCP tools</b><p>the same Harness reaches Clay's whole catalog,
-        so the eval widens as Clay does</p></div>
+      <div class="criterion"><b>Any caption set</b><p>point it at anyone's captions — ours, or
+        Clay's own pipeline — for a verdict, failure modes, and cost, no retraining</p></div>
     </div>
     <p class="big">The impact: Clay can trust a caption set before training on it, instead of
-      finding out after a continental-scale run. A bad caption caught here is a wrong lesson the
-      model never learns.</p>
+      finding out after a continental-scale run. And the ontology learned on the way makes the
+      next batch of captions better — a loop that compounds, not a one-off score.</p>
   </div>`;
 }
 
@@ -161,8 +164,8 @@ export const SLIDES = [
     spoken: "Here is the whole journey. One aerial image comes in on the left. Step one, a model on AWS writes a caption. Step two, before each statement is kept, we check it against the imagery. Step three, we score it against open map data the model never saw. Step four, a gate decides whether it is good enough. What comes out on the right is a verdict you can trust. The same path works for one image or a million.",
     notes: ["Walk it as a story: one image in on the left, a verdict out on the right.", "Point at each numbered stop. End on: same path scales to millions."] },
   { title: "Our approach · what's new", seconds: 70, component: Approach,
-    spoken: "Three things set this apart from a plain prompt. First, verify-then-write: each claim is checked against imagery at its own spot as the caption is written, so wrong claims are dropped, not graded after. Second, the captioner never sees the answer keys, so a good score is earned, and grounding is two numbers so it can't win by saying less. Third, it gives a full verdict on anyone's caption set, with a dataset card and a gate, not just a number.",
-    notes: ["This carries originality: verify-then-write, hidden keys, verdict on any set.", "Land: we built the loop that makes captions better, not a one-off score."] },
+    spoken: "Three things set this apart from a plain prompt. First, verify-then-write: each claim is checked against imagery as the caption is written, so wrong claims are dropped, not graded after. Second, the captioner never sees the answer keys, so a good score is earned. Third, and this is the differentiator: our object vocabulary is learned from a caption corpus and fed back into the model, so it confuses a greenhouse for a solar array less often. The ontology both scores captions and teaches the next ones — a loop, proven by the gate.",
+    notes: ["Originality: verify-then-write, hidden keys, and the ontology that feeds the model.", "The loop is the story: the ontology scores AND teaches. Proven by the gate, not asserted.", "Honest: the A/B/C comparison number is pending real Clay embeddings."] },
   { title: "Live demo", seconds: 100, component: Demo,
     spoken: "Now the proof. A case: the image and what is really there. Its caption, with each claim marked supported or not, right on the image. The report, five criteria side by side. The dataset card, showing where captions go wrong. And compare to baseline: the gate says better, worse, or inconclusive.",
     notes: ["The core of the pitch. Case → Caption → report → dataset card → gate.", "Keep the recorded Batch open as the offline fallback."] },
@@ -170,8 +173,8 @@ export const SLIDES = [
     spoken: "On our committed baseline: correctness zero point five eight, coverage zero point six seven, fidelity zero point five four, retrieval zero point eight nine. The headline: the gate caught a vague prompt whose coverage collapsed from zero point six seven to zero point two seven, and stopped it. That is the evaluation doing its job.",
     notes: ["Numbers from the committed Baseline base-v2.", "Lead with the gate catching the vague prompt: coverage 0.67 → 0.27."] },
   { title: "Scale & impact", seconds: 60, component: Scale,
-    spoken: "Will it scale? Clay has already published fifteen point two billion embeddings — that is the scale its captions must reach. Everything here is serverless: Bedrock, S3, and Step Functions fan out over images with no server to outgrow. Cheap checks run on the whole set; the costly judge only on a sample. The impact: Clay can trust a caption set before training on it, instead of finding out after a continental-scale run.",
-    notes: ["Answer the scale question head on: 15.2B embeddings is the target.", "Impact: a bad caption caught here is a wrong lesson the model never learns."] },
+    spoken: "Will it scale? Clay has already published fifteen point two billion embeddings — that is the scale its captions must reach. Everything here is serverless: Bedrock, S3, and Step Functions fan out over images with no server to outgrow. Cheap checks run on the whole set; the costly judge only on a sample. Point it at any caption set, including Clay's own pipeline. The impact: Clay can trust a set before training on it, and the ontology it learns makes the next batch better — a loop that compounds.",
+    notes: ["Answer scale head on: 15.2B embeddings is the target; serverless fan-out.", "Impact + loop: a bad caption caught here is a lesson never learned; the ontology compounds."] },
   { title: "What it means for Clay", seconds: 45, theme: "dark", component: Next,
     spoken: "What it means for Clay: hand Clayzer a caption set, get a verdict — how much to trust, where it fails, what it costs to fix. Then point it at Clay's own pipeline. Our ask is Clay's real caption set and its rubric weights. And any slide here reads itself aloud — press A.",
     notes: ["Close on the ask: Clay's real caption set and its rubric weights.", "Mention the Listen feature (A) as the accessibility point."] },
