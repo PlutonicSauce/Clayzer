@@ -56,9 +56,39 @@ change. The Harness gets both images (earlier first) and `harness.CHANGE_PROMPT`
 Batch records as `change_prompt_sha`. Change Cases aren't verified with LGND Geo: its images
 aren't dated to the pair.
 
+The site is dated by USGS's install year, or by Global Renewables Watch's construction quarter
+when USGS has none (`src/clayzer/grw.py`; the two GeoPackages, 450 MB, download once into
+`~/.cache/clayzer/grw/`). GRW also cross-checks every USGS year. When they're more than a year
+apart, `clayzer case` refuses to build: on the dev sites, each source was wrong at times. Look at
+the site's NAIP images, then choose:
+
+```sh
+uv run clayzer case uspvdb 400117 --change                 # refused: USGS 2013, GRW 2018Q1
+uv run clayzer case uspvdb 400117 --change --dated-by usgs  # panels are in NAIP 2016: USGS is right
+```
+
+GRW's first quarter, 2017 Q4, means "already there when GRW started", not a date, so it can't
+bracket a pair (it can still contradict a USGS year of 2019 or later). Each Change Case records
+how it was dated in `dating`, and GRW's release under `answer_keys`.
+
 Positives use the latest NAIP image taken after the site was built. Site and turbine ids come
 from the USGS APIs (`https://energy.usgs.gov/api/uspvdb/v1/projects`,
 `https://energy.usgs.gov/api/uswtdb/v1/turbines`).
+
+Where a Chip clearly contradicts its labels (houses OSM never mapped, a dry wash mapped as
+water), record the fix in `fixtures/caption/cases/label-corrections.toml`. Every build applies
+it, so the fix survives a rebuild; hand-added labels have `source = "manual"` and no count.
+
+**Setting spread.** A gate can only see what its Cases show. `clayzer spread` labels each
+Case's surroundings (one cell of its Chip without its subject) with an LGND settings classifier
+and reports, for solar, wind and negative Cases, how many sit in each setting, an evenness from
+0 (all one) to 1 (even), and the settings with none. `--suggest` searches LGND for each gap and
+prints `clayzer case` commands for the nearest USGS sites, at least 1 km from every Case.
+
+```sh
+uv run clayzer spread              # about one LGND call per Case the first time
+uv run clayzer spread --suggest    # plus one search per gap
+```
 
 ## The evaluation loop
 
@@ -168,6 +198,27 @@ check catches wrong objects far better than a Claim one cell off.
 uv run clayzer batch --repeats 3 --verify --label verify
 ```
 
+**A verifier per class.** `ontology/verifiers.toml` routes each object class's Claims to the
+verifier that works for it: `imagery_check` (above, the default), `classifier` (the cell's image
+is labelled by an LGND classifier built from the file's text examples, one call for all such
+Claims; built once per LGND account, the first time a Batch needs it), or `none` (not checked,
+kept as skipped). Calibration measures both verifiers on the development Cases and chooses:
+
+```sh
+uv run clayzer verifier calibrate            # report only; about 50 LGND calls the first time
+uv run clayzer verifier calibrate --write    # also rewrite the routes; commit the file
+uv run clayzer verifier routes               # what each class uses now, and why
+```
+
+It writes Claims of its own (one per Case per class, at cells the Reference Labels settle) and
+reports, per class, the share of true Claims each verifier keeps and false Claims it removes.
+A verifier gets the route only if it beats keeping every Claim. Probes where the verifier and
+the label disagree are listed for a look by eye: a label is often what's wrong. Image lookups
+are cached in the store (`lgnd/lookups.json`), and every command that spends LGND calls says
+how many first and stops above `--max-calls` (default 100; the free tier allows 150 a day).
+Reports go to `calibration/verifiers/<time>/`. Batches record the routes' hash
+(`verifiers_sha`), so Compare shows when they changed.
+
 ## Importing a Caption Set
 
 A Caption Set from any source (Clay's, a benchmark's, another pipeline's) becomes Cases, one per
@@ -184,6 +235,18 @@ uv run clayzer import --from-batch <batch-id> --export set.jsonl   # our own Cap
 
 `--from-batch` turns a Batch's Captions into a Caption Set and imports it: the labels should
 match that Batch's Cases, since the footprints and dates are the same.
+
+RSICD's human captions convert to a Caption Set too. RSICD has no locations, dates, or published
+ground sample distance, so its rows are unlocated (`geometry`, `datetime`, and `gsd_m` null):
+its Cases can be judged and searched but not grounded, and the too-small check can't be made.
+
+```sh
+uv run clayzer rsicd --split test                  # 5,465 captions of 1,093 images → data/rsicd-test.jsonl
+uv run clayzer import data/rsicd-test.jsonl --name rsicd-test
+```
+
+The captions file is downloaded once into `~/.cache/clayzer/rsicd/`. RSICD states no license:
+never commit its captions or images, and cite Lu et al. 2017.
 
 ## Claims from free text
 
@@ -255,3 +318,8 @@ Leave out `-c store=...` to have the stack create a new bucket. With Podman, set
 `CDK_DOCKER=podman`. The hosted app never starts Batches, and its role can only read the store
 prefix. `npx aws-cdk@2 destroy` removes everything except the bucket. To build the image on its
 own: `docker build -t clayzer .` (see the [Dockerfile](../Dockerfile)).
+
+CI ([.github/workflows/ci.yml](../.github/workflows/ci.yml)) can deploy the same stack on every
+push to main, assuming a role through GitHub's OIDC so no AWS keys are stored in GitHub.
+[deploy.md](deploy.md) walks through the manual deploy, what each step becomes in CI, and the
+one-time setup the CI deploy needs.

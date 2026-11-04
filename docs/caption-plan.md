@@ -683,6 +683,7 @@ decisions is in ADR-0006 and ADR-0007.
 | Caption Runs and the loop | Verify-then-write over MCP with LGND Geo's imagery check as the verifier, so caption Runs get Traces, summaries, a Workflow Score, and replay (REQ-01, REQ-04 to REQ-09) |
 | Order of work | The evaluation loop (Repeats, Batches, Compare, gate) before caption quality; verify-then-write after |
 | Grounding | Two numbers, correctness and coverage, reported and gated separately; positives' Chips offset so the site can be in any cell (decided 2026-11-04) |
+| Hand label corrections | Where a Chip clearly contradicts USGS or OSM, a person records the fix in `fixtures/caption/cases/label-corrections.toml` (add a missing object as `source = "manual"` with no count, or drop one the image doesn't show); every Case build applies it (decided 2026-11-04) |
 | Position credit | Exact cell only, no neighbour credit: with labels listing every cell an object covers, a near miss is a wrong cell (decided 2026-11-04) |
 | Regression gate | A drop regresses when it exceeds max(0.05, the Baseline's Spread); a sharp rise in Spread warns (decided 2026-11-04) |
 | Tracing | Hybrid (ADR-0001, confirmed 2026-11-04): JSONL Traces in S3 are the record and feed scoring, replay, and the Clayzer app; an OpenTelemetry export goes through ADOT to X-Ray, with CloudWatch metrics per Run, for the ops view; spans carry no prompt text or outputs |

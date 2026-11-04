@@ -12,10 +12,12 @@ from clayzer.store import LocalStore
 
 ROOT = REPO / "fixtures" / "caption"
 CASES = parse_jsonl((ROOT / "cases" / "caption-dev.jsonl").read_bytes())
+# The held-out Texas set: scored once at the end, never tuned on (caption-plan.md §3).
+TEST_CASES = parse_jsonl((ROOT / "cases" / "caption-test.jsonl").read_bytes())
 
 
 def test_every_case_has_its_chip_and_no_chip_is_orphaned():
-    uris = {chip["uri"] for case in CASES for chip in case["chips"]}
+    uris = {chip["uri"] for case in CASES + TEST_CASES for chip in case["chips"]}
     assert all(u.startswith("chips/") for u in uris)
     on_disk = {f"chips/{f.name}" for f in (ROOT / "chips").glob("*.png")}
     assert uris == on_disk
@@ -46,13 +48,14 @@ def test_osm_labels_carry_the_odbl_notice():
 
 def test_nothing_private_or_signed_is_committed():
     pattern = re.compile(r"https?://|s3://|amazonaws|\b\d{12}\b|sig=|token", re.IGNORECASE)
-    for f in [ROOT / "cases" / "caption-dev.jsonl", *(ROOT / "chips").glob("*.json")]:
+    for f in [*(ROOT / "cases").glob("*.jsonl"), *(ROOT / "chips").glob("*.json")]:
         assert not pattern.search(f.read_text()), f.name
 
 
 def test_push_fills_an_empty_store_and_a_batch_runs_on_it(tmp_path, monkeypatch):
     store = LocalStore(tmp_path / "data", tmp_path / "batches")
-    assert _push(store, ROOT) == len(list((ROOT / "chips").glob("*"))) + 1
+    case_files = list((ROOT / "cases").glob("*.jsonl"))
+    assert _push(store, ROOT) == len(list((ROOT / "chips").glob("*"))) + len(case_files)
     cases = load_cases(store, "cases/caption-dev.jsonl")
     assert len(cases) == len(CASES)
     settings = Settings(
@@ -78,7 +81,58 @@ def test_no_chip_is_partly_blank():
 
     from clayzer.chips import MAX_BLANK, blank_share
 
-    for case in CASES:
+    for case in CASES + TEST_CASES:
         for chip in case["chips"]:  # both Chips of a Change Case's pair
             img = np.asarray(Image.open(ROOT / chip["uri"]).convert("RGB"))
             assert blank_share(np.moveaxis(img, -1, 0)) <= MAX_BLANK, chip["id"]
+
+
+def test_the_committed_cases_carry_every_hand_correction():
+    from clayzer.cases import apply_corrections, load_corrections
+
+    corrections = load_corrections()
+    ids = {case["id"] for case in CASES + TEST_CASES}
+    assert corrections and all(c["case"] in ids for c in corrections)
+    for case in CASES + TEST_CASES:
+        labels = case["reference_labels"]
+        assert apply_corrections(case["id"], labels, corrections) == labels, case["id"]
+
+
+def test_label_corrections_drop_add_and_merge_once():
+    import pytest
+
+    from clayzer.cases import apply_corrections
+
+    labels = [
+        {"object": "building", "count": 2, "position": "north_east", "cells": ["north_east"],
+         "attributes": {}, "source": "osm", "source_ids": ["way/1"]},
+        {"object": "water", "count": None, "position": "south", "cells": ["south"],
+         "attributes": {}, "source": "osm", "source_ids": ["way/2"]},
+    ]  # fmt: skip
+    corrections = [
+        {"case": "c", "object": "water", "action": "drop"},
+        {"case": "c", "object": "building", "action": "add", "cells": ["south", "north_east"]},
+        {"case": "c", "object": "parking_lot", "action": "add", "cells": ["centre"]},
+        {"case": "other", "object": "building", "action": "drop"},
+    ]
+    once = apply_corrections("c", labels, corrections)
+    assert [lb["object"] for lb in once] == ["building", "parking_lot"]
+    assert once[0]["cells"] == ["north_east", "south"] and once[0]["count"] is None
+    assert once[0]["source"] == "osm+manual" and once[0]["position"] == "north_east"
+    assert once[1]["source"] == "manual" and once[1]["position"] == "centre"
+    assert apply_corrections("c", once, corrections) == once
+    assert labels[0]["count"] == 2  # the input is left alone
+    with pytest.raises(ValueError):
+        apply_corrections(
+            "c", [], [{"case": "c", "object": "x", "action": "add", "cells": ["middle"]}]
+        )
+
+
+def test_the_texas_test_set_is_held_apart_from_development():
+    assert TEST_CASES and all(c["region"] == "test" for c in TEST_CASES)
+    assert all(c["region"] == "dev" for c in CASES)
+    for case in TEST_CASES:
+        w, s, e, n = case["chips"][0]["bbox"]
+        assert -106.7 < w and e < -93.5 and 25.8 < s and n < 36.6, case["id"]  # Texas
+    kinds = [case["id"].split("-")[2] for case in TEST_CASES]
+    assert kinds.count("neg") >= 15 and kinds.count("uspvdb") + kinds.count("uswtdb") >= 35

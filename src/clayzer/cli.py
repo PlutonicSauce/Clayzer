@@ -21,6 +21,9 @@ clayzer ui --calibrate                      also let /label save hand-made label
 clayzer login lgnd                          sign in to an MCP server that needs it (browser, once)
 clayzer tools roda                          list an MCP server's tools
 clayzer tools lgnd --call TOOL --args JSON  call one tool and print the result
+clayzer verifier calibrate [--write]        measure each class's verifier on dev Cases; choose routes
+clayzer verifier routes                     which verifier checks each class, and why
+clayzer spread [--suggest]                  how varied the Cases' surroundings are, and the gaps
 
 Everything is read from and written to the store: local folders, or CLAYZER_STORE=s3://...
 """
@@ -99,6 +102,8 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument("kind", choices=["uspvdb", "uswtdb", "neg"])
     c.add_argument("args", nargs="+", help="a USGS case_id, or lon lat for a negative")
     c.add_argument("--n", type=int, default=1, help="negative number")
+    c.add_argument("--dated-by", choices=["usgs", "grw"],
+                   help="with --change: which date to use when USGS and GRW disagree, after a look")  # fmt: skip
     c.add_argument("--change", action="store_true",
                    help="a Change Case: the site before and after its install year (a Chip Pair)")  # fmt: skip
     c.add_argument("--state", default="CA", help="state code for a negative")
@@ -176,6 +181,13 @@ def main(argv: list[str] | None = None) -> int:
     im.add_argument("--export", type=Path, metavar="JSONL",
                     help="with --from-batch: also write the Caption Set itself to this file")  # fmt: skip
 
+    rs = sub.add_parser("rsicd", help="RSICD's human captions as a Caption Set file, to import")
+    rs.add_argument("--split", choices=["train", "val", "test"], default="test")
+    rs.add_argument("--limit", type=int, help="only the split's first N images (5 captions each)")
+    rs.add_argument(
+        "--out", type=Path, help="JSON Lines to write (default data/rsicd-<split>.jsonl)"
+    )
+
     ex = sub.add_parser("extract", help="the Claims a caption's text makes; or calibrate that")
     ex.add_argument("text", nargs="?", help="a caption")
     ex.add_argument("--check", metavar="BATCH_ID",
@@ -190,9 +202,34 @@ def main(argv: list[str] | None = None) -> int:
     tl.add_argument("--call", metavar="TOOL", help="call this tool")
     tl.add_argument("--args", default="{}", help="the tool's arguments as JSON")
 
+    vf = sub.add_parser("verifier", help="which verifier checks each object class")
+    vf_sub = vf.add_subparsers(dest="action", required=True)
+    cal = vf_sub.add_parser("calibrate", help="measure the verifiers on development Cases")
+    cal.add_argument("--per-class", type=int, default=6,
+                     help="true and false probes per class, each (at most 15)")  # fmt: skip
+    cal.add_argument("--write", action="store_true", help="save the chosen routes to "
+                     "ontology/verifiers.toml")  # fmt: skip
+    cal.add_argument("--max-calls", type=int, default=100,
+                     help="stop before starting if it would take more LGND calls")  # fmt: skip
+    vf_sub.add_parser("routes", help="show the routes in ontology/verifiers.toml")
+
+    sp = sub.add_parser("spread", help="how varied the Cases' surroundings are, and the gaps")
+    sp.add_argument("--suggest", action="store_true",
+                    help="search LGND for each gap and print `clayzer case` commands")  # fmt: skip
+    sp.add_argument("--max-calls", type=int, default=100,
+                    help="stop before starting if it would take more LGND calls")  # fmt: skip
+
     a = p.parse_args(argv)
     if a.cmd in ("login", "tools"):
         return _tools_command(a)
+    if a.cmd == "verifier" and a.action == "routes":
+        from clayzer import verifiers
+
+        routes = verifiers.load()
+        print(f"default {routes.default}; classifier {routes.classifier}")
+        for cls, r in routes.routes.items():
+            print(f"  {cls:<14} {r['method']:<14} {r.get('reason', '')}")
+        return 0
     store = settings.store()
     key = cases_key(a.region)
 
@@ -205,7 +242,14 @@ def main(argv: list[str] | None = None) -> int:
             if a.kind == "neg":
                 print("--change needs a USGS site: uspvdb or uswtdb", file=sys.stderr)
                 return 2
-            case = build_change(a.kind, int(a.args[0]), a.region, store, settings.naip_source)
+            from clayzer.grw import Flagged
+
+            try:
+                case = build_change(a.kind, int(a.args[0]), a.region, store,
+                                    settings.naip_source, a.dated_by)  # fmt: skip
+            except Flagged as e:
+                print(f"not built: {e}", file=sys.stderr)
+                return 2
         elif a.kind == "neg":
             lon, lat = map(float, a.args)
             case = build_negative(lon, lat, a.n, a.state, a.region, store, settings.naip_source)
@@ -220,6 +264,11 @@ def main(argv: list[str] | None = None) -> int:
         chips = " → ".join(f"{c['id']} ({c['source']})" for c in case["chips"])
         print(f"{case['id']}: chip {chips}, {case['prep_seconds']} s")
         print("  labels: " + (", ".join(labels) or "none"))
+        if d := case.get("dating"):
+            print(f"  dated by {d['source']}: USGS {d['usgs_year'] or 'no year'}, "
+                  f"GRW {', '.join(d['grw']) or 'no match'}")  # fmt: skip
+            if d["flag"]:
+                print(f"  flagged: {d['flag']}; dated by {d['source']}, chosen by {d['chosen_by']}")
         print(f"  stored in {store.url(key)}")
         return 0
 
@@ -328,7 +377,9 @@ def main(argv: list[str] | None = None) -> int:
         for st in steps:
             at = st.attributes
             tokens = (at.get("usage") or {}).get("totalTokens", "")
-            result = st.error or (st.output or {}).get("stop_reason", "")
+            # A tool Step's output is the tool's text; an llm Step's is a dict.
+            out = st.output if isinstance(st.output, dict) else {}
+            result = st.error or out.get("stop_reason", "")
             if at.get("fault"):
                 f = at["fault"]
                 result = (
@@ -408,11 +459,26 @@ def main(argv: list[str] | None = None) -> int:
         store.put(import_key(name), to_jsonl(result.cases), "application/x-ndjson")
         located = sum(c["located"] for c in result.cases)
         small = sum(1 for c in result.cases if c["imported"]["too_small"])
+        unknown = sum(1 for c in result.cases if c["imported"]["too_small"] is None)
         print(f"  {len(result.cases)} Cases ({located} located), {len(result.skipped)} skipped, "
-              f"{small} with Claims possibly too small for their imagery")  # fmt: skip
+              f"{small} with Claims possibly too small for their imagery"
+              + (f", {unknown} with no imagery resolution to check against" if unknown else ""))  # fmt: skip
         for s in result.skipped[:10]:
             print(f"  skipped {s['caption_id']}: {s['reason']}")
         return 0 if result.cases else 1
+
+    if a.cmd == "rsicd":
+        from clayzer import rsicd
+
+        rows = rsicd.rows(json.loads(rsicd.captions_file().read_text()), a.split, a.limit)
+        out = a.out or settings.data_dir / f"rsicd-{a.split}.jsonl"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text("".join(json.dumps(r) + "\n" for r in rows))
+        images = len({r["chip_id"] for r in rows})
+        print(f"{len(rows)} captions of {images} RSICD {a.split} images → {out}")
+        print("  never commit it (no license stated; cite Lu et al. 2017). Next:")
+        print(f"  uv run clayzer import {out} --name rsicd-{a.split}")
+        return 0
 
     if a.cmd == "extract":
         from clayzer.config import bedrock
@@ -446,6 +512,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  {r['failed']} failed; saved in {store.url(prefix)}/agreement.json")
         return 0
 
+    if a.cmd in ("verifier", "spread"):
+        return _lgnd_command(a, store, load_cases(store, key))
+
     if a.cmd == "ui":
         try:
             from clayzer.ui.app import serve
@@ -459,6 +528,69 @@ def main(argv: list[str] | None = None) -> int:
         serve(settings, a.region, a.allow_launch, a.host, a.port, a.calibrate)
         return 0
     return 1
+
+
+def _lgnd_command(a, store, cases: list[dict]) -> int:
+    """`clayzer verifier calibrate` and `clayzer spread`: both read the region's Cases and spend
+    LGND's daily calls (150 on the free tier), so each says what it will cost first."""
+    from clayzer import lgnd
+
+    if a.region == "test":
+        print("calibrate and measure on development Cases only (CAP-16)", file=sys.stderr)
+        return 2
+    cases = [c for c in cases if c["id"].startswith("fixed-")]
+    if not cases:
+        print(f"no Cases for region {a.region!r}; `clayzer push --from fixtures/caption`",
+              file=sys.stderr)  # fmt: skip
+        return 1
+    cached = lgnd.Lookups(None, store)
+    if a.cmd == "verifier":
+        from clayzer import calibrate, verifiers
+
+        routes = verifiers.load()
+        plan = calibrate.probes(cases, min(a.per_class, 15))
+        cost = calibrate.estimate(plan, cached, routes)
+        print(f"{len(plan)} probes from {len(cases)} Cases: about {cost} LGND calls")
+    else:
+        from clayzer import spread
+
+        cost = spread.estimate(cases, cached, a.suggest)
+        print(f"{len(cases)} Cases: at most {cost} LGND calls")
+    if cost > a.max_calls:
+        print(f"that's over --max-calls {a.max_calls}; raise it, or use --per-class",
+              file=sys.stderr)  # fmt: skip
+        return 2
+    try:
+        from clayzer.mcp_auth import NotSignedIn
+        from clayzer.tools import Toolbox
+    except ImportError:
+        print("MCP tools need the tools extra: uv sync --extra tools", file=sys.stderr)
+        return 1
+    try:
+        with Toolbox.named(["lgnd"]) as box:
+            if a.cmd == "verifier":
+                result = calibrate.run(cases, box.call, store, a.per_class, routes)
+                prefix = calibrate.save(store, result, routes)
+                print(calibrate.to_markdown(result, routes))
+                print(f"saved in {store.url(prefix)}")
+                if a.write:
+                    new = calibrate.updated(routes, result)
+                    verifiers.DEFAULT.write_text(verifiers.render(new))
+                    print(f"routes written to {verifiers.DEFAULT} (commit it to share)")
+                return 0
+            measured = spread.measure(cases, box.call, store)
+            found = spread.suggest(cases, measured, box.call) if a.suggest else None
+            text = spread.to_markdown(measured, found)
+    except NotSignedIn as e:
+        print(e, file=sys.stderr)
+        return 1
+    from datetime import UTC, datetime
+
+    key = f"spread/{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}/report.md"
+    store.put(key, text.encode(), "text/markdown")
+    print(text)
+    print(f"saved in {store.url(key)}")
+    return 0
 
 
 def _tools_command(a) -> int:

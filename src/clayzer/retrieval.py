@@ -26,7 +26,7 @@ def embed(client, model: str, text: str) -> list[float]:
 
 
 def _cos(a, b) -> float:
-    dot = sum(x * y for x, y in zip(a, b))
+    dot = sum(x * y for x, y in zip(a, b, strict=True))
     return dot / (math.sqrt(sum(x * x for x in a)) * math.sqrt(sum(y * y for y in b)) or 1)
 
 

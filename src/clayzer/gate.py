@@ -38,7 +38,7 @@ MEASUREMENT = ("judge_model", "judge_prompt_sha", "embed_model", "cases_sha", "c
                "ontology_version", "ontology_sha", "scorer_version")  # fmt: skip
 # Settings a change to the captioner is expected to vary.
 CAPTIONER = ("caption_model", "prompt_sha", "change_prompt_sha", "prompt_source", "tools",
-             "max_turns")  # fmt: skip
+             "max_turns", "verifiers_sha")  # fmt: skip
 # The code itself: a change can move either, so it's shown but not warned about.
 CODE = ("code_commit", "code_dirty")
 
