@@ -79,6 +79,8 @@ class BatchConfig:
     # MCP servers the Harness may call (tools.py); empty means the single-call Harness.
     tools: list[str] = field(default_factory=list)
     max_turns: int = harness.MAX_TURNS
+    # The MCP server that verifies drafted Claims (verify.py), or None for no verification.
+    verify: str | None = None
 
 
 def _sha(data: bytes) -> str:
@@ -135,7 +137,10 @@ def _classify(e: Exception) -> str:
     return SANDBOX_FAILURE
 
 
-def _run_one(client, cfg: BatchConfig, prompt: str, case: dict, repeat: int, store, toolbox=None):
+def _run_one(
+    client, cfg: BatchConfig, prompt: str, case: dict, repeat: int, store, toolbox=None,
+    verifier=None,
+):  # fmt: skip
     """One Run: caption the Case's Chip, then score it. Returns (result, caption).
 
     Every model call is recorded in the Run's Trace, which is written whatever the outcome,
@@ -157,9 +162,11 @@ def _run_one(client, cfg: BatchConfig, prompt: str, case: dict, repeat: int, sto
     )  # fmt: skip
     try:
         try:
+            # The verifier, not the model, gets the Chip's footprint (ADR-0009).
+            footprint = {"bbox": chip["bbox"], "date": chip.get("date")} if verifier else None
             cap, step = harness.caption(
                 client, cfg.caption_model, chip["id"], png, prompt, tracer, chip["uri"],
-                toolbox, cfg.max_turns,
+                toolbox, cfg.max_turns, verifier, footprint,
             )  # fmt: skip
         except harness.HarnessFault as e:
             empty = {"text": "", "objects": [], "relations": [], "uncertain": []}
@@ -189,6 +196,7 @@ def _run_one(client, cfg: BatchConfig, prompt: str, case: dict, repeat: int, sto
             "fidelity": None,
             "seconds_to_caption": step["seconds"],
             "caption_tokens": step["usage"].get("totalTokens"),
+            "verification": step.get("verification"),
         }  # fmt: skip
         if cfg.judge_model:
             try:
@@ -222,11 +230,13 @@ def start(
     progress=print,
     narrate: bool = True,
     tools: list[str] | None = None,
+    verify: str | None = None,
 ) -> str:
     """Create a Batch and run it. Returns the Batch id."""
     batch_id = create(
-        cases, settings, store, repeats, label, region, prompt, prompt_source, judge, tools
-    )
+        cases, settings, store, repeats, label, region, prompt, prompt_source, judge, tools,
+        verify,
+    )  # fmt: skip
     resume(batch_id, settings, store, progress, narrate)
     return batch_id
 
@@ -242,6 +252,7 @@ def create(
     prompt_source: str = "built-in",
     judge: bool = True,
     tools: list[str] | None = None,
+    verify: str | None = None,
 ) -> str:
     """Write a new Batch's configuration, prompt, and frozen Cases. Returns the Batch id."""
     # Labels become part of store keys, so only letters, digits, dashes and underscores.
@@ -262,6 +273,7 @@ def create(
         prompt_sha=_sha(prompt.encode()),
         prompt_source=prompt_source,
         tools=list(tools or []),
+        verify=verify,
     )
     store.put(
         _key(batch_id, "batch.json"), (json.dumps(asdict(cfg), indent=2) + "\n").encode(), JSON
@@ -285,17 +297,23 @@ def resume(batch_id: str, settings: Settings, store, progress=print, narrate: bo
 
     todo = [(c, r) for r in range(1, cfg.repeats + 1) for c in cases if (c["id"], r) not in done]
     stopped = None
-    # MCP servers start once per Batch, and only if a Run is left to do.
-    if cfg.tools and todo:
+    # MCP servers start once per Batch, and only if a Run is left to do. The model is offered
+    # only its own servers' tools; the verifier's stay out of its prompt.
+    servers = list(dict.fromkeys(cfg.tools + ([cfg.verify] if cfg.verify else [])))
+    if servers and todo:
         from clayzer.tools import Toolbox
 
-        tools = Toolbox.named(cfg.tools)
+        tools = Toolbox.named(servers)
     else:
         tools = nullcontext()
-    with tools as toolbox:
+    with tools as box:
+        model_tools = box.view(cfg.tools) if box is not None and cfg.tools else None
+        verifier = box.view([cfg.verify]) if box is not None and cfg.verify else None
         for i, (case, repeat) in enumerate(todo, 1):
             try:
-                result, cap = _run_one(client, cfg, prompt, case, repeat, store, toolbox)
+                result, cap = _run_one(
+                    client, cfg, prompt, case, repeat, store, model_tools, verifier
+                )
             except CredentialsExpired as e:
                 stopped = f"credentials expired after {i - 1} of {len(todo)} Runs: {e}"[:300]
                 break

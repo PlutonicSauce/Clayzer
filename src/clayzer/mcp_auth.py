@@ -73,7 +73,10 @@ class FileTokenStorage:
         tmp.chmod(0o600)
         tmp.replace(self.path)
 
-    async def get_tokens(self):
+    def signed_in(self) -> bool:
+        return bool(self._read().get("tokens"))
+
+    async def get_tokens(self, force_refresh: bool = False):
         from mcp.shared.auth import OAuthToken
 
         data = self._read()
@@ -86,7 +89,7 @@ class FileTokenStorage:
             # Saved before expiry was recorded: the file was written when the token arrived.
             expires_at = self.path.stat().st_mtime + token.expires_in - EXPIRY_MARGIN
         expired = expires_at is not None and time.time() >= expires_at
-        if expired and token.refresh_token and self.url:
+        if (expired or force_refresh) and token.refresh_token and self.url:
             return await self._refresh(token, data.get("client_info", {}).get("client_id")) or token
         return token
 
@@ -133,6 +136,42 @@ class FileTokenStorage:
 
     async def set_client_info(self, client_info) -> None:
         self._write("client_info", client_info)
+
+
+def stored_token_auth(name: str, url: str, directory: Path | None = None):
+    """httpx2 auth for a saved sign-in, used by everything except `clayzer login`.
+
+    It adds the saved access token to each request, refreshing it first when it has expired,
+    and on a 401 refreshes once and retries. The SDK's own provider does neither within a
+    running process: it doesn't know a loaded token's expiry, and on a 401 it starts a full
+    sign-in, which a Batch can't do (a Batch lost every LGND call after its first 5-minute
+    token expired). Check `.storage.signed_in()` before connecting.
+    """
+    import httpx2
+
+    class StoredTokenAuth(httpx2.Auth):
+        def __init__(self):
+            self.storage = FileTokenStorage(name, directory, url)
+            self._lock = asyncio.Lock()
+
+        async def _token(self, force: bool = False) -> str | None:
+            async with self._lock:
+                token = await self.storage.get_tokens(force_refresh=force)
+            return token.access_token if token else None
+
+        async def async_auth_flow(self, request):
+            access = await self._token()
+            if not access:
+                raise NotSignedIn(f"{name} needs a sign-in: run `clayzer login {name}` first")
+            request.headers["Authorization"] = f"Bearer {access}"
+            response = yield request
+            if response.status_code == 401:
+                fresh = await self._token(force=True)
+                if fresh and fresh != access:
+                    request.headers["Authorization"] = f"Bearer {fresh}"
+                    yield request
+
+    return StoredTokenAuth()
 
 
 def wait_for_callback(port: int, timeout: float = SIGN_IN_TIMEOUT) -> dict[str, str]:

@@ -130,6 +130,21 @@ The first call returns the newest NAIP observation at a point (`naip/obs:...`); 
 LGND's image model whether that observation supports a claim. Behind a TLS-intercepting proxy,
 set `CLAYZER_MCP_SYSTEM_TRUST=1`.
 
+**Verify, then write.** With `--verify`, the Harness checks each drafted Claim with LGND Geo
+before the Caption commits (`src/clayzer/verify.py`): it looks up LGND's NAIP image at the centre
+of the Claim's grid cell and asks LGND's image model whether the object is there. Claims it
+confirms stay; the rest move to `uncertain`, and a text-only call rewrites the prose from what
+is left. A Claim LGND couldn't check (an LGND failure) stays, marked unverified. The code, not
+the model, makes these calls from the Chip's footprint, so the model still sees only the image
+(ADR-0009). Every lookup and check is a `tool` Step with `role: verify`, and each Run result has
+counts (`verification`). LGND's images are about 160 m across, bigger than a 102 m cell, so the
+check catches wrong objects far better than a Claim one cell off.
+
+```sh
+uv run clayzer login lgnd
+uv run clayzer batch --repeats 3 --verify --label verify
+```
+
 A Batch writes `batches/<batch-id>/` in the store: `batch.json` (models, prompt hash, Cases
 hash, Repeats, scorer version), `prompt.txt`, `cases.jsonl` (frozen at the start),
 `results.jsonl`, `captions.jsonl`, `retrieval.jsonl`, `summary.json` (per-Case mean and

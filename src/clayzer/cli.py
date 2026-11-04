@@ -113,6 +113,10 @@ def main(argv: list[str] | None = None) -> int:
     b.add_argument(
         "--tools", nargs="+", metavar="SERVER", help="MCP servers the Harness may call, e.g. roda"
     )
+    b.add_argument(
+        "--verify", action="store_true",
+        help="check each drafted Claim with LGND Geo before writing (needs `clayzer login lgnd`)",
+    )  # fmt: skip
     b.add_argument("--resume", metavar="BATCH_ID", help="finish an existing Batch")
     b.add_argument("--no-narrate", action="store_true",
                    help="skip the model-written Trace summaries")  # fmt: skip
@@ -223,6 +227,7 @@ def main(argv: list[str] | None = None) -> int:
                 cases, settings, store, a.repeats, a.label, a.region, prompt,
                 str(a.prompt) if a.prompt else "built-in", judge=not a.no_judge,
                 narrate=not a.no_narrate, tools=a.tools,
+                verify="lgnd" if a.verify else None,
             )  # fmt: skip
             summary = batches.load(store, batch_id)["summary"]
         print(f"Batch {batch_id} in {store.url(f'batches/{batch_id}/')}")
