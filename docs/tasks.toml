@@ -1,0 +1,352 @@
+# The team's work board, shown on the Tasks page of `clayzer ui`.
+#
+# One [[task]] per piece of work. Keep it in step with docs/caption-plan.md: the plan says what
+# and why; this file says who is doing what now. Edit it in a PR like any other doc.
+#
+#   area    one of the five functional areas (caption-plan.md §4)
+#   tier    Must, Should, or Could (caption-plan.md §2)
+#   status  done, doing, todo, blocked, or decide (waiting on a team decision)
+#   closes  requirement ids: CAP-* (caption-design.md §2.1), REQ-* (caption-design.md §2.3),
+#           AWS-* (caption-design.md §2.2)
+#   start   where to begin: a file, a command, or a plan section
+#   after   ids of tasks that should land first
+
+# ── Data and Cases ──────────────────────────────────────────────────────────────────────
+
+[[task]]
+id = "data-access"
+title = "Verify data access: USGS, NAIP (Planetary Computer and AWS), OSM, Bedrock"
+area = "Data and Cases"
+tier = "Must"
+status = "done"
+closes = ["CAP-03", "CAP-19", "AWS-03"]
+start = "caption-plan.md §3"
+notes = "Verified 2026-11-03 in one participant account."
+
+[[task]]
+id = "dev-cases"
+title = "Build the ~60 development Cases (40 positive, 20 negative) in Mojave/Tehachapi"
+area = "Data and Cases"
+tier = "Must"
+status = "doing"
+closes = ["CAP-01", "CAP-16"]
+start = "uv run clayzer case uspvdb <id>  ·  src/clayzer/cases.py"
+notes = "4 built. Mix sizes and surroundings; include ordinary land (caption-plan.md §3)."
+
+[[task]]
+id = "lookalike-negatives"
+title = "Find look-alike negatives (greenhouses, parking lots) with LGND Geo's NAIP search"
+area = "Data and Cases"
+tier = "Must"
+status = "todo"
+closes = ["CAP-18"]
+start = "LGND Geo search_place_find; then uv run clayzer case neg <lon> <lat>"
+after = ["dev-cases"]
+
+[[task]]
+id = "fixtures"
+title = "Commit fixtures/caption/ (Cases + ~50 Chips) with an ODbL notice for OSM labels"
+area = "Data and Cases"
+tier = "Must"
+status = "todo"
+closes = ["REQ-15", "REQ-14"]
+start = "uv run clayzer push --from fixtures/caption (teammates load it into their bucket)"
+after = ["dev-cases"]
+
+[[task]]
+id = "texas-cases"
+title = "Build the ~60 Texas test Cases, held out: scored once at the end, never tuned on"
+area = "Data and Cases"
+tier = "Must"
+status = "todo"
+closes = ["CAP-16"]
+start = "uv run clayzer --region test case ..."
+
+[[task]]
+id = "usgs-polygons"
+title = "Use USPVDB polygons, not centroids, for solar positions and cells"
+area = "Data and Cases"
+tier = "Should"
+status = "todo"
+closes = ["CAP-10"]
+start = "src/clayzer/answer_keys.py usgs_labels"
+
+[[task]]
+id = "change-cases"
+title = "Change Cases: Chip Pairs from USGS install years and GRW construction dates"
+area = "Data and Cases"
+tier = "Should"
+status = "todo"
+closes = ["CAP-02"]
+start = "caption-plan.md §5.1 (kind = change)"
+
+# ── Captioning ──────────────────────────────────────────────────────────────────────────
+
+[[task]]
+id = "skeleton"
+title = "Walking skeleton: Chip → Nova Pro Caption → scores → report"
+area = "Captioning"
+tier = "Must"
+status = "done"
+closes = ["CAP-05", "AWS-01", "AWS-02"]
+start = "src/clayzer/harness.py"
+
+[[task]]
+id = "lgnd-client"
+title = "MCP client in the Harness with its own LGND Geo OAuth sign-in"
+area = "Captioning"
+tier = "Must"
+status = "todo"
+closes = ["REQ-01", "REQ-02"]
+start = "caption-plan.md §1.3; mcp Python SDK OAuth client"
+after = ["eval-loop"]
+
+[[task]]
+id = "verify-then-write"
+title = "Verify-then-write: check each Claim with LGND's imagery check at its grid cell"
+area = "Captioning"
+tier = "Must"
+status = "todo"
+closes = ["CAP-10", "REQ-01", "CAP-18"]
+start = "caption-plan.md §1.3, §6"
+after = ["lgnd-client", "grounding-fix"]
+
+[[task]]
+id = "prompt-loop"
+title = "Improve the caption prompt through the loop: one change per Batch, gated"
+area = "Captioning"
+tier = "Must"
+status = "todo"
+closes = ["CAP-01", "CAP-06"]
+start = "uv run clayzer batch --prompt <file> --label <change>; clayzer gate"
+after = ["grounding-fix", "gate-rule"]
+
+[[task]]
+id = "second-captioner"
+title = "Opus 5.5 as a second captioning VLM (self-graded verdicts flagged)"
+area = "Captioning"
+tier = "Must"
+status = "todo"
+closes = ["REQ-10", "REQ-19"]
+start = "uv run clayzer batch --caption-model us.anthropic.claude-opus-5-5"
+
+[[task]]
+id = "gpu-vlm"
+title = "An open VLM on a SageMaker GPU endpoint; GPU-seconds per Caption"
+area = "Captioning"
+tier = "Should"
+status = "blocked"
+closes = ["CAP-12", "AWS-04"]
+start = "caption-plan.md §7 AWS service tasks"
+notes = "Needs the GPU quota request first."
+
+# ── Evaluation ──────────────────────────────────────────────────────────────────────────
+
+[[task]]
+id = "eval-loop"
+title = "Evaluation loop: Batches, Repeats, resume, Compare, Baseline, regression gate"
+area = "Evaluation"
+tier = "Must"
+status = "done"
+closes = ["CAP-15", "REQ-14"]
+start = "src/clayzer/batch.py, src/clayzer/gate.py"
+notes = "Built 2026-11-04; an unchanged rerun passed and a vague prompt failed."
+
+[[task]]
+id = "grounding-fix"
+title = "Stop grounding from rewarding Captions that say less"
+area = "Evaluation"
+tier = "Must"
+status = "done"
+closes = ["CAP-10"]
+start = "src/clayzer/grounding.py; caption-plan.md §8"
+notes = "Done 2026-11-04: Chips offset so the site can be in any cell; grounding split into correctness and coverage. Follow-up: centre's neighbour credit (next task)."
+
+[[task]]
+id = "gate-rule"
+title = "Stop a noisy candidate from relaxing its own regression gate"
+area = "Evaluation"
+tier = "Must"
+status = "done"
+closes = ["CAP-15"]
+start = "src/clayzer/gate.py; caption-plan.md §8"
+notes = "Done 2026-11-04: the Baseline's Spread only, plus a warning when a Case turns erratic."
+
+[[task]]
+id = "centre-credit"
+title = "Stop \"centre\" earning half credit for position on every Case"
+area = "Evaluation"
+tier = "Must"
+status = "decide"
+closes = ["CAP-10"]
+start = "src/clayzer/grounding.py _position_score; caption-plan.md §8"
+notes = "The centre cell neighbours all 8 others, so a Claim at centre always scores at least 0.5. Options: no neighbour credit, or only along a row or column."
+
+[[task]]
+id = "rsicd"
+title = "RSICD benchmark: ~100 test images for fidelity and retrieval against human captions"
+area = "Evaluation"
+tier = "Must"
+status = "todo"
+closes = ["CAP-07", "CAP-09", "CAP-11", "CAP-17"]
+start = "caption-plan.md §3 RSICD rules (download at run time, never commit)"
+
+[[task]]
+id = "workflow-score"
+title = "Workflow Score for caption Runs: verification calls per Claim, failures, steps"
+area = "Evaluation"
+tier = "Must"
+status = "todo"
+closes = ["REQ-06"]
+start = "caption-plan.md §1.3"
+after = ["verify-then-write"]
+
+[[task]]
+id = "label-prep"
+title = "Label preparation time per label set (definition still asked of Clay)"
+area = "Evaluation"
+tier = "Must"
+status = "doing"
+closes = ["CAP-13"]
+start = "Case prep_seconds; caption-plan.md §9"
+notes = "Recorded per Case and summed per Batch; the definition is a question for Clay."
+
+[[task]]
+id = "vrsbench"
+title = "VRSBench test split as a grounding benchmark (object boxes → counts, positions)"
+area = "Evaluation"
+tier = "Should"
+status = "todo"
+closes = ["CAP-10", "CAP-17"]
+start = "caption-plan.md §3 What scores what"
+
+[[task]]
+id = "judge-calibration"
+title = "Calibrate the fidelity Judge with blind Calibration Labels on caption Runs"
+area = "Evaluation"
+tier = "Should"
+status = "todo"
+closes = ["REQ-19"]
+start = "GLOSSARY.md Calibration Label"
+
+# ── Sandbox integration ─────────────────────────────────────────────────────────────────
+
+[[task]]
+id = "s3-store"
+title = "S3 store per account; NAIP read from AWS in us-west-2"
+area = "Sandbox integration"
+tier = "Must"
+status = "done"
+closes = ["AWS-03", "CAP-19"]
+start = "src/clayzer/store.py; README Storage"
+
+[[task]]
+id = "web-app"
+title = "Team web app: workflow, tasks, Cases, Batches, compare, gate, launch"
+area = "Sandbox integration"
+tier = "Should"
+status = "done"
+closes = ["REQ-12"]
+start = "uv run clayzer ui"
+
+[[task]]
+id = "trace-summaries"
+title = "Readable Trace summaries for caption Runs"
+area = "Sandbox integration"
+tier = "Must"
+status = "todo"
+closes = ["REQ-05", "REQ-04"]
+start = "batches/<id>/trace.jsonl"
+
+[[task]]
+id = "replay"
+title = "Recorded-Trace replay: rescore stored Captions without calling the Harness"
+area = "Sandbox integration"
+tier = "Must"
+status = "todo"
+closes = ["REQ-09"]
+start = "batches/<id>/captions.jsonl"
+
+[[task]]
+id = "iam"
+title = "Least-privilege IAM roles; no credentials in the repo"
+area = "Sandbox integration"
+tier = "Must"
+status = "todo"
+closes = ["AWS-13"]
+start = "caption-plan.md §7 AWS service tasks"
+
+[[task]]
+id = "xray"
+title = "Export Traces through ADOT to X-Ray"
+area = "Sandbox integration"
+tier = "Should"
+status = "todo"
+closes = ["AWS-05", "REQ-11"]
+start = "caption-plan.md §7 AWS service tasks"
+
+[[task]]
+id = "cdk"
+title = "CDK app for the stack, deployable into any teammate's account"
+area = "Sandbox integration"
+tier = "Should"
+status = "todo"
+closes = ["AWS-07"]
+start = "caption-plan.md §7"
+
+[[task]]
+id = "app-runner"
+title = "Run the web app on App Runner so the demo is a live URL"
+area = "Sandbox integration"
+tier = "Should"
+status = "todo"
+closes = ["AWS-08"]
+start = "caption-plan.md §7"
+after = ["web-app", "cdk"]
+
+[[task]]
+id = "gpu-quota"
+title = "Request a SageMaker GPU instance quota (can take a day or more)"
+area = "Sandbox integration"
+tier = "Should"
+status = "todo"
+closes = ["AWS-04"]
+start = "Service Quotas console, us-west-2"
+
+# ── Demo and delivery ───────────────────────────────────────────────────────────────────
+
+[[task]]
+id = "questions-for-clay"
+title = "Send the questions to Clay: example captions, retrieval sets, label prep, LGND limits"
+area = "Demo and delivery"
+tier = "Must"
+status = "todo"
+closes = ["CAP-07", "CAP-08", "CAP-13"]
+start = "caption-plan.md §9"
+
+[[task]]
+id = "spec-pointers"
+title = "Point the Sandbox spec's REQ-C1/C2 at CAP-01 to CAP-19"
+area = "Demo and delivery"
+tier = "Must"
+status = "todo"
+closes = []
+start = "caption-plan.md §7 Before kickoff"
+
+[[task]]
+id = "demo-stories"
+title = "Caption demo Stories and the midday-freeze demo pack"
+area = "Demo and delivery"
+tier = "Must"
+status = "todo"
+closes = ["REQ-09"]
+start = "caption-plan.md §7 Day 2"
+
+[[task]]
+id = "readiness"
+title = "Readiness check: no disallowed services, licenses, nothing secret committed"
+area = "Demo and delivery"
+tier = "Must"
+status = "todo"
+closes = ["AWS-12", "REQ-13", "REQ-17"]
+start = "caption-plan.md §7"

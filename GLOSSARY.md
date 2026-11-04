@@ -71,6 +71,21 @@ _Avoid_: label (ambiguous with Caption), ground truth, annotation
 The dataset Reference Labels come from.
 _Avoid_: ground truth dataset, reference set
 
+**Caption Set**:
+A collection of Captions from one source, such as one of Clay's caption pipelines, scored together
+to judge how far the source can be trusted.
+_Avoid_: caption dataset, caption corpus
+
+**Object Class**:
+A kind of thing a Claim can name, such as a solar array or a road, with its place in the Object
+Ontology.
+_Avoid_: object type, category, label
+
+**Object Ontology**:
+The set of Object Classes, how they relate (which class is a kind of which), and how each maps to
+Answer Keys, benchmarks, and the words people use for it.
+_Avoid_: taxonomy, vocabulary, class list
+
 ### Observing
 
 **Run**:

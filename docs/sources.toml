@@ -1,0 +1,531 @@
+# The External Dependencies in docs/vision-hackathon.md, shown on the Data sources page of
+# `clayzer ui`. One [[source]] per dependency, in the vision doc's order.
+#
+#   group      the vision doc's bullet the source sits under
+#   status     used (Clayzer reads it today), partial (some of it, or only by the team, not the
+#              code), planned (a task will use it), waiting (on Clay), or unused (deliberately not)
+#   data       what kind of data it is
+#   format     the file or API shape
+#   sample     a real record, trimmed; `sample_from` says where it came from
+#   images     `chip:<id>` for a Chip in the store, or an https URL of a figure in the dataset's
+#              own repo (hotlinked, never committed: several licenses don't allow it)
+#   used_in    where Clayzer uses it: a repo path and a symbol that must appear in that file
+#              (tests/test_ui.py checks both, so a rename shows up here)
+#   tasks      ids from docs/tasks.toml that use or will use it
+#
+# Licenses and access notes follow caption-plan.md §3; keep the two in step.
+
+# ── Input imagery ───────────────────────────────────────────────────────────────────────
+
+[[source]]
+id = "naip"
+name = "NAIP (National Agriculture Imagery Program)"
+group = "Input imagery"
+url = "https://registry.opendata.aws/naip/"
+license = "Public domain (USDA FSA)"
+status = "used"
+data = "Aerial imagery of the contiguous US: RGB + near-infrared, 0.6 m per pixel, 2010–2023, a new state-wide capture every 2–3 years."
+format = "Cloud-optimized GeoTIFF per quarter-quad, found through a STAC catalog. Clayzer cuts 512 × 512 px RGB PNG Chips (about 300 m across) and stores a JSON sidecar."
+access = "Two copies of the same imagery (CLAYZER_NAIP_SOURCE): `pc` = Microsoft Planetary Computer (free, SAS-signed), used while preparing Cases; `aws` = the `naip-visualization` bucket in us-west-2 (Requester-Pays), used in the sandbox. The Planetary Computer catalog finds the item either way."
+sample_from = "data/chips/ca-uspvdb-400117-20220702.json (the Chip sidecar Clayzer writes)"
+sample = '''
+{
+  "id": "ca-uspvdb-400117-20220702",
+  "date": "2022-07-02",
+  "bbox": [-118.195108, 35.228099, -118.191692, 35.230901],
+  "crs": "EPSG:26911",
+  "source": "naip-pc",
+  "naip_item": "ca_m_3511855_nw_11_060_20220702",
+  "size": 512,
+  "res": 0.6
+}'''
+images = [
+  { src = "chip:ca-uspvdb-400117-20220702", caption = "Solar Case: Pine Tree Solar, Kern County, NAIP 2022-07-02" },
+  { src = "chip:ca-uswtdb-3025453-20220702", caption = "Wind Case: Alite Wind Farm turbines, NAIP 2022-07-02" },
+  { src = "chip:ca-neg-1-20220607", caption = "Negative Case near Shafter, NAIP 2022-06-07" },
+]
+used_in = [
+  { path = "src/clayzer/chips.py", symbol = "def find_naip", what = "STAC search for the latest NAIP item over a point, after the site's install year" },
+  { path = "src/clayzer/chips.py", symbol = "def cut_chip", what = "windowed read and PNG + JSON write; picks Planetary Computer or the AWS bucket" },
+  { path = "src/clayzer/cases.py", symbol = "find_naip", what = "every Case's Chip" },
+  { path = "src/clayzer/harness.py", symbol = "NAIP", what = "the only input the captioner sees" },
+  { path = "src/clayzer/judge.py", symbol = "NAIP", what = "the fidelity Judge looks at the same Chip" },
+]
+tasks = ["data-access", "dev-cases", "s3-store"]
+
+# ── Sample vector data ──────────────────────────────────────────────────────────────────
+
+[[source]]
+id = "vantor"
+name = "Vantor open data"
+group = "Sample vector data"
+url = "s3://vantor-opendata"
+license = "CC BY-NC 4.0"
+status = "unused"
+data = "Not vectors, despite the brief: very-high-resolution satellite imagery (WorldView, ~0.5 m pan) from 12 disaster events in 2026, with pre/post phases."
+format = "Per scene: a GeoTIFF (up to ~1.6 GB), a JPEG thumbnail, and a STAC Item JSON, under events/<event-name>/."
+access = "Anonymous S3 listing and HTTPS. Too large to read whole; window reads only."
+sample_from = "events/Nepal-Flooding-Aug-2026/B030001100CF1210.json, fetched 2026-11-03 (trimmed)"
+sample = '''
+{
+  "id": "B030001100CF1210",
+  "type": "Feature",
+  "collection": "Nepal-Flooding-Aug-2026",
+  "properties": {
+    "title": "[POST] Vantor WV02 Image B030001100CF1210",
+    "datetime": "2026-08-28T05:07:57.401535Z",
+    "phase": "post",
+    "pan_gsd": 0.49,
+    "multispectral_gsd": 1.97,
+    "eo:cloud_cover": 74,
+    "view:off_nadir": 15.42
+  },
+  "assets": {
+    "visual":    { "href": ".../B030001100CF1210.tif" },
+    "thumbnail": { "href": ".../B030001100CF1210.jpg" }
+  },
+  "license": "CC-BY-NC-4.0"
+}'''
+images = [
+  { src = "https://vantor-opendata.s3.amazonaws.com/events/Nepal-Flooding-Aug-2026/B030001100CF1210.jpg", caption = "Thumbnail of the sampled scene: WorldView-2, post-flood, 74% cloud" },
+]
+used_in = []
+notes = "Could-tier only: disaster Change Cases (CAP-04, blocked on Clay confirming whether vectors exist beyond this bucket). Indirectly present: USWTDB turbine positions were digitized from Vantor imagery (`t_img_src` below). Never committed: the license is non-commercial."
+tasks = ["questions-for-clay"]
+
+# ── Embeddings ──────────────────────────────────────────────────────────────────────────
+
+[[source]]
+id = "lgnd-embeddings"
+name = "LGND embeddings (Clay v1.5)"
+group = "Embeddings"
+url = "https://source.coop/clay/lgnd-embeddings"
+license = "CC BY 4.0"
+status = "planned"
+data = "Clay v1.5 foundation-model embeddings of global Sentinel-2 L2A (10 m), Jan 2017 – Apr 2026: one 256- or 1024-dim vector per Major TOM grid cell (1,280 m or 2,560 m) per month. ~15.2 B embeddings."
+format = "GeoParquet 1.1, hive-partitioned by model_version / collection / chip_size / dims / geohash / year / month; ~340 MB files, Hilbert-ordered."
+access = "Anonymous (s3://us-west-2.opendata.source.coop/clay/lgnd-embeddings/). Query rows with DuckDB and a bbox filter; don't download whole files."
+sample_from = "the dataset's schema (monthly-aggregated/README.md), as one illustrative row"
+sample = '''
+chips_id      string     spatio-temporally unique id of the embedding
+cell_id       string     Major TOM cell
+stac_item_id  string     source Sentinel-2 scene (Earth Search), joins to rasters/
+collection    string     "sentinel-2-l2a"
+datetime      timestamp  acquisition time
+embedding     float32[256]  [0.013, -0.402, 0.118, …]
+bbox          struct     {xmin, ymin, xmax, ymax}
+geometry      WKB        cell footprint, EPSG:4326'''
+used_in = []
+notes = "Planned for step 1 of two-step selection (caption-plan.md §3): pick diverse or look-alike cells, then cut NAIP Chips inside them. Sentinel-2 cells are coarser than a Chip, so embeddings choose what to caption; they are never an Answer Key."
+tasks = ["dev-cases", "lookalike-negatives"]
+
+# ── Geospatial MCP tools ────────────────────────────────────────────────────────────────
+
+[[source]]
+id = "roda-mcp"
+name = "RODA MCP server (Registry of Open Data on AWS)"
+group = "Geospatial MCP tools"
+url = "https://aws.amazon.com/blogs/opensource/introducing-mcp-server-for-registry-of-open-data-on-aws/"
+license = "Apache-2.0"
+status = "unused"
+data = "A tool, not a dataset: search and sample the datasets listed on the AWS Registry of Open Data (NAIP is one)."
+format = "MCP server over stdio (`uvx awslabs.roda-mcp-server@latest`); tool calls return dataset metadata and sample object listings."
+access = "Local, no account. Allowed for both the Harness and the Case builder (caption-plan.md §3)."
+sample_from = "the kind of answer it gives (not run here)"
+sample = '''
+search_datasets("naip") ->
+  name: NAIP: National Agriculture Imagery Program
+  resources: s3://naip-analytic, s3://naip-visualization (us-west-2, Requester Pays)
+  license: public domain'''
+used_in = []
+notes = "Not wired in. Clayzer finds NAIP through the Planetary Computer STAC catalog instead, which already gives exact item ids. RODA matters once the Harness goes agentic (REQ-02)."
+tasks = []
+
+[[source]]
+id = "geo-mcp-shortlist"
+name = "Clay's Geo-MCP shortlist, including LGND Geo"
+group = "Geospatial MCP tools"
+url = "https://docs.google.com/spreadsheets/d/1cMoPxhNTzNHuWEAK_PtAgFUqEMxQ1AyoZxMCzfdkYzQ/edit?usp=sharing"
+license = "Per server; LGND Geo is commercial (whitelisted for the hackathon)"
+status = "partial"
+data = "Tools, not datasets. LGND Geo (https://geo.lgnd.ai/mcp) has 18 tools in four groups (search, discover, classify, check) over embeddings of global Sentinel-2 and contiguous-US NAIP (2020–2023)."
+format = "Remote MCP over HTTP with a per-person OAuth sign-in."
+access = "In Claude Code it loads from the repo's .mcp.json in a session started in the repo. The Harness has no MCP client yet. Servers that read OSM (openstreetmap-mcp-server, mcp-nominatim, Overture) are forbidden to the Harness, since OSM is an Answer Key (ADR-0006)."
+sample_from = "the shape of LGND Geo's imagery check, as planned for verify-then-write (caption-plan.md §1.3)"
+sample = '''
+reasoning_imagery_check(
+  question = "Is there a solar array in this image?",
+  images   = [<LGND NAIP image ids for the Claim's grid cell>]
+) -> [{ image: "...", answer: "yes" | "no" | "maybe", reason: "..." }]'''
+used_in = [
+  { path = ".mcp.json", symbol = "geo.lgnd.ai/mcp", what = "team Claude Code sessions: searching NAIP for look-alike negatives while building Cases" },
+]
+notes = "The team uses it by hand today; the code doesn't call it. Next: an MCP client in the Harness, then verify-then-write. A tool used to verify Claims must never be used to score them."
+tasks = ["lgnd-client", "verify-then-write", "lookalike-negatives", "workflow-score"]
+
+# ── ADB task ────────────────────────────────────────────────────────────────────────────
+
+[[source]]
+id = "adb-task"
+name = "ADB task: input data, harness(es), scoring rubric"
+group = "ADB task"
+url = ""
+license = "From Clay"
+status = "unused"
+data = "Inputs, agent harness(es) under test, and a scoring rubric for an ADB-style \"use AI to build a dataset\" task; teams bring synthetic prompts."
+format = "Not received."
+access = "From Clay at kickoff."
+sample_from = ""
+sample = ""
+used_in = []
+notes = "Out of scope for Clayzer: the team took the caption task (REQ-03). Listed so nobody looks for it in this repo."
+tasks = []
+
+# ── Caption task ────────────────────────────────────────────────────────────────────────
+
+[[source]]
+id = "clay-captions"
+name = "Clay's example captions and retrieval evaluation set"
+group = "Caption task"
+url = ""
+license = "From Clay"
+status = "waiting"
+data = "Example captions Clay considers good, and a set of retrieval queries with the images each should find."
+format = "Unknown until received."
+access = "Asked of Clay (questions-for-clay)."
+sample_from = "what Clayzer uses meanwhile: its own query set and Answer-Key classes"
+sample = '''
+retrieval queries (src/clayzer/retrieval.py QUERIES):
+  "find solar farms", "find wind turbines", "find railroads", …
+relevant Captions: the Cases whose Reference Labels contain that class'''
+used_in = [
+  { path = "src/clayzer/retrieval.py", symbol = "QUERIES", what = "stand-in query set until Clay's arrives" },
+]
+notes = "Until they arrive, fidelity has no human reference on our own Chips (RSICD fills that on its images) and retrieval queries come from Answer-Key classes."
+tasks = ["questions-for-clay", "rsicd"]
+
+[[source]]
+id = "caption-rubric"
+name = "Five-criterion caption rubric"
+group = "Caption task"
+url = ""
+license = "From Clay"
+status = "used"
+data = "Criteria, not data: retrieval quality, grounding (most important), fidelity, cost, label preparation time. Weights not set, so each is reported on its own."
+format = "A table in the vision and technical docs."
+access = "docs/vision-hackathon.md, \"Caption Generation: Tasks and Rubric\"."
+sample_from = "a Caption from runs/20261104T033821Z/captions.jsonl, which the criteria score (trimmed)"
+sample = '''
+{
+  "case_id": "fixed-dev-uswtdb-3025453",
+  "text": "The image shows a desert landscape with two wind turbines in the west and
+           centre positions … an unpaved road running through the centre …",
+  "objects": [
+    {"id": "o1", "object": "wind_turbine", "count": 1, "position": "west"},
+    {"id": "o2", "object": "wind_turbine", "count": 1, "position": "centre"},
+    {"id": "o6", "object": "road", "count": 1, "position": "centre",
+     "attributes": {"surface": "unpaved"}}
+  ],
+  "relations": [{"subject": "o1", "relation": "west_of", "object": "o2"}],
+  "uncertain": []
+}'''
+images = [
+  { src = "chip:ca-uswtdb-3025453-20220702", caption = "The Chip the sample Caption describes" },
+]
+used_in = [
+  { path = "src/clayzer/grounding.py", symbol = "def grounding", what = "grounding: Claims against Reference Labels, in code" },
+  { path = "src/clayzer/judge.py", symbol = "def fidelity", what = "fidelity: an image-aware LLM Judge" },
+  { path = "src/clayzer/retrieval.py", symbol = "def retrieval", what = "retrieval quality: text query to Caption with Titan embeddings" },
+  { path = "src/clayzer/cases.py", symbol = "prep_seconds", what = "label preparation time, per Case" },
+  { path = "src/clayzer/report_html.py", symbol = "def render_html", what = "each criterion reported on its own" },
+]
+notes = "Cost is partial: Bedrock exposes tokens and latency, not GPU-seconds (gpu-vlm is blocked on a GPU quota)."
+tasks = ["skeleton", "label-prep", "gpu-vlm", "grounding-fix"]
+
+# ── Retrieval answer keys ───────────────────────────────────────────────────────────────
+
+[[source]]
+id = "grw"
+name = "Global Renewables Watch v1.0"
+group = "Retrieval answer keys"
+url = "https://github.com/microsoft/global-renewables-watch/releases/tag/v1.0"
+license = "MIT"
+status = "planned"
+data = "Model-detected solar PV farms (86,410 polygons) and onshore wind turbines (375,197 points) worldwide, each with an estimated construction quarter (Q4 2017 – Q2 2024) and the land use before it."
+format = "Two GeoPackages: solar_all_2024q2_v1.gpkg (395 MB), wind_all_2024q2_v1.gpkg (58 MB)."
+access = "GitHub release download."
+sample_from = "the release assets, listed 2026-11-03 (columns not yet read)"
+sample = '''
+solar_all_2024q2_v1.gpkg   395,395,072 bytes   polygons + construction date + prior land use
+wind_all_2024q2_v1.gpkg     58,085,376 bytes   points   + construction date + prior land use'''
+images = [
+  { src = "https://raw.githubusercontent.com/microsoft/global-renewables-watch/main/images/Figure1.jpg", caption = "Figure 1 from the GRW repo: detected solar (yellow) and wind (blue) worldwide, and a close-up" },
+]
+used_in = [
+  { path = "ontology/objects.toml", symbol = "\"grw\"", what = "solar_array and wind_turbine list GRW as a future key" },
+]
+notes = "Should: construction dates for Change Cases. Could: an Answer Key outside the US, where USGS has nothing. Model-detected, so less exact than USGS within the US."
+tasks = ["change-cases"]
+
+[[source]]
+id = "uspvdb"
+name = "USGS USPVDB (US Large-Scale Solar Photovoltaic Database)"
+group = "Retrieval answer keys"
+url = "https://eerscmap.usgs.gov/uspvdb/"
+license = "Public domain"
+status = "used"
+data = "6,611 US solar sites ≥ 1 MW DC: centroid, polygon, array area, capacity, install year, mount type, system type (ground, rooftop, canopy, floating)."
+format = "REST API (PostgREST-style filters) at energy.usgs.gov/api/uspvdb/v1/projects; also CSV / shapefile downloads."
+access = "Anonymous. The eerscmap.usgs.gov address in the brief can be blocked on some networks; Clayzer uses energy.usgs.gov."
+sample_from = "GET …/projects?case_id=eq.400117, fetched 2026-11-03 (trimmed)"
+sample = '''
+{
+  "case_id": 400117,
+  "p_name": "Pine Tree Solar Project",
+  "p_state": "CA", "p_county": "Kern",
+  "ylat": 35.22950, "xlong": -118.19340,
+  "p_area": 124781,
+  "p_year": 2013,
+  "p_cap_dc": 9.80, "p_cap_ac": 8.50,
+  "p_axis": "fixed-tilt", "p_tilt": 30,
+  "p_sys_type": "ground",
+  "p_img_date": 20220303
+}'''
+images = [
+  { src = "chip:ca-uspvdb-400117-20220702", caption = "Chip cut around site 400117 (Pine Tree Solar); its array becomes the `solar_array` Reference Label" },
+]
+used_in = [
+  { path = "src/clayzer/answer_keys.py", symbol = "def uspvdb_site", what = "the site a positive Case is cut around" },
+  { path = "src/clayzer/answer_keys.py", symbol = "def usgs_near", what = "every site near a Chip (Reference Labels; proving absence for negatives)" },
+  { path = "src/clayzer/answer_keys.py", symbol = "def solar_size", what = "size attribute from p_area" },
+  { path = "src/clayzer/cases.py", symbol = "p_sys_type", what = "keeps ground-mounted sites only; NAIP must post-date p_year" },
+]
+notes = "Positions use the centroid today; using the polygon is a Should (usgs-polygons). Never visible to the Harness (ADR-0006)."
+tasks = ["dev-cases", "texas-cases", "usgs-polygons", "change-cases"]
+
+[[source]]
+id = "uswtdb"
+name = "USGS USWTDB (US Wind Turbine Database)"
+group = "Retrieval answer keys"
+url = "https://eerscmap.usgs.gov/uswtdb/"
+license = "Public domain"
+status = "used"
+data = "77,839 US wind turbines: exact position, project, install year, make and model, hub height, rotor diameter, location confidence."
+format = "REST API at energy.usgs.gov/api/uswtdb/v1/turbines; also a 1.7 MB CSV."
+access = "Anonymous."
+sample_from = "GET …/turbines?case_id=eq.3025453, fetched 2026-11-03 (trimmed)"
+sample = '''
+{
+  "case_id": 3025453,
+  "p_name": "Alite Wind Farm",
+  "t_state": "CA", "t_county": "Kern County",
+  "ylat": 35.03149, "xlong": -118.34369,
+  "p_year": 2008,
+  "t_manu": "Vestas", "t_model": "V90-3.0",
+  "t_hh": 80.00, "t_rd": 90.00,
+  "t_conf_loc": 3,
+  "t_img_src": "Vantor", "t_img_date": "2/20/2021"
+}'''
+images = [
+  { src = "chip:ca-uswtdb-3025453-20220702", caption = "Chip cut around turbine 3025453; USWTDB finds 2 turbines, in `centre` and `south_west`" },
+]
+used_in = [
+  { path = "src/clayzer/answer_keys.py", symbol = "def uswtdb_turbine", what = "the turbine a positive Case is cut around" },
+  { path = "src/clayzer/answer_keys.py", symbol = "def usgs_near", what = "every turbine in the Chip, counted and placed on the 3×3 grid" },
+  { path = "src/clayzer/cli.py", symbol = "uswtdb", what = "`clayzer case uswtdb <id>`" },
+]
+notes = "Turbines are points, so counts and positions are exact: the strongest grounding signal we have."
+tasks = ["dev-cases", "texas-cases", "change-cases"]
+
+[[source]]
+id = "osm"
+name = "OpenStreetMap"
+group = "Retrieval answer keys"
+url = "https://www.openstreetmap.org"
+license = "ODbL (committed Case files need \"© OpenStreetMap contributors\")"
+status = "used"
+data = "Crowd-mapped vector features. Clayzer takes roads, railroads, buildings, water, fields, parking lots, and greenhouses; power features are left to USGS."
+format = "Overpass API JSON: ways with tags and node geometry, clipped to the Chip bbox."
+access = "Public Overpass server (CLAYZER_OVERPASS_URL to override); backs off on 429/50x."
+sample_from = "way 1095768955 from Overpass, fetched 2026-11-03, and the Reference Label Clayzer derives from it in data/cases/caption-dev.jsonl"
+sample = '''
+raw element:
+{
+  "type": "way", "id": 1095768955,
+  "tags": { "building": "warehouse", "name": "CJ Logistics", "addr:city": "Shafter" },
+  "geometry": [ {"lat": 35.4556793, "lon": -119.2003875}, … ]
+}
+
+becomes a Reference Label on Case fixed-dev-neg-1:
+{"object": "building", "count": 1, "position": "north_east",
+ "cells": ["north_west", "north", "north_east"], "source": "osm",
+ "source_ids": ["way/1095768955"]}'''
+images = [
+  { src = "chip:ca-neg-1-20220607", caption = "Chip for Case fixed-dev-neg-1: OSM supplies its building (north_east), parking lot, railroad and roads" },
+]
+used_in = [
+  { path = "src/clayzer/answer_keys.py", symbol = "def overpass", what = "fetch the ways inside a Chip" },
+  { path = "src/clayzer/answer_keys.py", symbol = "def osm_labels", what = "turn ways into per-object Reference Labels: count, position, cells, road surface" },
+  { path = "ontology/objects.toml", symbol = "osm = ", what = "which OSM tags map to which object class" },
+  { path = "src/clayzer/grounding.py", symbol = "OSM", what = "most Claims are scored against OSM labels" },
+]
+notes = "Covers everything that isn't solar or wind, so most Claims get scored. Forbidden to the Harness (ADR-0006). Stays out of Batch summaries and Baselines, which carry no Claim rows."
+tasks = ["dev-cases", "fixtures", "grounding-fix"]
+
+# ── Auxiliary caption datasets ──────────────────────────────────────────────────────────
+
+[[source]]
+id = "levir-cc"
+name = "LEVIR-CC"
+group = "Auxiliary caption datasets"
+url = "https://github.com/Chen-Yang-Liu/LEVIR-CC-Dataset"
+license = "HF card says Apache-2.0; Google Earth imagery, academic use only"
+status = "planned"
+data = "10,077 before/after image pairs (256 × 256 px, 0.5 m) from 20 Texas sites, each with five human change captions."
+format = "PNG pairs (A/, B/) and a captions JSON: per pair a filename, split, change flag, and sentences."
+access = "Download at run time; never commit."
+sample_from = "the dataset's caption format (not fetched here; illustrative)"
+sample = '''
+{"filename": "train_000123.png", "split": "train", "changeflag": 1,
+ "sentences": [{"raw": "two buildings are built along the road ."}, …]}'''
+images = [
+  { src = "https://raw.githubusercontent.com/Chen-Yang-Liu/RSICC/main/Example/dataset_example.png", caption = "Example pairs with their five change captions, from the authors' repo" },
+]
+used_in = []
+notes = "Should: a change benchmark for fidelity. It covers Texas, our test state: benchmark only, never tune on it."
+tasks = ["change-cases"]
+
+[[source]]
+id = "change-agent"
+name = "Change-Agent (LEVIR-MCI)"
+group = "Auxiliary caption datasets"
+url = "https://github.com/Chen-Yang-Liu/Change-Agent"
+license = "MIT (code); data as LEVIR-CC"
+status = "planned"
+data = "LEVIR-CC's pairs plus pixel change masks for buildings and roads (released as LEVIR-MCI)."
+format = "LEVIR-CC layout plus a mask PNG per pair (0 = no change, 1 = road, 2 = building)."
+access = "Download at run time; never commit."
+sample_from = "the dataset's layout (not fetched here; illustrative)"
+sample = '''
+A/train_000123.png   before
+B/train_000123.png   after
+label/train_000123.png   per-pixel change class
+captions: as LEVIR-CC'''
+images = [
+  { src = "https://raw.githubusercontent.com/Chen-Yang-Liu/Change-Agent/main/resource/dataset.png", caption = "LEVIR-MCI examples: before, after, and the road (yellow) / building (red) change mask" },
+]
+used_in = []
+notes = "Should: the masks give countable, placeable change, so they can score grounding on change Captions, not just fidelity."
+tasks = ["change-cases"]
+
+[[source]]
+id = "second-cc"
+name = "SECOND-CC"
+group = "Auxiliary caption datasets"
+url = "https://github.com/ChangeCapsInRS/SecondCC"
+license = "Check before use"
+status = "unused"
+data = "Change captioning over the SECOND semantic change detection images, with semantic change maps."
+format = "Image pairs, semantic maps, captions."
+access = "Download at run time."
+sample_from = ""
+sample = ""
+images = [
+  { src = "https://raw.githubusercontent.com/ChangeCapsInRS/SecondCC/main/fig/dataset.jpg", caption = "SECOND-CC example: image pair, semantic change maps, five captions" },
+]
+used_in = []
+notes = "Could: change grounding from its semantic maps, after LEVIR-MCI."
+tasks = []
+
+[[source]]
+id = "rscc"
+name = "RSCC"
+group = "Auxiliary caption datasets"
+url = "https://github.com/Bili-Sakura/RSCC"
+license = "Check before use"
+status = "unused"
+data = "A large real-world change-caption set of disaster pre/post pairs."
+format = "Image pairs and captions."
+access = "Download at run time."
+sample_from = ""
+sample = ""
+images = [
+  { src = "https://raw.githubusercontent.com/Bili-Sakura/RSCC/master/assets/rscc_overview2.png", caption = "RSCC example: a flooding pair and its model-written change caption" },
+]
+used_in = []
+notes = "Not usable as gold: every caption, including the test set, is model-written (QvQ-Max)."
+tasks = []
+
+[[source]]
+id = "vrsbench"
+name = "VRSBench"
+group = "Auxiliary caption datasets"
+url = "https://github.com/lx709/VRSBench"
+license = "Annotations CC BY 4.0 (the HF card also says CC BY-NC 4.0); DOTA images academic use only"
+status = "planned"
+data = "Test split of 9,350 images with human-checked captions and 16,159 object references (boxes, 26 categories)."
+format = "Images plus JSON of captions and referring objects with boxes."
+access = "GitHub / Hugging Face; download at run time; never commit."
+sample_from = "the annotation shape (not fetched here; illustrative)"
+sample = '''
+{"image_id": "P0003_0002.png",
+ "caption": "Several large storage tanks sit in the upper left …",
+ "objects": [{"obj_cls": "storage-tank", "obj_coord": [12, 40, 88, 110]}, …]}'''
+images = [
+  { src = "https://raw.githubusercontent.com/lx709/VRSBench/main/fig_example.png", caption = "VRSBench example: object boxes, referring expressions, VQA, and a detailed caption" },
+]
+used_in = []
+notes = "Should: boxes become counts and 3×3 positions, so it can score grounding on someone else's images."
+tasks = ["vrsbench"]
+
+[[source]]
+id = "rsicd"
+name = "RSICD_optimal"
+group = "Auxiliary caption datasets"
+url = "https://github.com/201528014227051/RSICD_optimal"
+license = "None stated; imagery from commercial map services"
+status = "partial"
+data = "10,921 aerial images in 30 scene classes, five human captions each (8,734 / 1,094 / 1,093 split). Two-thirds of captions are repeats."
+format = "dataset_rsicd.json: per image a filename, split, and sentences (raw + tokens). Images from arampacha/rsicd on Hugging Face."
+access = "Download at run time; never commit images or captions; cite Lu et al. 2017."
+sample_from = "the first record of dataset_rsicd.json, fetched 2026-11-03 (trimmed)"
+sample = '''
+{"filename": "airport_1.jpg", "imgid": 0, "split": "train",
+ "sentences": [
+   {"raw": "many planes are parked next to a long building in an airport .",
+    "tokens": ["many", "planes", "are", "parked", …], "sentid": 0},
+   … 4 more, identical here
+ ]}'''
+images = [
+  { src = "https://raw.githubusercontent.com/201528014227051/RSICD_optimal/master/example.PNG", caption = "Two RSICD images with their five human captions, from the repo's README" },
+]
+used_in = [
+  { path = "ontology/objects.toml", symbol = "rsicd_scenes", what = "crosswalk from RSICD scene classes to Clayzer object classes" },
+  { path = "tests/test_ontology.py", symbol = "RSICD_SCENES", what = "checks the crosswalk uses real RSICD class names" },
+]
+notes = "Must: ~100 test images for fidelity and retrieval against human captions. Captions rarely state counts or positions: a reference, not a style."
+tasks = ["rsicd"]
+
+# ── Sandbox ─────────────────────────────────────────────────────────────────────────────
+
+[[source]]
+id = "aws-sandbox"
+name = "AWS sandbox account and open-source repo"
+group = "Sandbox"
+url = ""
+license = "Repo: Apache-2.0 (OSM-derived Case files under ODbL)"
+status = "used"
+data = "Where data lives, not a dataset: one S3 bucket per teammate's account for Chips, Cases, Runs, and Batches; Bedrock for the captioner, Judge, and embeddings."
+format = "S3 keys mirrored by local folders: chips/, cases/, batches/<id>/…"
+access = "CLAYZER_STORE=s3://clayzer-<account-id>-us-west-2/caption, or local folders when unset."
+sample_from = "the store keys"
+sample = '''
+chips/ca-uspvdb-400117-20220702.png
+chips/ca-uspvdb-400117-20220702.json
+cases/caption-dev.jsonl
+batches/20261104T052042Z-base/report.html'''
+used_in = [
+  { path = "src/clayzer/store.py", symbol = "def open_store", what = "local and S3 stores with the same keys" },
+  { path = "src/clayzer/config.py", symbol = "CLAYZER_NAIP_SOURCE", what = "settings: store, models, NAIP source" },
+]
+tasks = ["s3-store", "iam", "cdk"]
