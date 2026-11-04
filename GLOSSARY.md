@@ -38,6 +38,15 @@ _Avoid_: our agent, default agent
 A fixed-size image tile of one place on one date: the unit a Caption describes.
 _Avoid_: tile, patch, image
 
+**Grid**:
+The 3×3 division of a Chip into nine equal cells, used to locate Claims and compare their
+positions with Reference Labels. With north up, the cells read left to right:
+north-west, north, north-east (top row); west, centre, east (middle row); south-west, south,
+south-east (bottom row). The nine-square overlay in the overview's "A caption from the Baseline"
+example shows this Grid: "north-west sections of the image" refers to the upper-left cell.
+A structured Claim names one cell, using the cell holding most of the object.
+_Avoid_: bounding box (the Grid gives a coarse position, not an object's exact outline)
+
 **Chip Pair**:
 Two Chips of the same place on different dates.
 _Avoid_: image pair, before/after
