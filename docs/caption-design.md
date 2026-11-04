@@ -502,6 +502,61 @@ Each idea is mapped to the rubric criterion it serves.
 grounding and label-preparation cost directly, and every step is measured by the same
 evaluation loop.
 
+### Stretch goals: cost and quality at scale
+
+Clay cares about the cost and the quality of captions together. At Clay's scale (15.2B
+published embeddings, continental coverage), a large VLM call per Chip will never be affordable,
+so these ideas spend the VLM only where nothing cheaper will do, and each one is measured with
+the same loop (Batches, Compare, the gate). All are **Could**; each has a task in
+[tasks.toml](tasks.toml). Recommended order: 8, 9, 11, then 10 for the headline; 14 is the scale
+story for the pitch even if it only covers one class.
+
+8. **Verified Claims per dollar** (Cost, Grounding). Report verified Claims per dollar and per
+   GPU-second next to cost per Caption. It joins the two things Clay cares about in one number,
+   and it fixes a known weakness: grounding rewards vaguer Captions (fewer Claims scores higher),
+   but a vague Caption earns few verified Claims.
+9. **The cheapest resolution per object class** (Cost, Grounding). Image tokens drive VLM cost.
+   Caption at 256 px first and go to 512 px only where the Object Ontology's `min_visible_m`
+   says a class can't be seen at the coarser size. Sweep the resolution in Batches and plot
+   grounding against cost per class.
+10. **Escalate on low confidence** (Cost, Grounding, Fidelity). A cheap VLM captions every Chip;
+    a cheap confidence signal (two cheap samples agree, or the share of Claims that pass
+    verification) sends only failing Chips to Nova Pro or Opus. The headline is "X% of the top
+    model's quality at Y% of its cost". Idea 2 picks Chips before captioning; this escalates
+    after a cheap Caption.
+11. **Claims only, prose for free** (Cost, Retrieval). The Harness already asks the VLM for
+    structured Claims plus a `text` field. Drop `text`: the VLM returns only the compact Claims
+    (fewer output tokens, the expensive kind), and templates or a small text model write the
+    prose. The same Claims can be phrased several ways at no VLM cost, which may help a
+    text-native model. Measure the token saving and any change in fidelity and retrieval.
+12. **Open data first, VLM for the rest** (Cost, Grounding). Counts and positions of mapped
+    objects come from open vector data through a text-only call, far cheaper than a vision call;
+    the VLM adds only what no map has. **Catch:** ADR-0006 keeps Answer Keys out of caption
+    inputs, so write from sources we don't score against (Overture, Microsoft building
+    footprints) and score against USGS and OSM, or grounding is circular. Map data can also be
+    older or newer than the image, so check it against what's visible.
+13. **Reuse Captions across near-duplicates** (Cost, Label prep time). Much of the land looks
+    alike. For a Chip very close to an already-captioned one in Clay/LGND embedding space, reuse
+    its class-level statements, recompute counts and positions cheaply, and verify. Idea 2
+    chooses what to caption; this covers the rest without a VLM call. **Risk:** an error spreads
+    to every neighbour, so measure the reuse error.
+14. **Claims straight from embeddings** (Cost at scale, CAP-18). Train small probes from LGND
+    or Clay embeddings to presence and count Claims, labelled by USGS on a seed set. Billions of
+    existing embeddings become Claims for the cost of a lookup and a matrix multiply, using
+    Clay's own asset. **Limit:** LGND embeddings are Sentinel-2 based (10 m), so small objects
+    are out of reach; one class (solar) is enough to show it.
+15. **Cheap evaluation at scale** (Cost of scoring Clay's caption sets). Scoring a million
+    Captions with an Opus Judge costs more than writing them. Deterministic grounding covers
+    most Claims; a small Judge does the rest, with Opus only where they disagree, on a stratified
+    sample with intervals (extends CAP-21). Report the cost to evaluate a million Captions.
+16. **Cheaper hardware and cheaper calls** (Cost). For the open VLM: SageMaker asynchronous
+    endpoints that scale to zero, Spot capacity for batch runs, or one Inferentia2 instance (a
+    modest instance, within the disallow list); report Captions per GPU-hour and per dollar. For
+    Bedrock: batch inference (AWS-10), prompt caching for the long fixed prompt (ontology,
+    relation vocabulary), and several Chips per call. *Unverified:* which open VLMs run on
+    Inferentia2, Bedrock's batch discount, and whether Nova Pro supports prompt caching; check
+    in an account before relying on any of them.
+
 ## 9. Open questions for Clay
 
 - What does "label preparation time" measure (section 5, item 3)?

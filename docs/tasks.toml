@@ -1363,3 +1363,193 @@ refs = [
   "GLOSSARY.md (Story)",
 ]
 
+
+# ── Stretch goals: cost and quality at scale (caption-design.md §8, ideas 8–16) ────────────
+
+[[task]]
+id = "claims-per-dollar"
+step = "report"
+title = "Report verified Claims per dollar and per GPU-second next to cost per Caption"
+area = "Evaluation"
+tier = "Could"
+status = "todo"
+closes = ["CAP-12", "CAP-10"]
+start = "src/clayzer/report.py"
+context = "Clay cares about cost and quality together. One number joins them, and it fixes a known weakness: grounding rewards vaguer Captions (fewer Claims scores higher), but a vague Caption earns few verified Claims. Uses the token and timing data Runs already record."
+done_when = [
+  "Each Batch report shows verified Claims per dollar (Bedrock prices) and per GPU-second where GPU time exists",
+  "Compare shows the change between two Batches",
+  "A vaguer prompt is shown scoring worse on it than a specific one",
+]
+refs = [
+  "docs/caption-design.md §8 (idea 8)",
+  "src/clayzer/report.py",
+  "src/clayzer/grounding.py",
+]
+
+[[task]]
+id = "resolution-ladder"
+step = "harness"
+title = "Find the cheapest image resolution per object class (256 px first, 512 px only where needed)"
+area = "Captioning"
+tier = "Could"
+status = "todo"
+closes = ["CAP-12", "CAP-10"]
+start = "src/clayzer/harness.py"
+context = "Image tokens drive VLM cost. Add a resolution setting to the Harness, sweep it in Batches, and plot grounding against cost per class. Use the Object Ontology's min_visible_m to decide which classes need full resolution."
+done_when = [
+  "The Harness takes a resolution setting, recorded in the Trace",
+  "Batches at 256, 384, and 512 px on the dev Cases",
+  "A per-class table of grounding against tokens or seconds per Caption",
+]
+refs = [
+  "docs/caption-design.md §8 (idea 9)",
+  "src/clayzer/harness.py",
+  "ontology/objects.toml",
+]
+
+[[task]]
+id = "confidence-cascade"
+step = "harness"
+title = "Escalate on low confidence: a cheap VLM first, the expensive one only for failing Chips"
+area = "Captioning"
+tier = "Could"
+status = "todo"
+closes = ["CAP-12", "CAP-10", "CAP-11"]
+start = "src/clayzer/harness.py"
+after = ["second-captioner"]
+context = "A cheap VLM captions every Chip; a cheap confidence signal (two cheap samples agree, or the share of Claims that pass verification) sends only failing Chips to Nova Pro or Opus. The pitch headline: X% of the top model's quality at Y% of its cost."
+done_when = [
+  "A cascade Harness with a configurable confidence threshold",
+  "A Batch comparing cheap-only, expensive-only, and cascade on grounding and cost",
+  "The share of Chips escalated is reported",
+]
+refs = [
+  "docs/caption-design.md §8 (idea 10)",
+  "src/clayzer/harness.py",
+  "src/clayzer/batch.py",
+]
+
+[[task]]
+id = "claims-only-output"
+step = "harness"
+title = "Claims-only VLM output, with the prose written from the Claims"
+area = "Captioning"
+tier = "Could"
+status = "todo"
+closes = ["CAP-05", "CAP-12", "CAP-09"]
+start = "src/clayzer/harness.py (CAPTION_TOOL)"
+context = "submit_caption already returns structured objects and relations plus a prose text field. Drop text from the VLM's output and write it from the Claims with templates or a small text model: fewer output tokens, and several phrasings per Chip at no VLM cost."
+done_when = [
+  "A Harness variant whose VLM output has no text field",
+  "Prose rendered from Claims, with at least two phrasings",
+  "Output tokens per Caption, fidelity, and retrieval compared with the current Harness",
+]
+refs = [
+  "docs/caption-design.md §8 (idea 11)",
+  "src/clayzer/harness.py",
+  "docs/adr/0007-claims-use-a-grid-and-a-fixed-relation-vocabulary.md",
+]
+
+[[task]]
+id = "open-data-first"
+step = "harness"
+title = "Open data first: mapped objects from vector data, the VLM only for what no map has"
+area = "Captioning"
+tier = "Could"
+status = "todo"
+closes = ["CAP-10", "CAP-12"]
+start = "docs/adr/0006-answer-keys-are-hidden-from-caption-inputs.md"
+context = "Counts and positions of mapped objects come from open vector data through a text-only call, far cheaper than a vision call. ADR-0006 keeps Answer Keys out of caption inputs, so write from sources we don't score against (Overture, Microsoft building footprints) and keep USGS and OSM for scoring. Check map data against the image date."
+done_when = [
+  "The writing sources are disjoint from the Answer Keys, checked by a test",
+  "A Batch comparing grounding and cost with the VLM-only Harness",
+  "Claims from map data that the image doesn't show are counted",
+]
+refs = [
+  "docs/caption-design.md §8 (idea 12)",
+  "docs/adr/0006-answer-keys-are-hidden-from-caption-inputs.md",
+  "src/clayzer/answer_keys.py",
+]
+
+[[task]]
+id = "caption-reuse"
+step = "harness"
+title = "Reuse Captions across near-duplicate Chips found in embedding space"
+area = "Captioning"
+tier = "Could"
+status = "todo"
+closes = ["CAP-18", "CAP-12", "CAP-13"]
+start = "docs/caption-design.md §8 (idea 13)"
+context = "For a Chip very close to an already-captioned one in Clay/LGND embedding space, reuse its class-level statements, recompute counts and positions cheaply, and verify. An error spreads to every neighbour, so the reuse error must be measured."
+done_when = [
+  "A similarity threshold chosen from data, not guessed",
+  "Reuse error measured on Chips that were also captioned directly",
+  "VLM calls saved per 1,000 Chips reported",
+]
+refs = [
+  "docs/caption-design.md §8 (idea 13)",
+  "src/clayzer/retrieval.py",
+]
+
+[[task]]
+id = "embedding-probes"
+step = "harness"
+title = "Claims straight from embeddings: probes from LGND/Clay embeddings to presence and count (one class)"
+area = "Captioning"
+tier = "Could"
+status = "todo"
+closes = ["CAP-18", "CAP-05"]
+start = "docs/caption-design.md §8 (idea 14)"
+context = "Small probes from embeddings to Claims, labelled by USGS on a seed set, turn billions of existing embeddings into Claims for the cost of a lookup. LGND embeddings are Sentinel-2 based (10 m), so start with a large class: solar."
+done_when = [
+  "A probe for solar presence trained on the dev region and tested on another",
+  "Precision and recall with intervals, and cost per 1,000 Chips",
+  "A pitch slide comparing it with VLM Captions on the same Chips",
+]
+refs = [
+  "docs/caption-design.md §8 (idea 14)",
+  "ontology/objects.toml",
+]
+
+[[task]]
+id = "cheap-eval"
+step = "output"
+title = "Cheap evaluation at scale: deterministic first, a small Judge next, Opus only on disagreement"
+area = "Evaluation"
+tier = "Could"
+status = "todo"
+closes = ["CAP-21", "CAP-11"]
+start = "src/clayzer/judge.py"
+after = ["stratified-verdict", "judge-calibration"]
+context = "Scoring a million Captions with an Opus Judge costs more than writing them. Deterministic grounding covers most Claims; a small Judge does the rest, with Opus only where they disagree, on a stratified sample. Report the cost to evaluate a million Captions."
+done_when = [
+  "A Judge cascade with its agreement rate against Opus on the calibration labels",
+  "The cost to evaluate a million Captions, cascade against Opus-only",
+]
+refs = [
+  "docs/caption-design.md §8 (idea 15)",
+  "src/clayzer/judge.py",
+  "docs/adr/0005-judge-variance-handled-by-sampling.md",
+]
+
+[[task]]
+id = "cheap-hardware"
+step = "ship"
+title = "Cheaper hardware and calls: scale-to-zero or Spot for the open VLM, prompt caching and batching on Bedrock"
+area = "Platform"
+tier = "Could"
+status = "todo"
+closes = ["CAP-12", "AWS-04", "AWS-10"]
+start = "infra/app.py"
+after = ["gpu-vlm", "gpu-quota"]
+context = "Open VLM: SageMaker asynchronous endpoints that scale to zero, Spot capacity for batch runs, or one Inferentia2 instance (a modest instance, within the disallow list). Bedrock: batch inference, prompt caching for the long fixed prompt, several Chips per call. Unverified: which open VLMs run on Inferentia2, Bedrock's batch discount, and Nova Pro prompt caching; check in an account first."
+done_when = [
+  "Each option checked in an account before any work depends on it",
+  "Captions per GPU-hour and per dollar for each option tried",
+]
+refs = [
+  "docs/caption-design.md §8 (idea 16)",
+  "docs/caption-design.md §3.4",
+  "infra/app.py",
+]
