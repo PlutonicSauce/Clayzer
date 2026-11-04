@@ -194,3 +194,68 @@ def test_a_failed_refresh_returns_the_old_token(tmp_path, monkeypatch):
     monkeypatch.setattr(mcp_auth, "http_client", _sign_in_service([], token_status=400))
     store = _expired_store(tmp_path)
     assert asyncio.run(store.get_tokens()).access_token == "old"
+
+
+@needs
+def test_a_401_mid_batch_refreshes_once_and_retries(tmp_path, monkeypatch):
+    import json
+
+    import httpx2
+
+    from clayzer import mcp_auth
+
+    seen = []
+    monkeypatch.setattr(mcp_auth, "http_client", _sign_in_service(seen))
+    store = _expired_store(tmp_path)
+    data = json.loads(store.path.read_text())
+    data["expires_at"] = time.time() + 600  # looks valid, but the server has revoked it
+    store.path.write_text(json.dumps(data))
+
+    def mcp(request):
+        seen.append(request)
+        ok = request.headers.get("Authorization") == "Bearer new"
+        return httpx2.Response(200 if ok else 401)
+
+    auth = mcp_auth.stored_token_auth("lgnd", "https://mcp.example/mcp", tmp_path / "auth")
+
+    async def go():
+        async with httpx2.AsyncClient(auth=auth, transport=httpx2.MockTransport(mcp)) as c:
+            return await c.post("https://mcp.example/mcp")
+
+    assert asyncio.run(go()).status_code == 200
+    hits = [str(r.url) for r in seen]
+    assert hits.count("https://mcp.example/mcp") == 2  # the 401, then the retry
+    assert hits.count("https://auth.example/oauth2/token") == 1
+
+
+@needs
+def test_an_expired_token_is_refreshed_before_the_request(tmp_path, monkeypatch):
+    import httpx2
+
+    from clayzer import mcp_auth
+
+    seen = []
+    monkeypatch.setattr(mcp_auth, "http_client", _sign_in_service(seen))
+    _expired_store(tmp_path)
+    auth = mcp_auth.stored_token_auth("lgnd", "https://mcp.example/mcp", tmp_path / "auth")
+    sent = []
+
+    def mcp(request):
+        sent.append(request.headers.get("Authorization"))
+        return httpx2.Response(200)
+
+    async def go():
+        async with httpx2.AsyncClient(auth=auth, transport=httpx2.MockTransport(mcp)) as c:
+            return await c.post("https://mcp.example/mcp")
+
+    assert asyncio.run(go()).status_code == 200 and sent == ["Bearer new"]
+
+
+@needs
+def test_without_a_sign_in_the_toolbox_refuses_up_front(tmp_path, monkeypatch):
+    from clayzer.tools import McpServer, Toolbox
+
+    monkeypatch.setenv("CLAYZER_AUTH_DIR", str(tmp_path / "empty"))
+    remote = McpServer("lgnd", url="https://mcp.example/mcp", oauth=True)
+    with pytest.raises(NotSignedIn, match="clayzer login lgnd"), Toolbox([remote]):
+        pass

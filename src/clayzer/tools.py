@@ -95,6 +95,21 @@ class ToolResult:
     error_code: str | None = None
 
 
+class ToolView:
+    """Some of a Toolbox's tools, callable like the Toolbox itself."""
+
+    def __init__(self, box: Toolbox, specs: list[ToolSpec]):
+        self.box, self.specs = box, specs
+
+    def server_for(self, name: str) -> str | None:
+        return next((s.server for s in self.specs if s.name == name), None)
+
+    def call(self, name: str, arguments: dict) -> ToolResult:
+        if self.server_for(name) is None:
+            return ToolResult(f"unknown tool {name!r}", True, "UnknownTool")
+        return self.box.call(name, arguments)
+
+
 class Toolbox:
     """The tools of one or more MCP servers, callable from synchronous code.
 
@@ -168,13 +183,23 @@ class Toolbox:
             if server.url:
                 from mcp.client.streamable_http import streamable_http_client
 
-                from clayzer.mcp_auth import http_client, oauth_provider
-
-                auth = (
-                    oauth_provider(server.name, server.url, self.interactive, blocked)
-                    if server.oauth
-                    else None
+                from clayzer.mcp_auth import (
+                    NotSignedIn,
+                    http_client,
+                    oauth_provider,
+                    stored_token_auth,
                 )
+
+                auth = None
+                if server.oauth and self.interactive:
+                    auth = oauth_provider(server.name, server.url, True, blocked)
+                elif server.oauth:
+                    # Batches and `clayzer tools`: the saved sign-in, refreshed as it expires.
+                    auth = stored_token_auth(server.name, server.url)
+                    if not auth.storage.signed_in():
+                        raise NotSignedIn(
+                            f"{server.name} needs a sign-in: run `clayzer login {server.name}` first"
+                        )
                 client = await self._stack.enter_async_context(http_client(auth))
                 read, write = await self._stack.enter_async_context(
                     streamable_http_client(server.url, http_client=client)
@@ -203,6 +228,11 @@ class Toolbox:
 
     def server_for(self, name: str) -> str | None:
         return next((s.server for s in self.specs if s.name == name), None)
+
+    def view(self, servers: list[str]) -> ToolView:
+        """The tools of only some of the servers, sharing this Toolbox's connections: the
+        model is offered its own tools, and the verifier's stay out of its prompt."""
+        return ToolView(self, [s for s in self.specs if s.server in servers])
 
     def call(self, name: str, arguments: dict) -> ToolResult:
         """Call a tool. Failures come back as results, not exceptions: a failing tool is data

@@ -74,7 +74,7 @@ jobs:
 
   # Pushes to main and manual runs deploy into the account behind the `aws` environment.
   # Set up once: deploy infra/github_oidc.py, then give the environment the AWS_DEPLOY_ROLE_ARN
-  # secret and the AWS_REGION and CLAYZER_STORE variables (README, "Deploying from CI").
+  # secret and the AWS_REGION and CLAYZER_STORE variables (docs/deploy.md, "What's left").
   deploy:
     needs: [lint, test, frontend, infra]
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')

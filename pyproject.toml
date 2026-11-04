@@ -18,6 +18,7 @@ dependencies = [
 [project.optional-dependencies]
 ui = [
     "fastapi>=0.115",
+    "markdown>=3.5",
     "uvicorn>=0.30",
 ]
 tools = [

@@ -6,6 +6,10 @@ Without tools it's a single VLM call with structured output. With a Toolbox of M
 (tools.py) it's a plain tool-use loop (ADR-0002): a model turn, its tool calls, their results,
 repeat, until the model calls `submit_caption` or the turn budget runs out. Every model turn is
 an `llm` Step and every tool call a `tool` Step in the Run's Trace (REQ-01).
+
+With verification (verify.py), the drafted Claims are then checked against LGND Geo's imagery,
+unconfirmed ones move to `uncertain`, and if any moved, a text-only call rewrites the prose from
+the Claims that are left: verify, then write.
 """
 
 import time
@@ -42,6 +46,19 @@ submit_caption exactly once, when you're done.
 
 MAX_TURNS = 8  # model turns per Caption in the tool-use loop
 MAX_TOOL_TEXT = 20_000  # characters of one tool result the model sees; the Trace keeps it all
+
+REWRITE_PROMPT = """\
+Below is a draft caption of an aerial image (NAIP, 0.6 m per pixel, about 300 m across, north
+up), and the Claims that survived a check against imagery. Some drafted Claims weren't
+confirmed and are gone. Rewrite the caption text so it states only the confirmed Claims: their
+objects, counts, positions, and relations. Don't mention anything that isn't in them. 1 to 3
+plain sentences. Submit it with the submit_caption tool, listing the confirmed Claims as they
+are.
+
+Draft text: {text}
+
+Confirmed Claims: {claims}
+"""
 
 CAPTION_TOOL = {
     "toolSpec": {
@@ -102,6 +119,68 @@ class HarnessFault(Exception):
 
 
 def caption(
+    client,
+    model: str,
+    chip_id: str,
+    png: bytes,
+    prompt_template: str = PROMPT,
+    tracer=None,
+    image_key: str | None = None,
+    toolbox=None,
+    max_turns: int = MAX_TURNS,
+    verifier=None,
+    footprint: dict | None = None,
+) -> tuple[dict, dict]:
+    """Caption one Chip, and with a `verifier` (a Toolbox with LGND Geo) and the Chip's
+    `footprint`, verify its Claims and rewrite it from the confirmed ones (verify.py).
+
+    The rest is `_draft`'s: see there."""
+    cap, step = _draft(client, model, chip_id, png, prompt_template, tracer, image_key,
+                       toolbox, max_turns)  # fmt: skip
+    if verifier is None or footprint is None:
+        return cap, step
+    from clayzer.verify import verify
+
+    cap, report = verify(cap, footprint, verifier, tracer)
+    step["verification"] = {k: v for k, v in report.items() if k != "checks"}
+    if tracer is not None:
+        tracer.run.metadata["verification"] = report
+    if report["moved"]:
+        cap["text"] = _rewrite(client, model, cap, step, tracer)
+    return cap, step
+
+
+def _rewrite(client, model: str, cap: dict, step: dict, tracer) -> str:
+    """The text-only call that writes the prose from the confirmed Claims. Only its text is
+    used: the Claims stay the ones the verifier kept."""
+    import json
+
+    claims = {"objects": cap["objects"], "relations": cap["relations"]}
+    prompt = REWRITE_PROMPT.format(text=cap["text"], claims=json.dumps(claims))
+    request = {
+        "modelId": model,
+        "messages": [{"role": "user", "content": [{"text": prompt}]}],
+        "toolConfig": {"tools": [CAPTION_TOOL], "toolChoice": {"tool": {"name": "submit_caption"}}},
+        "inferenceConfig": {"maxTokens": 800},
+    }
+    if tracer is None:
+        resp = client.converse(**request)
+    else:
+        recorded = {"prompt": prompt, "tools": ["submit_caption"],
+                    "tool_choice": "submit_caption", "max_tokens": 800}  # fmt: skip
+        resp = tracer.converse(client, "llm", "rewrite", request, recorded,
+                               {"expects_tool": "submit_caption"})  # fmt: skip
+    for k, v in resp.get("usage", {}).items():
+        if isinstance(v, int):
+            step["usage"][k] = step["usage"].get(k, 0) + v
+    blocks = resp["output"]["message"]["content"]
+    submitted = next((b["toolUse"]["input"] for b in blocks if "toolUse" in b), None)
+    if submitted is None or not submitted.get("text"):
+        raise HarnessFault(f"{model} didn't rewrite the verified Caption", step)
+    return submitted["text"]
+
+
+def _draft(
     client,
     model: str,
     chip_id: str,

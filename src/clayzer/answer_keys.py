@@ -28,9 +28,19 @@ USER_AGENT = "clayzer-caption-eval/0.1 (+https://github.com/PlutonicSauce/Clayze
 
 
 def _get(url: str, params: list[tuple[str, str]]) -> list[dict]:
-    r = httpx.get(url, params=params, timeout=60, headers={"User-Agent": USER_AGENT})
-    r.raise_for_status()
-    return r.json()
+    # The USGS APIs return 502 and time out in bursts; back off and retry, like Overpass.
+    for attempt in range(4):
+        try:
+            r = httpx.get(url, params=params, timeout=60, headers={"User-Agent": USER_AGENT})
+        except httpx.TransportError:
+            if attempt == 3:
+                raise
+        else:
+            if r.status_code not in (429, 502, 503, 504) or attempt == 3:
+                r.raise_for_status()
+                return r.json()
+        time.sleep(5 * 2**attempt)
+    raise AssertionError("unreachable")
 
 
 def _bbox_params(bbox, buffer_deg: float = 0.0) -> list[tuple[str, str]]:

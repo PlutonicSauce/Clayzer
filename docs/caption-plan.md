@@ -243,7 +243,10 @@ an ODbL notice; the rest of the repo stays Apache-2.0 (REQ-15).
 
 **Provenance** (REQ-14). Benchmark Reference Captions are downloaded at run time, so each Run
 records the dataset version or commit hash and the image ids it used, enough to fetch the same
-references again.
+references again. Every Batch also records what it was judged with (`src/clayzer/provenance.py`):
+the caption prompt, the Judge's rubric, the frozen Cases, a SHA-256 of every Chip (checked
+before each Run), the ontology's version, and the git commit. The Batch page shows them beside
+the Baseline's, with a link to every stored file.
 
 **Outside benchmark rules** (RSICD, VRSBench, LEVIR-CC / LEVIR-MCI). Their imagery is commercial
 or academic-only, so the RSICD rules below apply to all of them. LEVIR covers Texas, our test
@@ -584,7 +587,7 @@ v0.1 of [`ontology/objects.toml`](../ontology/objects.toml) matches the code's l
 |---|---|---|---|---|
 | Captioning and judging through Bedrock (Nova Pro, Opus 5.5) | AWS-01 | Captioning, Evaluation | Must | In the walking skeleton |
 | Retrieval embeddings with Titan Text Embeddings v2 | AWS-02 | Evaluation | Must | In the walking skeleton |
-| Private, encrypted S3 bucket per account; one key layout | AWS-03 | Data and Cases | Must | Done in the README setup |
+| Private, encrypted S3 bucket per account; one key layout | AWS-03 | Data and Cases | Must | Done: docs/cli.md, Storage |
 | Least-privilege IAM roles; no credentials in the repo | AWS-13 | Platform | Must | Day 1 |
 | GPU quota request, then a SageMaker endpoint with one open VLM; GPU-seconds per Caption | AWS-04 | Captioning | Should | Quota before kickoff; endpoint Day 2 afternoon |
 | ADOT collector; Traces in X-Ray | AWS-05 | Platform | Should | Day 2 morning |

@@ -39,7 +39,8 @@ done_when = [
 ]
 refs = [
   "docs/caption-plan.md §3 (Data)",
-  "README.md (Set up, Storage)",
+  "README.md (Getting started)",
+  "docs/cli.md (Storage)",
   "docs/sources.toml",
 ]
 see_it = "Data sources page (#/sources): each source with its access, license, status, and the code that reads it."
@@ -73,7 +74,7 @@ refs = [
   "docs/caption-plan.md §5.1 (Case format)",
   "src/clayzer/cases.py",
   "src/clayzer/answer_keys.py",
-  "README.md (Build Cases)",
+  "docs/cli.md (Build Cases)",
 ]
 
 [[task]]
@@ -321,7 +322,7 @@ refs = [
   "docs/caption-plan.md §3 (LGND Geo row)",
   ".mcp.json",
 ]
-see_it = "CLI: `clayzer login lgnd` (once, in the browser), then `clayzer tools lgnd` to list its tools and `clayzer tools lgnd --call <tool> --args <json>` to call one (README, Tools). In a Batch, `--tools lgnd` puts its calls in each Run's page (#/runs/<batch>/<case>/<repeat>)."
+see_it = "CLI: `clayzer login lgnd` (once, in the browser), then `clayzer tools lgnd` to list its tools and `clayzer tools lgnd --call <tool> --args <json>` to call one (docs/cli.md, Tools). In a Batch, `--tools lgnd` puts its calls in each Run's page (#/runs/<batch>/<case>/<repeat>)."
 changes = [
   "src/clayzer/mcp_auth.py: OAuth sign-in with dynamic client registration and a one-shot callback on 127.0.0.1; the sign-in saved privately outside the repo; expired tokens refreshed through the sign-in service; TLS from CLAYZER_MCP_SYSTEM_TRUST or SSL_CERT_FILE",
   "src/clayzer/tools.py: remote servers over streamable HTTP with OAuth; `lgnd` added; each server's reported name and version recorded",
@@ -335,10 +336,11 @@ step = "harness"
 title = "Verify-then-write: check each Claim with LGND's imagery check at its grid cell"
 area = "Captioning"
 tier = "Must"
-status = "todo"
+status = "done"
 closes = ["CAP-10", "REQ-01", "CAP-18"]
 start = "caption-plan.md §1.3, §6"
 after = ["lgnd-client", "grounding-fix"]
+notes = "Done 2026-11-04: `clayzer batch --verify`. Gated against the Baseline (4 dev Cases \u00d7 3 Repeats, Batch 20261104T124711Z-verify-2): FAIL. Correctness rose on all 4 Cases (two flagged improved: the negative Case 0.59 \u2192 0.81, uspvdb-402150 0.52 \u2192 0.66); 49 of 60 Claims confirmed, 10 moved, 1 unverified. On the negative Case it removed two false solar arrays (a storage yard, dirt ground) and a false vegetation Claim, but also parking lots placed one cell off, which cost coverage there (0.47 \u2192 0.33). Retrieval MRR fell in 2 of 3 Repeats (Batch 0.89 \u2192 0.78; candidate Spread \u00b10.10), with rewritten Captions shorter (39 \u2192 36 words). So `--verify` stays opt-in. Next: re-check a rejected Claim in the neighbouring cells and move it instead of dropping it, and keep the rewrite's wording close to the draft. LGND's 5-minute tokens are refreshed mid-Batch (verified)."
 context = "The Harness drafts Claims, checks each with LGND Geo's `reasoning_imagery_check` at its grid cell, and writes the Caption only from confirmed Claims; the rest go in `uncertain`. To check a cell, look up the LGND image at the cell's centre with `search_chip_lat_lon` (LGND images are about 160 m across, roughly one cell). The verifier is never an Answer Key and never used in scoring."
 done_when = [
   "Each check is a `tool` Step in the Trace",
@@ -349,6 +351,61 @@ refs = [
   "docs/caption-plan.md §1.3",
   "docs/caption-plan.md §6",
   "docs/adr/0006-answer-keys-are-hidden-from-caption-inputs.md",
+]
+see_it = "CLI: `clayzer batch --verify` (after `clayzer login lgnd`). A Run's page (#/runs/<batch>/<case>/<repeat>) shows each lookup and check as a tool Step, then the rewrite; `clayzer gate <batch>` compares it with the Baseline."
+changes = [
+  "src/clayzer/verify.py: the image lookup at each Claim's cell centre, the imagery check, and the keep / move / unverified policy",
+  "src/clayzer/harness.py: caption() verifies after drafting, and a text-only rewrite writes the prose from the confirmed Claims",
+  "src/clayzer/batch.py: BatchConfig.verify; the model is offered only its own tools, the verifier gets LGND and the Chip's footprint",
+  "src/clayzer/tools.py: Toolbox.view, some servers' tools sharing one set of connections",
+  "src/clayzer/mcp_auth.py: stored_token_auth refreshes the saved sign-in before it expires and once on a 401, within a running Batch",
+  "docs/adr/0009-the-verifier-gets-the-chip-footprint-the-captioner-doesnt.md: why the code, not the model, verifies",
+  "tests/test_verify.py: the policy, the rewrite, the Workflow Score's tool plan, and a Batch with a fake LGND",
+]
+
+[[task]]
+id = "verify-relocate"
+step = "harness"
+title = "Verify-then-write: re-check a rejected Claim in its neighbouring cells, and move it instead of dropping it"
+area = "Captioning"
+tier = "Should"
+status = "todo"
+closes = ["CAP-10", "CAP-01"]
+start = "src/clayzer/verify.py"
+after = ["verify-then-write"]
+context = "The first gated Batch with --verify (verify-then-write's notes) raised correctness everywhere but dropped Claims the model had placed one cell off: on the negative Case, parking lots drafted at north when they're at north_west, which LGND checked at north, saw a rooftop, and rejected; coverage fell 0.47 to 0.33. Before moving a rejected Claim to uncertain, check the same object in the neighbouring cells (up to 8 more checks; share each cell's image lookup) and, if one confirms it, keep the Claim at that cell. That recovers near-miss coverage and fixes positions, which grounding scores. Watch the cost: record the extra checks per Caption."
+done_when = [
+  "A rejected Claim is re-checked in its neighbouring cells and kept at the first that confirms it",
+  "Moves are recorded in the verification report and the Trace",
+  "A --verify Batch gated against the Baseline: coverage on the negative Case back to at least the Baseline's, correctness kept",
+  "Extra LGND calls per Caption reported",
+]
+refs = [
+  "src/clayzer/verify.py",
+  "src/clayzer/grid.py",
+  "docs/tasks.toml (verify-then-write notes)",
+]
+
+[[task]]
+id = "verify-rewrite-wording"
+step = "harness"
+title = "Verify-then-write: keep the rewrite's wording close to the draft, so retrieval doesn't fall"
+area = "Captioning"
+tier = "Should"
+status = "todo"
+closes = ["CAP-09", "CAP-06"]
+start = "src/clayzer/harness.py (REWRITE_PROMPT, _rewrite)"
+after = ["verify-then-write"]
+context = "In the first gated --verify Batch, retrieval MRR fell in 2 of 3 Repeats (Batch 0.89 to 0.78) and rewritten Captions were shorter (39 to 36 words) with drifting wording (a paved road became a dirt road). The rewrite should only remove what was rejected: keep the draft's sentences and words for everything confirmed. Options: ask for minimal edits in REWRITE_PROMPT; or skip the model and delete the rejected Claims' phrases from the draft; or rewrite only the sentences that mention a rejected Claim. With 4 Cases retrieval is noisy (the candidate's Spread was ±0.10), so compare with more Repeats or Cases before concluding."
+done_when = [
+  "The rewrite keeps confirmed Claims' wording (a test with a fixed draft)",
+  "Words per Caption and retrieval compared with the draft-only Harness",
+  "A --verify Batch gated against the Baseline with retrieval not regressed",
+]
+refs = [
+  "src/clayzer/harness.py",
+  "src/clayzer/retrieval.py",
+  "docs/tasks.toml (verify-then-write notes)",
 ]
 
 [[task]]
@@ -368,7 +425,7 @@ done_when = [
   "A log of every attempt and its result",
 ]
 refs = [
-  "README.md (The evaluation loop)",
+  "docs/cli.md (The evaluation loop)",
   "src/clayzer/harness.py (PROMPT)",
   "src/clayzer/gate.py",
 ]
@@ -552,7 +609,7 @@ done_when = [
 refs = [
   "src/clayzer/batch.py",
   "src/clayzer/gate.py",
-  "README.md (The evaluation loop)",
+  "docs/cli.md (The evaluation loop)",
 ]
 see_it = "Batches page (#/batches): every Batch with its scores; tick two to compare them (#/compare/<a>/<b>). A Batch's page shows its regression gate against the Baseline, and the home page's scorecard sets the latest Batch beside the Baseline. CLI: `clayzer batch`, `batches`, `compare`, `baseline accept`, `gate`."
 changes = [
@@ -935,14 +992,14 @@ area = "Platform"
 tier = "Must"
 status = "done"
 closes = ["AWS-03", "CAP-19"]
-start = "src/clayzer/store.py; README Storage"
+start = "src/clayzer/store.py; docs/cli.md (Storage)"
 context = "Done 2026-11-04: one private, encrypted bucket per account; the same keys in any bucket or in local folders; NAIP read from AWS in us-west-2."
 done_when = [
   "Batches and Traces land in the bucket",
 ]
 refs = [
   "src/clayzer/store.py",
-  "README.md (Storage)",
+  "docs/cli.md (Storage)",
 ]
 see_it = "The store the app reads is shown at the top right of every page. CLI: `clayzer push` copies a local chips/ and cases/ folder into the store."
 changes = [
@@ -967,7 +1024,7 @@ done_when = [
 refs = [
   "src/clayzer/ui/app.py",
   "src/clayzer/ui/static/app.js",
-  "README.md (The team web app)",
+  "README.md (Getting started)",
 ]
 see_it = "`uv run clayzer ui` (http://127.0.0.1:8770), or the hosted copy: Overview, How it works, Tasks, Cases, Batches with Compare and the gate, Data sources, Concepts, and the pitch deck at /deck."
 changes = [
@@ -995,7 +1052,7 @@ done_when = [
 refs = [
   "docs/caption-design.md §2.3 (REQ-05)",
   "src/clayzer/trace.py",
-  "README.md (The evaluation loop)",
+  "docs/cli.md (The evaluation loop)",
 ]
 see_it = "A Run's page (#/runs/<batch>/<case>/<repeat>): the verdict, the summary written in code, and the model-written narrative. CLI: `clayzer summarize <batch>` (`--narrate` writes missing narratives)."
 changes = [
@@ -1099,7 +1156,7 @@ area = "Platform"
 tier = "Should"
 status = "done"
 closes = ["AWS-08"]
-start = "infra/app.py; README \"Hosting it on AWS\""
+start = "infra/app.py; docs/cli.md \"Hosting it on AWS\""
 notes = "Live since 2026-11-03 and redeployed from commits since, built by infra/app.py. App Runner is denied to the participant role (checked 2026-11-03), so Fargate it is."
 after = ["web-app"]
 context = "The web app at a URL the judges can open (AWS-08): the container on ECS Fargate behind a load balancer, with CloudFront in front, read-only, reading that account's bucket."
@@ -1113,7 +1170,7 @@ refs = [
   "docs/caption-plan.md §7 (AWS service tasks)",
   "src/clayzer/ui/app.py",
 ]
-see_it = "The hosted site: the CDK stack's Url output (README \"Hosting it on AWS\")."
+see_it = "The hosted site: the CDK stack's Url output (docs/cli.md \"Hosting it on AWS\")."
 changes = [
   "infra/app.py: CloudFront to a load balancer to one ARM64 Fargate task; the task role only reads the store prefix",
   "Dockerfile: the web app image, read-only by default, built from requirements.lock with optional mirror and CA secrets",
@@ -1156,7 +1213,7 @@ done_when = [
 ]
 refs = [
   "src/clayzer/trace.py",
-  "README.md (The evaluation loop)",
+  "docs/cli.md (The evaluation loop)",
   "docs/adr/0001-own-trace-format-otel-is-an-export.md",
 ]
 see_it = "A Run's page (#/runs/<batch>/<case>/<repeat>) lists every Step: request, response, timing, tokens, and retries. CLI: `clayzer trace <batch> <case>` (`--json` for the raw Trace)."
@@ -1743,4 +1800,37 @@ refs = [
   "docs/caption-design.md §8 (idea 16)",
   "docs/caption-design.md §3.4",
   "infra/app.py",
+]
+
+[[task]]
+id = "batch-provenance"
+step = "report"
+title = "Provenance on every Batch and Run: what it was judged with, and where its files are"
+area = "Evaluation"
+tier = "Must"
+status = "done"
+closes = ["REQ-14"]
+notes = "Done 2026-11-04: src/clayzer/provenance.py. A Batch now also saves the Judge's rubric (judge-prompt.txt, hashed), a SHA-256 of every Chip (chips.json, checked before each Run), the ontology's version and file hash, the git commit and whether it had uncommitted changes, and the narrative model. A replaced Chip is a Sandbox Failure, and resume refuses a changed rubric. Compare and the gate treat rubric, Chip and ontology changes as measurement changes; Batches from before show them as not recorded, and the gate says to re-run the Baseline. Benchmark Reference Captions (RSICD) aren't used yet, so their dataset version isn't recorded yet."
+see_it = "A Batch's page (#/batches/<id>/provenance): every setting beside the Baseline's, with differences marked, and every stored file with an in-app link, its store address to copy, and an AWS console link on S3. A Run's page: Provenance, with the Case and Chip it was scored on and its Trace, summary and narrative."
+changes = [
+  "src/clayzer/provenance.py: the Judge rubric, ontology, code version and Chip hashes; the lists of a Batch's settings and stored files",
+  "src/clayzer/batch.py: new Batches record them, each Run checks its Chip's hash, and resume refuses a changed Judge rubric",
+  "src/clayzer/gate.py: rubric, Chip and ontology changes are measurement changes; tools and turn budget are captioner changes; unrecorded items get a warning",
+  "src/clayzer/ui/app.py: /api/batches/<id>/provenance, /api/batches/<id>/runs/<run>/provenance, and /api/batches/<id>/files/<name> for the allow-listed files",
+  "src/clayzer/ui/static/app.js: Provenance panels on the Batch and Run pages; Compare labels code and not-recorded changes",
+  "tests/test_provenance.py: what's recorded, a replaced Chip, a changed rubric, Compare and gate kinds, the API, and the file allow-list",
+]
+start = "caption-design.md §2.3 (REQ-14)"
+after = ["eval-loop", "run-report"]
+context = "The vision brief: \"every scored run keeps its traces, inputs, and the rubric/reference it was judged against\". A Batch already froze its caption prompt and Cases; the Judge's rubric, the Chip images, the ontology and the code could change without any record."
+done_when = [
+  "Every new Batch records the Judge rubric, Chip hashes, ontology version and git commit",
+  "A Run never scores a Chip that changed since its Batch started",
+  "Compare and the gate flag a changed rubric, Chip set or ontology",
+  "The Batch and Run pages show the settings and link every stored file",
+]
+refs = [
+  "docs/vision-hackathon.md §Business Constraints",
+  "docs/caption-design.md §2.3 (REQ-14)",
+  "src/clayzer/batch.py",
 ]

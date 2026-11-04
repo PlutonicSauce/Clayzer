@@ -165,10 +165,6 @@ main { padding: 18px 28px 48px; max-width: 1280px; }
 .mission-top b { font-variant-numeric: tabular-nums; }
 .mission .meter-bar span { background: linear-gradient(90deg, #7fae86, #2f6b3a); }
 .mission small { display: block; margin-top: 4px; }
-.grab-title { margin-top: 18px; }
-.grab { list-style: none; margin: 4px 0 0; padding: 0; }
-.grab li { display: flex; justify-content: space-between; gap: 10px; align-items: baseline;
-  padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
 @media (max-width: 900px) {
   .home-score, .home-row { grid-template-columns: 1fr; gap: 22px; }
 }
@@ -245,6 +241,8 @@ main { padding: 18px 28px 48px; max-width: 1280px; }
   margin: 2px 0 0; padding: 0; list-style: none; }
 .how-code code { display: inline-block; padding: 4px 10px; border-radius: 6px;
   background: #f6f1ee; border: 1px solid var(--line); font-size: 12.5px; }
+.how-docs { margin: 2px 0 0; padding-left: 18px; font-size: 14.5px; line-height: 1.7; }
+.how-docs a { color: #2d5a66; }
 .how-tasks { align-self: start; margin-top: 10px; padding: 4px 16px 16px; border-radius: 10px;
   background: #faf7f5; border: 1px solid var(--line); }
 .how-task { padding: 10px 0; border-bottom: 1px solid var(--line); }
@@ -376,3 +374,18 @@ pre.sample { background: #faf6f3; border: 1px solid var(--line); border-radius: 
 .term b { font-size: 15px; }
 abbr { text-decoration: underline dotted; cursor: help; }
 .empty { color: var(--muted); padding: 14px; border: 1px dashed var(--line); border-radius: 8px; }
+
+/* Provenance: a Batch's settings beside the Baseline's, and its stored files. */
+.prov { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 28px; align-items: start; }
+.prov h3 { margin-top: 0; }
+.prov-settings td:first-child { color: var(--muted); white-space: nowrap; }
+.prov-group th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--muted); background: #f7f3f1; }
+.prov-settings tr.differs td { background: #fbf4e6; }
+.prov-files tr.missing td { color: var(--muted); }
+.btn-link { background: none; border: 0; padding: 0; color: inherit; text-decoration: underline;
+  cursor: pointer; font: inherit; }
+.prov-run { margin: 10px 0 16px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 8px; }
+.prov-run > summary { cursor: pointer; font-weight: 600; }
+.prov-run table { margin-top: 10px; }
+@media (max-width: 1000px) { .prov { grid-template-columns: 1fr; } }
