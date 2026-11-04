@@ -104,6 +104,16 @@ Expired session credentials stop the Batch cleanly; refresh `.env` and finish it
 uv run clayzer batch --resume <batch-id>
 ```
 
+**Tools.** With `--tools`, the Harness becomes a tool-use loop: the captioning model may call
+MCP tools before it submits its Caption, for up to 8 model turns. Each tool call is a `tool`
+Step in the Run's Trace, and `batch.json` records the servers. Only servers allowed for the
+caption Harness are known (`src/clayzer/tools.py`; ADR-0006). Needs the `tools` extra and `uvx`:
+
+```sh
+uv sync --extra tools
+uv run clayzer batch --tools roda --label roda
+```
+
 A Batch writes `batches/<batch-id>/` in the store: `batch.json` (models, prompt hash, Cases
 hash, Repeats, scorer version), `prompt.txt`, `cases.jsonl` (frozen at the start),
 `results.jsonl`, `captions.jsonl`, `retrieval.jsonl`, `summary.json` (per-Case mean and
@@ -175,7 +185,8 @@ localhost only.
 | `CLAYZER_BASELINES_DIR` | `baselines/` (committed) |
 
 Behind a TLS-intercepting proxy, set `SSL_CERT_FILE` to the proxy's CA bundle; it's passed to
-GDAL for NAIP reads too.
+GDAL for NAIP reads too. MCP servers that ignore it (RODA does) need `CLAYZER_MCP_SYSTEM_TRUST=1`,
+which starts them with the OS trust store.
 
 ### Hosting it on AWS
 
@@ -205,7 +216,7 @@ uv run pytest
 
 ### Not built yet
 
-- Verify-then-write and the caption MCP server; the Harness is a single VLM call.
+- Verify-then-write and the LGND Geo sign-in; the tool-use loop has only RODA so far.
 - Workflow Score and Trace summaries (REQ-05, REQ-06 in
   [caption-design.md §2.3](docs/caption-design.md#23-evaluation-loop-requirements)).
 - Change Cases and the RSICD and VRSBench benchmarks.

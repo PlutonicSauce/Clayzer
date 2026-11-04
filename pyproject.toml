@@ -20,6 +20,9 @@ ui = [
     "fastapi>=0.115",
     "uvicorn>=0.30",
 ]
+tools = [
+    "mcp>=2.3,<3",
+]
 
 [project.scripts]
 clayzer = "clayzer.cli:main"
@@ -34,6 +37,7 @@ infra = [
     "aws-cdk-lib>=2.200",
     "constructs>=10",
 ]
+
 
 
 [build-system]

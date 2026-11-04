@@ -452,7 +452,7 @@ the prompt.
 4. **Teacher → student on the cost frontier** (Should, needs a GPU). A large VLM captions a seed
    set; a small open VLM is prompted or fine-tuned to match; plot quality against GPU-seconds per
    Caption.
-5. **An agentic Harness** (Must; saved for later on 2026-11-04). A tool-use loop in which the
+5. **An agentic Harness** (Must; built 2026-11-04 with RODA, `clayzer batch --tools`). A tool-use loop in which the
    captioner calls geospatial tools over MCP before it writes: RODA and stac-mcp first, then
    LGND Geo (imagery check, classifiers). This is the briefs' first success criterion (REQ-01),
    and the tool calls are what the Workflow Score judges. Verify-then-write (1) is one use of it.

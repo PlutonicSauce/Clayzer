@@ -28,7 +28,8 @@ import hashlib
 import json
 import re
 import statistics
-from dataclasses import asdict, dataclass
+from contextlib import nullcontext
+from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 
 from botocore.exceptions import BotoCoreError, ClientError
@@ -72,6 +73,9 @@ class BatchConfig:
     prompt_sha: str
     prompt_source: str
     scorer_version: str = SCORER_VERSION
+    # MCP servers the Harness may call (tools.py); empty means the single-call Harness.
+    tools: list[str] = field(default_factory=list)
+    max_turns: int = harness.MAX_TURNS
 
 
 def _sha(data: bytes) -> str:
@@ -128,7 +132,7 @@ def _classify(e: Exception) -> str:
     return SANDBOX_FAILURE
 
 
-def _run_one(client, cfg: BatchConfig, prompt: str, case: dict, repeat: int, store):
+def _run_one(client, cfg: BatchConfig, prompt: str, case: dict, repeat: int, store, toolbox=None):
     """One Run: caption the Case's Chip, then score it. Returns (result, caption).
 
     Every model call is recorded in the Run's Trace, which is written whatever the outcome,
@@ -151,8 +155,9 @@ def _run_one(client, cfg: BatchConfig, prompt: str, case: dict, repeat: int, sto
     try:
         try:
             cap, step = harness.caption(
-                client, cfg.caption_model, chip["id"], png, prompt, tracer, chip["uri"]
-            )
+                client, cfg.caption_model, chip["id"], png, prompt, tracer, chip["uri"],
+                toolbox, cfg.max_turns,
+            )  # fmt: skip
         except harness.HarnessFault as e:
             empty = {"text": "", "objects": [], "relations": [], "uncertain": []}
             result = {
@@ -210,9 +215,12 @@ def start(
     prompt_source: str = "built-in",
     judge: bool = True,
     progress=print,
+    tools: list[str] | None = None,
 ) -> str:
     """Create a Batch and run it. Returns the Batch id."""
-    batch_id = create(cases, settings, store, repeats, label, region, prompt, prompt_source, judge)
+    batch_id = create(
+        cases, settings, store, repeats, label, region, prompt, prompt_source, judge, tools
+    )
     resume(batch_id, settings, store, progress)
     return batch_id
 
@@ -227,6 +235,7 @@ def create(
     prompt: str = harness.PROMPT,
     prompt_source: str = "built-in",
     judge: bool = True,
+    tools: list[str] | None = None,
 ) -> str:
     """Write a new Batch's configuration, prompt, and frozen Cases. Returns the Batch id."""
     # Labels become part of store keys, so only letters, digits, dashes and underscores.
@@ -246,6 +255,7 @@ def create(
         embed_model=settings.embed_model,
         prompt_sha=_sha(prompt.encode()),
         prompt_source=prompt_source,
+        tools=list(tools or []),
     )
     store.put(
         _key(batch_id, "batch.json"), (json.dumps(asdict(cfg), indent=2) + "\n").encode(), JSON
@@ -268,18 +278,26 @@ def resume(batch_id: str, settings: Settings, store, progress=print) -> dict:
 
     todo = [(c, r) for r in range(1, cfg.repeats + 1) for c in cases if (c["id"], r) not in done]
     stopped = None
-    for i, (case, repeat) in enumerate(todo, 1):
-        try:
-            result, cap = _run_one(client, cfg, prompt, case, repeat, store)
-        except CredentialsExpired as e:
-            stopped = f"credentials expired after {i - 1} of {len(todo)} Runs: {e}"[:300]
-            break
-        results.append(result)
-        if cap is not None and result["status"] != SANDBOX_FAILURE:
-            captions.append(cap)
-        progress(f"  [{i}/{len(todo)}] {result['run_id']}: {_one_line(result)}")
-        store.put(_key(batch_id, "results.jsonl"), to_jsonl(results), NDJSON)
-        store.put(_key(batch_id, "captions.jsonl"), to_jsonl(captions), NDJSON)
+    # MCP servers start once per Batch, and only if a Run is left to do.
+    if cfg.tools and todo:
+        from clayzer.tools import Toolbox
+
+        tools = Toolbox.named(cfg.tools)
+    else:
+        tools = nullcontext()
+    with tools as toolbox:
+        for i, (case, repeat) in enumerate(todo, 1):
+            try:
+                result, cap = _run_one(client, cfg, prompt, case, repeat, store, toolbox)
+            except CredentialsExpired as e:
+                stopped = f"credentials expired after {i - 1} of {len(todo)} Runs: {e}"[:300]
+                break
+            results.append(result)
+            if cap is not None and result["status"] != SANDBOX_FAILURE:
+                captions.append(cap)
+            progress(f"  [{i}/{len(todo)}] {result['run_id']}: {_one_line(result)}")
+            store.put(_key(batch_id, "results.jsonl"), to_jsonl(results), NDJSON)
+            store.put(_key(batch_id, "captions.jsonl"), to_jsonl(captions), NDJSON)
 
     retr = [] if stopped else _retrieval(client, cfg, cases, captions)
     store.put(_key(batch_id, "retrieval.jsonl"), to_jsonl(retr), NDJSON)
