@@ -1,12 +1,14 @@
-"""Keeps the code's object lists in step with ontology/objects.toml (ADR-0008).
-
-If one of these fails, either the ontology or the code changed alone: update the other, or
-change both together.
+"""The ontology file (ADR-0008): well-formed, its crosswalks real, and the code's vocabularies
+read from it, so adding a class is a one-file change.
 """
+
+import subprocess
+import sys
+import textwrap
 
 import pytest
 
-from clayzer import answer_keys, grounding, harness, retrieval
+from clayzer import answer_keys, grounding, harness, ontology, retrieval
 from clayzer.ontology import load
 
 ONT = load()
@@ -46,17 +48,50 @@ def test_hierarchy_is_well_formed():
         assert set(cls.confusers) <= set(ONT.classes), f"{cls.id}: unknown confuser"
 
 
-def test_claimable_classes_match_the_harness_vocabulary():
-    assert set(ONT.claimable()) == set(harness.OBJECTS)
-
-
-def test_keyed_classes_match_grounding():
-    assert ONT.keyed() == grounding.KEYED
-
-
-def test_retrieval_queries_match():
-    assert ONT.queries() == retrieval.QUERIES
+def test_the_code_reads_its_vocabularies_from_the_file():
+    assert harness.OBJECTS == tuple(ONT.claimable())
+    assert grounding.KEYED == ONT.keyed()
+    assert retrieval.QUERIES == ONT.queries()
     assert set(ONT.queries().values()) <= set(ONT.claimable())
+
+
+HELIPAD = """
+[[class]]
+id = "helipad"
+name = "Helipad"
+parent = "transportation"
+claimable = true
+definition = "A marked landing pad for helicopters."
+keyed_by = ["osm"]
+osm = [{ aeroway = "helipad" }]
+queries = ["find helipads"]
+"""
+
+
+def test_a_class_added_to_the_file_reaches_the_prompt_scoring_retrieval_and_osm(tmp_path):
+    # A fresh interpreter, so module-level vocabularies are read from the edited copy.
+    path = tmp_path / "objects.toml"
+    path.write_text(ontology.DEFAULT.read_text(encoding="utf-8") + HELIPAD, encoding="utf-8")
+    script = textwrap.dedent(f"""
+        from clayzer import ontology
+        real = ontology.load
+        ontology.load = lambda path={str(path)!r}: real(path)
+        from clayzer import answer_keys, grounding, harness, retrieval
+        assert "helipad" in harness.OBJECTS
+        assert "helipad" in harness.CAPTION_TOOL["toolSpec"]["inputSchema"]["json"]["properties"][
+            "objects"]["items"]["properties"]["object"]["enum"]
+        assert "helipad" in harness.PROMPT.format(grid="", objects=", ".join(harness.OBJECTS),
+                                                  relations="")
+        label = {{"object": "helipad", "count": 1, "position": "centre", "cells": ["centre"],
+                  "attributes": {{}}}}
+        claim = {{"id": "o1", "object": "helipad", "count": 1, "position": "centre"}}
+        g = grounding.grounding({{"text": "", "objects": [claim], "relations": []}}, [label])
+        assert g["correctness"] == 1.0 and g["unscored"] == []
+        assert retrieval.QUERIES["find helipads"] == "helipad"
+        assert answer_keys.osm_object({{"aeroway": "helipad"}}) == "helipad"
+        assert 'way["aeroway"~"^(helipad)$"]' in answer_keys.overpass_filters()
+    """)
+    subprocess.run([sys.executable, "-c", script], check=True)
 
 
 @pytest.mark.parametrize(
@@ -99,9 +134,26 @@ def test_every_class_says_what_it_covers():
         assert cls.definition, f"{cls.id} has no definition"
 
 
-def test_the_road_rules_list_every_highway_type_the_code_maps():
-    listed = {rule["highway"] for rule in ONT.classes["road"].osm}
-    assert listed == answer_keys.ROAD_TYPES
+@pytest.mark.parametrize(
+    "tags,class_id",
+    [
+        ({"building": "yes", "highway": "service"}, "building"),  # buildings before roads
+        ({"building": "yes", "amenity": "parking"}, "building"),  # a parking garage
+        ({"building": "yes", "landuse": "greenhouse_horticulture"}, "greenhouse"),  # deeper class
+        ({"landuse": "farmland", "intermittent": "yes"}, "field"),  # only water is dried out
+        ({"highway": "footway"}, None),
+    ],
+)
+def test_osm_precedence_matches_the_mapping_before_the_ontology_drove_it(tags, class_id):
+    assert answer_keys.osm_object(tags) == class_id
+
+
+def test_overpass_asks_for_every_key_the_rules_use():
+    filters = "".join(answer_keys.overpass_filters())
+    for _, rule in ONT.osm_rules():
+        for key in rule:
+            assert f'way["{key}"' in filters
+    assert 'way["building"]' in filters  # any value
 
 
 @pytest.mark.parametrize(

@@ -50,6 +50,11 @@ def render(b: dict) -> str:
         ),
         f"| Fidelity | {_f(batch['fidelity'])} | image-aware Judge |",
         f"| Retrieval | {_ms(batch['retrieval_mrr'])} | MRR per Repeat, mean ± Spread |",
+        (
+            f"| Retrieval recall@1 | {_ms(batch.get('retrieval_recall_at_1'))} | "
+            f"{_ms(batch.get('retrieval_recall_at_1_expanded'))} with queries expanded by "
+            "synonyms |"
+        ),
         f"| Label preparation time | {_f(batch['label_prep_seconds'], 1)} s | building all Cases |",
         (
             f"| Cost (partial) | {_f(batch['seconds_per_caption'], 1)} s, "

@@ -1209,9 +1209,10 @@ step = "output"
 title = "Partial credit in grounding when a Claim names a parent or sibling of the label's class"
 area = "Evaluation"
 tier = "Should"
-status = "todo"
+status = "done"
 closes = ["CAP-10"]
 start = "src/clayzer/grounding.py"
+notes = "Done 2026-11-04, except the Baseline rescore: a Claim one step from a label's class (parent or child: building over a greenhouse, or the reverse) is a near miss worth 0.5 in precision and coverage; its position is scored against that label, its count and attributes aren't; siblings (road and railroad) get nothing. 0.5 is a choice to review: right thing at the wrong level of detail, matching the count rule's half credit. SCORER_VERSION grounding-5. The Baseline rescore needs the S3 store and wasn't run: `uv run clayzer rescore <baseline batch-id>` against it."
 after = ["ontology-in-code"]
 context = "A Claim of \"building\" over a greenhouse is closer than one of \"water\". The ontology records each class's parent, so grounding can score a Claim one step away (parent or child) between a hit and a miss."
 done_when = [
@@ -1224,6 +1225,14 @@ refs = [
   "src/clayzer/grounding.py",
   "ontology/objects.toml",
 ]
+see_it = "A Batch report's Claim table: a near miss, half credit badge with the label it was credited against. CLI: `uv run clayzer rescore <batch-id>` rescores a stored Batch with it."
+changes = [
+  "src/clayzer/grounding.py: near misses at ontology distance 1, NEAR_CREDIT 0.5, and a `near` list of labels only a near miss mentioned",
+  "src/clayzer/batch.py: SCORER_VERSION grounding-5, so the gate warns when comparing across the change",
+  "src/clayzer/report_html.py: the Claim table shows near misses against their label",
+  "tests/test_grounding.py: parent and child near misses, siblings and unrelated classes get nothing, an exact Claim takes the label",
+  "docs/caption-design.md: §3.5 says parent or child at distance 1, half credit",
+]
 
 [[task]]
 id = "synonym-queries"
@@ -1231,9 +1240,10 @@ step = "output"
 title = "Retrieval: expand queries with each class's synonyms and measure recall@k with and without"
 area = "Evaluation"
 tier = "Should"
-status = "todo"
+status = "done"
 closes = ["CAP-09", "CAP-06"]
 start = "src/clayzer/retrieval.py"
+notes = "Done 2026-11-04: each retrieval query is also scored expanded with its class's ontology synonyms, a Caption ranked by its best match among the phrasings; Batches report recall@1 both ways. Expansion as best-match over phrasings is a choice to review (the alternative is scoring each phrasing as its own query). Only queries with a relevant Caption are embedded, each phrasing once."
 after = ["ontology-in-code"]
 context = "Retrieval queries today are fixed phrases (\"find solar farms\"). The ontology lists synonyms (\"solar farm\", \"PV plant\"); expanding queries with them shows whether Captions are findable however people phrase things."
 done_when = [
@@ -1244,6 +1254,14 @@ refs = [
   "docs/caption-design.md §3.5",
   "src/clayzer/retrieval.py",
   "ontology/objects.toml",
+]
+see_it = "A Batch report: the Retrieval recall@1 row (report.md) and a With synonyms column per query (report.html). The summary's retrieval_recall_at_1_expanded."
+changes = [
+  "src/clayzer/retrieval.py: expansions from the ontology's synonyms; each query scored as written and expanded",
+  "src/clayzer/batch.py: summarize adds retrieval_recall_at_1_expanded",
+  "src/clayzer/report.py: recall@1 with and without expansion",
+  "src/clayzer/report_html.py: a With synonyms column in the retrieval table",
+  "tests/test_retrieval.py: a synonym finds the Caption the fixed query misses; Batches report both",
 ]
 
 # ── Platform ─────────────────────────────────────────────────────────────────
@@ -1674,9 +1692,10 @@ step = "output"
 title = "Read OBJECTS, KEYED, the OSM mapping, and the retrieval QUERIES from the ontology instead of code lists"
 area = "Platform"
 tier = "Should"
-status = "todo"
+status = "done"
 closes = ["CAP-10"]
 start = "src/clayzer/ontology.py"
+notes = "Done 2026-11-04: harness OBJECTS, grounding KEYED, answer_keys osm_object, and retrieval QUERIES are read from ontology/objects.toml; the Overpass query is built from the same OSM rules. OSM precedence is now a rule in the file (the most specific class wins, then file order; intermittent=yes is never water), and the built-structures section moved above transportation so the mapping is unchanged: checked identical to the old code on 43,200 tag combinations. Ontology 0.3. The prompt now lists the object types in file order, so a Batch run after this differs from the Baseline in ontology_sha (a measurement setting the gate already flags)."
 after = ["ontology-review"]
 context = "Today the code has its own lists (harness OBJECTS, grounding KEYED, answer_keys osm_object, retrieval QUERIES) and a test keeps them in step with the ontology. Read them from the ontology instead, so adding a class is a one-file change."
 done_when = [
@@ -1691,6 +1710,16 @@ refs = [
   "src/clayzer/grounding.py",
   "src/clayzer/answer_keys.py",
   "src/clayzer/retrieval.py",
+]
+see_it = "tests/test_ontology.py: a class added to a copy of the file reaches the Harness's prompt and tool schema, grounding, retrieval, and the OSM mapping. CLI: `uv run pytest tests/test_ontology.py`."
+changes = [
+  "src/clayzer/ontology.py: osm_rules and osm_object, with precedence by class depth then file order",
+  "src/clayzer/harness.py: OBJECTS from the ontology's claimable classes",
+  "src/clayzer/grounding.py: KEYED from the ontology's keyed classes",
+  "src/clayzer/answer_keys.py: osm_object and the Overpass filters from the ontology's OSM rules; ROAD_TYPES removed",
+  "src/clayzer/retrieval.py: QUERIES from the ontology",
+  "ontology/objects.toml: version 0.3; built structures before transportation; header says the code reads it",
+  "tests/test_ontology.py: the drift tests replaced by a new-class flow-through test, OSM precedence cases, and Overpass coverage",
 ]
 
 [[task]]

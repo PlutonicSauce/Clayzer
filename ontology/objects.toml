@@ -1,7 +1,9 @@
 # Object ontology for Captions: the one place object classes are defined.
 #
-# Every object a Claim can name is a class here. Code reads its lists from this file, and
-# tests/test_ontology.py fails if the code's own lists drift from it (ADR-0008).
+# Every object a Claim can name is a class here. The code has no lists of its own: the Harness's
+# allowed objects, grounding's scored classes, the OSM mapping, and the retrieval queries are
+# read from this file, so adding a class here reaches the prompt, scoring, and retrieval
+# (ADR-0008).
 #
 # Fields per class:
 #   id, name          the Claim value and a readable name
@@ -9,8 +11,9 @@
 #   claimable         true if a Caption's Claims may use it today; false = candidate for later
 #   definition        what the class covers in a Chip, in one line: what a Claim of it asserts
 #   keyed_by          Answer Keys that can verify it (empty = Claims about it are unscored)
-#   osm               OSM tag rules the code maps to this class (tested against answer_keys.osm_object);
-#                     "*" is any value, and no rule matches a way tagged intermittent=yes
+#   osm               OSM tag rules the code maps to this class (answer_keys.osm_object applies them);
+#                     "*" is any value; the most specific class wins, then file order; a way
+#                     tagged intermittent=yes is never a water feature
 #   osm_reference     OSM tags for the class that the code does NOT use (e.g. power features come
 #                     from USGS); documentation for Answer Keys outside the US
 #   synonyms          other words people use; for retrieval queries and prompt wording
@@ -29,8 +32,11 @@
 # Version 0.2 (2026-11-04, ontology-review): a definition per class; water is only water there
 # all year (OSM mapped dry desert washes as intermittent streams); the road and building rules
 # list everything the code maps; construction_site stays a candidate; well_pad added as one.
+# Version 0.3 (2026-11-04, ontology-in-code): the code reads its lists from here. Built
+# structures come before transportation, so a way tagged both building and highway stays a
+# building; the Harness's prompt lists the object types in this file's order.
 
-version = "0.2"
+version = "0.3"
 
 # ── roots ───────────────────────────────────────────────────────────────────────────────
 
@@ -122,6 +128,48 @@ synonyms = ["pylon", "power line tower"]
 confusers = ["wind_turbine"]
 min_visible_m = 5
 
+# ── built structures ────────────────────────────────────────────────────────────────────
+
+[[class]]
+id = "building"
+name = "Building"
+parent = "built_structure"
+claimable = true
+definition = "A roofed structure: house, barn, shed, warehouse, or other building."
+keyed_by = ["osm"]
+osm = [{ building = "*" }]  # any building value; greenhouse is matched first
+synonyms = ["house", "warehouse", "structure", "barn"]
+confusers = ["greenhouse", "substation"]
+min_visible_m = 4
+queries = ["find buildings"]
+rsicd_scenes = ["denseresidential", "mediumresidential", "sparseresidential", "commercial", "industrial", "school", "church", "center"]
+
+[[class]]
+id = "greenhouse"
+name = "Greenhouse"
+parent = "building"
+claimable = true
+definition = "A glass or plastic-covered structure for growing plants."
+keyed_by = ["osm"]
+osm = [{ building = "greenhouse" }, { landuse = "greenhouse_horticulture" }]
+synonyms = ["glasshouse", "hothouse", "polytunnel"]
+confusers = ["solar_array", "building"]
+min_visible_m = 5
+queries = ["find greenhouses"]
+rsicd_scenes = []
+
+[[class]]
+id = "storage_tank"
+name = "Storage tank"
+parent = "built_structure"
+claimable = false
+definition = "A cylindrical tank for liquids or gas, seen from above as a circle."
+osm_reference = [{ man_made = "storage_tank" }]
+synonyms = ["oil tank", "silo"]
+confusers = ["building"]
+min_visible_m = 5
+rsicd_scenes = ["storagetanks"]
+
 # ── transportation ──────────────────────────────────────────────────────────────────────
 
 [[class]]
@@ -183,48 +231,6 @@ synonyms = ["airstrip"]
 confusers = ["road"]
 min_visible_m = 20
 rsicd_scenes = ["airport"]
-
-# ── built structures ────────────────────────────────────────────────────────────────────
-
-[[class]]
-id = "building"
-name = "Building"
-parent = "built_structure"
-claimable = true
-definition = "A roofed structure: house, barn, shed, warehouse, or other building."
-keyed_by = ["osm"]
-osm = [{ building = "*" }]  # any building value; greenhouse is matched first
-synonyms = ["house", "warehouse", "structure", "barn"]
-confusers = ["greenhouse", "substation"]
-min_visible_m = 4
-queries = ["find buildings"]
-rsicd_scenes = ["denseresidential", "mediumresidential", "sparseresidential", "commercial", "industrial", "school", "church", "center"]
-
-[[class]]
-id = "greenhouse"
-name = "Greenhouse"
-parent = "building"
-claimable = true
-definition = "A glass or plastic-covered structure for growing plants."
-keyed_by = ["osm"]
-osm = [{ building = "greenhouse" }, { landuse = "greenhouse_horticulture" }]
-synonyms = ["glasshouse", "hothouse", "polytunnel"]
-confusers = ["solar_array", "building"]
-min_visible_m = 5
-queries = ["find greenhouses"]
-rsicd_scenes = []
-
-[[class]]
-id = "storage_tank"
-name = "Storage tank"
-parent = "built_structure"
-claimable = false
-definition = "A cylindrical tank for liquids or gas, seen from above as a circle."
-osm_reference = [{ man_made = "storage_tank" }]
-synonyms = ["oil tank", "silo"]
-confusers = ["building"]
-min_visible_m = 5
-rsicd_scenes = ["storagetanks"]
 
 # ── water ───────────────────────────────────────────────────────────────────────────────
 

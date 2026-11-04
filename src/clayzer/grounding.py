@@ -8,6 +8,13 @@ for real Answer Keys:
 - Relations are scored as precision only: each directional relation the Caption asserts between
   two labelled types is checked against the labels' positions. Real OSM labels imply many
   relations, so recall would punish every Caption for not listing them all.
+- A Claim one step from a label's class in the ontology (its parent or child: "building" over a
+  greenhouse, or "greenhouse" over a building) is a near miss worth NEAR_CREDIT, half a hit, in
+  precision and in coverage (decided 2026-11-04). It names the right thing at the wrong level of
+  detail, which is closer than a wrong class but not the same as the right one; half matches
+  the count rule's credit for a near count. Its position is scored against that label; its
+  count and attributes aren't, since those belong to the other class. Siblings (road and
+  railroad, two steps apart) get nothing: a road is not a railroad.
 
 Grounding is two numbers, reported and gated separately (decided 2026-11-04):
 - correctness: of what the Caption claimed, how much is right. The mean of the parts that
@@ -20,12 +27,12 @@ visible instead of hiding it in a formula. Claims about types no Answer Key cove
 bare ground) are reported as unscored, not counted.
 """
 
+from clayzer import ontology
 from clayzer.grid import DIRECTIONAL, cell_distance, directions
 
-KEYED = {
-    "solar_array", "wind_turbine",  # USGS
-    "road", "railroad", "building", "water", "field", "parking_lot", "greenhouse",  # OSM
-}  # fmt: skip
+# Classes some Answer Key can verify (the ontology's `keyed_by`); Claims about others are unscored.
+KEYED = ontology.load().keyed()
+NEAR_CREDIT = 0.5
 
 
 def _mean(xs):
@@ -44,6 +51,13 @@ def _position_score(claimed: str, cells: list[str]) -> float:
     return 1.0 if d == 0 else 0.0
 
 
+def _near_label(obj: str, refs: dict[str, dict]) -> dict | None:
+    """The label whose class is one step from `obj` (parent or child), if any."""
+    ont = ontology.load()
+    near = [ref for cls, ref in sorted(refs.items()) if ont.distance(obj, cls) == 1]
+    return near[0] if near else None
+
+
 def grounding(caption: dict, labels: list[dict]) -> dict:
     refs = {lb["object"]: lb for lb in labels}
     claims = [o for o in caption["objects"] if o["object"] in KEYED]
@@ -53,7 +67,16 @@ def grounding(caption: dict, labels: list[dict]) -> dict:
     for cl in claims:
         ref = refs.get(cl["object"])
         if ref is None:
-            rows.append({"claim": cl, "verdict": "false positive"})
+            near = _near_label(cl["object"], refs)
+            if near is None:
+                rows.append({"claim": cl, "verdict": "false positive"})
+                continue
+            row = {"claim": cl, "verdict": "near miss", "ref_object": near["object"],
+                   "ref_position": near["position"]}  # fmt: skip
+            if cl.get("position") is not None:
+                row["position"] = _position_score(cl["position"], near["cells"])
+                positions.append(row["position"])
+            rows.append(row)
             continue
         row = {"claim": cl, "verdict": "matched", "ref_position": ref["position"]}
         # A Claim extracted from free text may not say where (extract.py): skip, don't guess.
@@ -86,12 +109,18 @@ def grounding(caption: dict, labels: list[dict]) -> dict:
             counts.append(_count_score(n, ref["count"]))
 
     claimed_types = set(claimed_counts)
-    missed = [lb["object"] for lb in labels if lb["object"] not in claimed_types]
-    matched = sum(r["verdict"] == "matched" for r in rows)
+    near_types = {r["ref_object"] for r in rows if r["verdict"] == "near miss"}
+    near = [lb["object"] for lb in labels
+            if lb["object"] not in claimed_types and lb["object"] in near_types]  # fmt: skip
+    missed = [lb["object"] for lb in labels
+              if lb["object"] not in claimed_types and lb["object"] not in near_types]  # fmt: skip
+    hits = sum(1.0 if r["verdict"] == "matched" else NEAR_CREDIT if r["verdict"] == "near miss"
+               else 0.0 for r in rows)  # fmt: skip
     # With no gradable Claims, precision is perfect on an empty Chip and undefined otherwise
     # (recall carries the miss).
-    precision = matched / len(claims) if claims else (None if labels else 1.0)
-    recall = (len(labels) - len(missed)) / len(labels) if labels else None
+    precision = hits / len(claims) if claims else (None if labels else 1.0)
+    found = len(labels) - len(missed) - len(near) + NEAR_CREDIT * len(near)
+    recall = found / len(labels) if labels else None
 
     type_of = {o["id"]: o["object"] for o in caption["objects"]}
     rel_rows, rel_unscored = [], []
@@ -123,6 +152,8 @@ def grounding(caption: dict, labels: list[dict]) -> dict:
         "rows": rows,
         "counts": count_by_type,
         "missed": missed,
+        # Labels only a near-miss Claim mentioned, credited NEAR_CREDIT in coverage.
+        "near": near,
         "unscored": [o["object"] for o in unkeyed],
         "relation_rows": rel_rows,
         "relations_unscored": rel_unscored,

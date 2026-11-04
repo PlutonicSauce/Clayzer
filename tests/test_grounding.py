@@ -47,15 +47,38 @@ def test_road_position_counts_anywhere_along_the_road():
 
 def test_false_positive_miss_and_neighbouring_cell_scores_nothing():
     labels = [label("wind_turbine", "west", count=3), label("building", "east", count=2)]
-    cap = caption(
-        [claim("o1", "wind_turbine", "centre", count=2), claim("o2", "greenhouse", "south")]
-    )
+    cap = caption([claim("o1", "wind_turbine", "centre", count=2), claim("o2", "water", "south")])
     g = grounding(cap, labels)
     assert g["precision"] == 0.5
     assert g["recall"] == 0.5
     assert g["missed"] == ["building"]
     assert g["position"] == 0.0
     assert g["count"] == 0.5
+
+
+def test_a_parent_or_child_class_is_a_near_miss_worth_half():
+    # "building" over a greenhouse: right thing, coarser class.
+    g = grounding(caption([claim("o1", "building", "east")]), [label("greenhouse", "east")])
+    assert g["rows"][0]["verdict"] == "near miss" and g["rows"][0]["ref_object"] == "greenhouse"
+    assert g["precision"] == 0.5 and g["coverage"] == 0.5
+    assert g["near"] == ["greenhouse"] and g["missed"] == []
+    assert g["position"] == 1.0  # scored against the greenhouse's cells
+    assert g["count"] is None  # a building count isn't a greenhouse count
+    # And the other way: "greenhouse" over a building.
+    g = grounding(caption([claim("o1", "greenhouse", "west")]), [label("building", "east")])
+    assert g["precision"] == 0.5 and g["position"] == 0.0
+
+
+def test_siblings_and_unrelated_classes_get_no_credit():
+    g = grounding(caption([claim("o1", "railroad", "north")]), [label("road", "north")])
+    assert g["rows"][0]["verdict"] == "false positive"  # two steps apart
+    assert g["precision"] == 0.0 and g["coverage"] == 0.0 and g["missed"] == ["road"]
+
+
+def test_an_exact_claim_takes_the_label_so_no_near_credit_is_added():
+    labels = [label("building", "east"), label("greenhouse", "west")]
+    g = grounding(caption([claim("o1", "building", "east")]), labels)
+    assert g["coverage"] == 0.5 and g["missed"] == ["greenhouse"] and g["near"] == []
 
 
 def test_claims_split_over_cells_are_counted_together():

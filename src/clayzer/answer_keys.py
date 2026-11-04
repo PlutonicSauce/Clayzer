@@ -26,6 +26,7 @@ import httpx
 from shapely.geometry import LineString, Polygon, box, shape
 from shapely.ops import unary_union
 
+from clayzer import ontology
 from clayzer.chips import Chip
 from clayzer.grid import GRID
 
@@ -203,50 +204,36 @@ def usgs_labels(
 
 # ── OSM ─────────────────────────────────────────────────────────────────────────────────
 
-ROAD_TYPES = {
-    "motorway", "trunk", "primary", "secondary", "tertiary", "unclassified", "residential",
-    "service", "track", "motorway_link", "trunk_link", "primary_link", "secondary_link",
-}  # fmt: skip
 PAVED = {"asphalt", "concrete", "paved", "chipseal", "paving_stones", "concrete:plates"}
 UNPAVED = {"unpaved", "gravel", "dirt", "ground", "compacted", "fine_gravel", "sand", "earth"}
 COUNTED = {"building", "greenhouse", "parking_lot"}
 
 
 def osm_object(tags: dict) -> str | None:
-    """The Caption object type an OSM way maps to, or None. Power features are left to USGS."""
-    if "power" in tags:
-        return None
-    if tags.get("building") == "greenhouse" or tags.get("landuse") == "greenhouse_horticulture":
-        return "greenhouse"
-    if "building" in tags:
-        return "building"
-    if tags.get("highway") in ROAD_TYPES:
-        return "road"
-    if tags.get("railway") == "rail":
-        return "railroad"
-    if tags.get("amenity") == "parking":
-        return "parking_lot"
-    # Only water that is there all year: in the desert OSM maps dry washes as intermittent
-    # streams, and a ditch or drain is usually dry from above.
-    if tags.get("intermittent") != "yes" and (
-        tags.get("natural") == "water" or tags.get("waterway") in {"river", "canal"}
-    ):
-        return "water"
-    if tags.get("landuse") in {"farmland", "meadow", "orchard", "vineyard"}:
-        return "field"
-    return None
+    """The Caption object type an OSM way maps to, or None, by the ontology's `osm` rules. Water
+    counts only where it's there all year: a ditch or drain is usually dry from above, so
+    neither has a rule."""
+    return ontology.load().osm_object(tags)
+
+
+def overpass_filters() -> list[str]:
+    """One Overpass way filter per OSM key the ontology's rules use: any value where a rule
+    takes any, else the exact values. `osm_object` then picks each way's class."""
+    values: dict[str, set[str]] = defaultdict(set)
+    for _, rule in ontology.load().osm_rules():
+        for k, v in rule.items():
+            values[k].add(v)
+    return [
+        f'way["{k}"]' if "*" in vs else f'way["{k}"~"^({"|".join(sorted(vs))})$"]'
+        for k, vs in sorted(values.items())
+    ]
 
 
 def overpass(bbox) -> list[dict]:
     w, s, e, n = bbox
     b = f"({s},{w},{n},{e})"
-    query = (
-        "[out:json][timeout:60];("
-        f'way["highway"]{b};way["railway"="rail"]{b};way["building"]{b};'
-        f'way["natural"="water"]{b};way["waterway"]{b};way["amenity"="parking"]{b};'
-        f'way["landuse"~"farmland|meadow|orchard|vineyard|greenhouse_horticulture"]{b};'
-        ");out tags geom;"
-    )
+    query = "[out:json][timeout:60];(" + "".join(f"{f}{b};" for f in overpass_filters())
+    query += ");out tags geom;"
     # The public Overpass server sheds load with 429 and 50x; back off and retry.
     for attempt in range(4):
         r = httpx.post(
