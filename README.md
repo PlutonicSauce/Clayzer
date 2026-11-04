@@ -264,6 +264,8 @@ so no AWS keys are stored in GitHub. Set it up once per account:
 
 The job builds the ARM64 image on an ARM runner, deploys, and checks `/api/config` on the
 CloudFront URL. The account ID is masked in the public logs.
+[docs/deploy.md](docs/deploy.md) walks through the manual deploy step by step, and what each
+step becomes in CI.
 
 To build the image on its own: `docker build -t clayzer .` (see the
 [Dockerfile](Dockerfile) for mirror and proxy options).
