@@ -1,9 +1,9 @@
 """The project's docs, served by the web app at /docs/<path>, so How it works can link to the
 plan and design section by section.
 
-Only the project's own Markdown is served (README, the glossary, the plan, the design, the briefs,
-the ADRs); any other path is refused. Section anchors match GitHub's, so links between the docs
-keep working. Links to other docs stay in the app; links to code point at GitHub. Mermaid
+Only the project's own Markdown is served (README, the CLI reference, the glossary, the plan,
+the design, the briefs, the ADRs); any other path is refused. Section anchors match GitHub's, so
+links between the docs keep working. Links to other docs stay in the app; links to code point at GitHub. Mermaid
 diagrams render with Mermaid from a CDN when it's reachable, and show as their source text when
 it isn't.
 """
@@ -24,7 +24,8 @@ DOCS = [
     ("docs/caption-plan.md", "The plan"),
     ("docs/caption-design.md", "The design"),
     ("GLOSSARY.md", "Glossary"),
-    ("README.md", "README: set up and commands"),
+    ("README.md", "README: getting started"),
+    ("docs/cli.md", "CLI and configuration reference"),
     ("docs/tech-hackathon.md", "Brief: technical"),
     ("docs/vision-hackathon.md", "Brief: vision"),
 ]

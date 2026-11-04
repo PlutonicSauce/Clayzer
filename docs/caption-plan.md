@@ -587,7 +587,7 @@ v0.1 of [`ontology/objects.toml`](../ontology/objects.toml) matches the code's l
 |---|---|---|---|---|
 | Captioning and judging through Bedrock (Nova Pro, Opus 5.5) | AWS-01 | Captioning, Evaluation | Must | In the walking skeleton |
 | Retrieval embeddings with Titan Text Embeddings v2 | AWS-02 | Evaluation | Must | In the walking skeleton |
-| Private, encrypted S3 bucket per account; one key layout | AWS-03 | Data and Cases | Must | Done in the README setup |
+| Private, encrypted S3 bucket per account; one key layout | AWS-03 | Data and Cases | Must | Done: docs/cli.md, Storage |
 | Least-privilege IAM roles; no credentials in the repo | AWS-13 | Platform | Must | Day 1 |
 | GPU quota request, then a SageMaker endpoint with one open VLM; GPU-seconds per Caption | AWS-04 | Captioning | Should | Quota before kickoff; endpoint Day 2 afternoon |
 | ADOT collector; Traces in X-Ray | AWS-05 | Platform | Should | Day 2 morning |
