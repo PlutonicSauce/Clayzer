@@ -1,0 +1,106 @@
+"""The Case builder: one Chip plus its Reference Labels (caption-plan.md §3, §5.1).
+
+Positives start from an Answer Key record and cut the Chip around it, in a NAIP image taken
+after the site was built, with the Chip's centre offset so the site can land in any grid cell.
+Negatives must show no USGS record inside the Chip plus a buffer.
+`prep_seconds` records label preparation time (CAP-13).
+
+A Chip's `uri` is its store key (`chips/<id>.png`), so a Case file works against any
+teammate's store.
+"""
+
+import json
+import time
+
+from clayzer import answer_keys as ak
+from clayzer.chips import Chip, cut_chip, find_naip, offset_for
+
+# About 300 m at these latitudes: negatives need USGS-free surroundings, not just a clear Chip.
+NEGATIVE_BUFFER_DEG = 0.003
+
+
+def _labels(chip: Chip) -> list[dict]:
+    solar, turbines = ak.usgs_near(chip.bbox, 0.0)
+    return ak.usgs_labels(chip, solar, turbines) + ak.osm_labels(chip, ak.overpass(chip.bbox))
+
+
+def _case(case_id: str, region: str, chip: Chip, labels: list[dict], started: float) -> dict:
+    return {
+        "id": case_id,
+        "task": "caption",
+        "kind": "fixed",
+        "region": region,
+        "chips": [
+            {
+                "id": chip.id,
+                "uri": f"chips/{chip.png}",
+                "date": chip.date,
+                "bbox": list(chip.bbox),
+                "source": chip.source,
+            }
+        ],
+        "reference_labels": labels,
+        "prep_seconds": round(time.monotonic() - started, 1),
+    }
+
+
+def build_positive(
+    answer_key: str, source_id: int, region: str, store, naip_source: str = "pc"
+) -> dict:
+    started = time.monotonic()
+    if answer_key == "uspvdb":
+        rec = ak.uspvdb_site(source_id)
+        if "ground" not in (rec.get("p_sys_type") or "ground"):
+            raise ValueError(f"USPVDB {source_id} isn't ground-mounted ({rec['p_sys_type']})")
+        state = rec["p_state"]
+    elif answer_key == "uswtdb":
+        rec = ak.uswtdb_turbine(source_id)
+        state = rec["t_state"]
+    else:
+        raise ValueError(f"unknown Answer Key {answer_key!r}")
+    lon, lat = rec["xlong"], rec["ylat"]
+    item = find_naip(lon, lat, after_year=rec.get("p_year"))
+    prefix = f"{state.lower()}-{answer_key}-{source_id}"
+    # Offset so the site lands anywhere in the 3×3 grid, not always in the centre cell.
+    offset = offset_for(f"{answer_key}-{source_id}")
+    chip = cut_chip(item, lon, lat, prefix, store, naip_source, offset)
+    return _case(f"fixed-{region}-{answer_key}-{source_id}", region, chip, _labels(chip), started)
+
+
+def build_negative(
+    lon: float, lat: float, n: int, state: str, region: str, store, naip_source: str = "pc"
+) -> dict:
+    started = time.monotonic()
+    item = find_naip(lon, lat)
+    chip = cut_chip(item, lon, lat, f"{state.lower()}-neg-{n}", store, naip_source)
+    solar, turbines = ak.usgs_near(chip.bbox, NEGATIVE_BUFFER_DEG)
+    if solar or turbines:
+        found = [f"uspvdb {s['case_id']}" for s in solar]
+        found += [f"uswtdb {t['case_id']}" for t in turbines]
+        for suffix in (".png", ".json"):
+            store.delete(f"chips/{chip.id}{suffix}")
+        raise ValueError(f"not a negative: USGS records nearby ({', '.join(found[:5])})")
+    labels = ak.osm_labels(chip, ak.overpass(chip.bbox))
+    return _case(f"fixed-{region}-neg-{n}", region, chip, labels, started)
+
+
+def cases_key(region: str) -> str:
+    return f"cases/caption-{region}.jsonl"
+
+
+def parse_jsonl(body: bytes) -> list[dict]:
+    return [json.loads(line) for line in body.decode().splitlines() if line.strip()]
+
+
+def to_jsonl(rows: list[dict]) -> bytes:
+    return "".join(json.dumps(r) + "\n" for r in rows).encode()
+
+
+def load_cases(store, key: str) -> list[dict]:
+    return parse_jsonl(store.get(key)) if store.exists(key) else []
+
+
+def save_case(store, key: str, case: dict) -> None:
+    """Add a Case, replacing any earlier Case with the same id."""
+    cases = [c for c in load_cases(store, key) if c["id"] != case["id"]] + [case]
+    store.put(key, to_jsonl(cases), "application/x-ndjson")
