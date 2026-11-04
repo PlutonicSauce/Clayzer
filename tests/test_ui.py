@@ -174,3 +174,11 @@ def test_requirements_endpoint(client):
     reqs = c.get("/api/requirements").json()
     assert reqs["CAP-10"].startswith("Grounding")
     assert {"REQ-06", "AWS-05"} <= set(reqs)
+
+
+def test_the_favicon_is_served_and_linked(client):
+    c, _ = client
+    for path in ("/static/favicon.ico", "/static/favicon-32.png", "/static/apple-touch-icon.png"):
+        assert c.get(path).status_code == 200, path
+    assert 'rel="icon"' in c.get("/").text
+    assert c.get("/favicon.ico").status_code == 200  # browsers ask the root too

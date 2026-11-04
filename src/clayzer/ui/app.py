@@ -276,6 +276,11 @@ def create_app(settings: Settings, region: str = "dev", allow_launch: bool = Fal
     def index():
         return FileResponse(STATIC / "index.html")
 
+    @app.get("/favicon.ico", include_in_schema=False)
+    def favicon():
+        # Browsers ask the root for it on pages without a <link rel="icon">, like reports.
+        return FileResponse(STATIC / "favicon.ico")
+
     @app.get("/deck")
     def deck():
         return FileResponse(STATIC / "deck" / "index.html")
