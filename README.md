@@ -126,7 +126,7 @@ tests/              offline tests: no AWS needed
 1. Pick a task, put your name in its `owner` field in [docs/tasks.toml](docs/tasks.toml), and work
    on a branch for that task.
 2. Before opening a PR, run the checks CI ([.github/workflows/ci.yml](.github/workflows/ci.yml))
-   runs on every push and PR:
+   runs on every PR and every push to main:
 
    ```sh
    uv run ruff check src tests

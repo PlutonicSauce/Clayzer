@@ -1,7 +1,9 @@
 name: CI
 
 on:
+  # Branches get their checks from their PR, so a PR branch doesn't run CI twice.
   push:
+    branches: [main]
   pull_request:
   # Deploy a branch by hand: Actions > CI > Run workflow.
   workflow_dispatch:
@@ -108,14 +110,15 @@ jobs:
         working-directory: infra
         env:
           CDK_DEFAULT_REGION: ${{ vars.AWS_REGION }}
+          CLAYZER_STORE: ${{ vars.CLAYZER_STORE }}
         # Without a store the stack would create a new bucket instead of reading the live one.
         run: |
-          if [ -z "${{ vars.CLAYZER_STORE }}" ]; then
+          if [ -z "$CLAYZER_STORE" ]; then
             echo "::error::Set the aws environment's CLAYZER_STORE variable (s3://<bucket>/<prefix>)"
             exit 1
           fi
           npx --yes aws-cdk@2 deploy Clayzer --require-approval never \
-            -c store="${{ vars.CLAYZER_STORE }}" --outputs-file outputs.json
+            -c store="$CLAYZER_STORE" --outputs-file outputs.json
           echo "url=$(jq -r '.Clayzer.Url' outputs.json)" >> "$GITHUB_OUTPUT"
       - name: Smoke test the live URL
         run: |
