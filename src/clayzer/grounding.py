@@ -1,129 +1,301 @@
-"""Grounding: Claims compared with Reference Labels, deterministically (caption-plan.md §1.4).
+"""Independent grounding with explicit evidence limits; never infer absence from a missing row.
 
-The formula is the walkthrough's proposal (prototype/flow-walkthrough.html), with two changes
-for real Answer Keys:
-- Position is right if the Claim's cell is any cell the object covers (a road crosses several);
-  any other cell scores 0. Neighbour credit was dropped (decided 2026-11-04): the centre cell
-  neighbours all eight others, so "centre" was a safe guess worth at least 0.5.
-- Relations are scored as precision only: each directional relation the Caption asserts between
-  two labelled types is checked against the labels' positions. Real OSM labels imply many
-  relations, so recall would punish every Caption for not listing them all.
-
-Grounding is two numbers, reported and gated separately (decided 2026-11-04):
-- correctness: of what the Caption claimed, how much is right. The mean of the parts that
-  apply: precision (claimed types the Answer Key has), count, position, attributes, relations.
-- coverage: how much of the Answer Key the Caption mentions (recall over the Case's labels).
-
-One averaged number let a terse Caption win: one correct Claim scored 0.88 on a two-label
-Case while detailed Captions with a few mistakes scored lower. Two numbers make that trade-off
-visible instead of hiding it in a formula. Claims about types no Answer Key covers (vegetation,
-bare ground) are reported as unscored, not counted.
+Correctness is the mean of available component scores, coverage is separate type recall.
+USGS and OSM records are incomplete. Unknown components have no weight. Counts from incomplete maps are lower bounds. Relations
+require all covered-cell pairs to agree. Exact cells only: centre gets no neighbour bonus.
 """
 
-from clayzer.grid import DIRECTIONAL, cell_distance, directions
+from clayzer.grid import DIRECTIONAL, directions
+from clayzer.ontology import load
 
-KEYED = {
-    "solar_array", "wind_turbine",  # USGS
-    "road", "railroad", "building", "water", "field", "parking_lot", "greenhouse",  # OSM
-}  # fmt: skip
+KEYED = load().keyed()
+
+SCORE_SCOPE_NOTE = (
+    "Correctness evaluates asserted facts; coverage is reference type recall. "
+    "A score of 1.0 does not establish full caption quality."
+)
+COMPARABILITY_NOTE = (
+    "Batches measured with different scorers, queries or Judge rubrics are not comparable; "
+    "a gate PASS alone does not establish performance improvement."
+)
+
+
+def specificity_note(g: dict) -> str:
+    """An explicit score qualifier, also safe for historical results without diagnostics."""
+    detail = g.get("specificity")
+    if detail is None:
+        return SCORE_SCOPE_NOTE + " Count and position completeness was not recorded."
+    parts = [SCORE_SCOPE_NOTE]
+    for name in ("count", "position"):
+        field = detail[name]
+        parts.append(
+            f"{name.capitalize()} detail: {field['stated']}/{field['available']} stated; "
+            f"{field['evaluated']}/{field['available']} evaluated."
+        )
+    parts.append(
+        "Field coverage describes specificity, not accuracy; omitted fields are unevaluated."
+    )
+    return " ".join(parts)
+
+
+def _specificity(rows: list[dict], refs: dict, count_scores: dict) -> dict:
+    """Reference-type count/position fields stated and checked, independent of correctness.
+
+    A split type's field is stated/evaluated only if every matching Claim supplies it/can be
+    checked. Missing reference fields are ineligible, not omissions by the captioner.
+    """
+    fields = {name: {"available": 0, "stated": 0, "evaluated": 0} for name in ("count", "position")}
+    for obj, ref in refs.items():
+        matches = [r for r in rows if r.get("reference_object") == obj]
+        for name, field in fields.items():
+            available = ref.get("count") is not None if name == "count" else bool(ref.get("cells"))
+            if not available:
+                continue
+            field["available"] += 1
+            stated = bool(matches) and all(r["claim"].get(name) is not None for r in matches)
+            field["stated"] += int(stated)
+            if name == "count":
+                evaluated = (
+                    stated
+                    and count_scores.get(obj) is not None
+                    and all(
+                        r["claim"]["object"] == obj and "count" not in r.get("unknown_fields", [])
+                        for r in matches
+                    )
+                )
+            else:
+                evaluated = stated and all(r.get("position") is not None for r in matches)
+            field["evaluated"] += int(evaluated)
+    available = sum(f["available"] for f in fields.values())
+    stated = sum(f["stated"] for f in fields.values())
+    return {
+        **fields,
+        "share": stated / available if available else None,
+        "definition": "Count/position reference-type fields stated / available; not an accuracy score",
+    }
 
 
 def _mean(xs):
-    v = [x for x in xs if x is not None]
-    return sum(v) / len(v) if v else None
+    values = [x for x in xs if x is not None]
+    return sum(values) / len(values) if values else None
 
 
 def _count_score(claimed: int, ref: int) -> float:
     if claimed == ref:
         return 1.0
+    if ref == 0:
+        return 0.0
     return 0.5 if abs(claimed - ref) / ref <= 0.34 else 0.0
 
 
-def _position_score(claimed: str, cells: list[str]) -> float:
-    d = min(cell_distance(claimed, c) for c in cells)
-    return 1.0 if d == 0 else 0.0
+def _position_score(claimed: str | None, cells: list[str]) -> float | None:
+    return float(claimed in cells) if claimed is not None and cells else None
 
 
-def grounding(caption: dict, labels: list[dict]) -> dict:
-    refs = {lb["object"]: lb for lb in labels}
-    claims = [o for o in caption["objects"] if o["object"] in KEYED]
-    unkeyed = [o for o in caption["objects"] if o["object"] not in KEYED]
+def _score_positive_fields(row, cl, ref):
+    row["unknown_fields"] = []
+    row["position"] = _position_score(cl.get("position"), ref.get("cells", []))
+    # Preserve upstream Change Case scoring only where temporal evidence is known.
+    if ref.get("change") in ("appeared", "disappeared", "unchanged"):
+        row["change"] = float(cl.get("change") == ref["change"])
+        if row["change"] == 0:
+            row["outcome"] = "contradicted"
+    if cl.get("position") is not None and row["position"] is None:
+        row["unknown_fields"].append("position")
+    for key, value in (cl.get("attributes") or {}).items():
+        if key in ref.get("attributes", {}):
+            ok = float(value == ref["attributes"][key])
+            row.setdefault("attributes", {})[key] = ok
+        else:
+            row["unknown_fields"].append(f"attributes.{key}")
+    if row["position"] == 0 or any(v == 0 for v in row.get("attributes", {}).values()):
+        row["outcome"] = "contradicted"
 
-    rows, counts, positions, attributes, changes = [], [], [], [], []
-    for cl in claims:
-        ref = refs.get(cl["object"])
-        if ref is None:
-            rows.append({"claim": cl, "verdict": "false positive"})
+
+def _score_counts(claimed_counts, refs, rows):
+    counts, count_by_type, count_scores = [], {}, {}
+    for obj, values in claimed_counts.items():
+        ref = refs[obj]
+        n, expected = sum(v for v in values if v is not None), ref.get("count")
+        complete = ref.get("count_complete", False)
+        score = None
+        if expected is not None and all(v is not None for v in values):
+            if complete:
+                score = _count_score(n, expected)
+            elif n < expected:
+                score = 0.0  # even the independently established lower bound is missed
+        if score is None:
+            for row in rows:
+                if row["claim"]["object"] == obj and row["claim"].get("count") is not None:
+                    row["unknown_fields"].append("count")
+        count_scores[obj] = score
+        if expected is not None:
+            count_by_type[obj] = {
+                "claimed": n if all(v is not None for v in values) else None,
+                "reference": expected,
+            }
+            counts.append(score)
+            if score is not None and score < 1:
+                for row in rows:
+                    if row["claim"]["object"] == obj:
+                        row["outcome"] = "contradicted"
+
+    return counts, count_by_type, count_scores
+
+
+def _score_relations(caption, rows, resolved, class_id):
+    rel_rows, rel_unscored = [], []
+    selected_ids = {r["claim"]["id"] for r in rows}
+    for relation in caption["relations"]:
+        if class_id is not None and not {relation["subject"], relation["object"]} <= selected_ids:
             continue
-        row = {"claim": cl, "verdict": "matched", "ref_position": ref["position"]}
-        # A Claim extracted from free text may not say where (extract.py): skip, don't guess.
-        if cl.get("position") is not None:
-            row["position"] = _position_score(cl["position"], ref["cells"])
+        a, b = resolved.get(relation["subject"]), resolved.get(relation["object"])
+        if (
+            relation["relation"] not in DIRECTIONAL
+            or not a
+            or not b
+            or a is b
+            or not a.get("cells")
+            or not b.get("cells")
+        ):
+            rel_unscored.append(relation)
+            continue
+        possibilities = {
+            relation["relation"] in directions(x, y) for x in a["cells"] for y in b["cells"]
+        }
+        if len(possibilities) != 1:
+            rel_unscored.append(relation)
+            continue
+        rel_rows.append(
+            {
+                "subject": a["object"],
+                "relation": relation["relation"],
+                "object": b["object"],
+                "ok": possibilities.pop(),
+            }
+        )
+
+    return rel_rows, rel_unscored
+
+
+def grounding(caption: dict, labels: list[dict], *, class_id: str | None = None) -> dict:
+    """A class slice retains the full matching context, including exact-class precedence.
+
+    Parent matches appear in both the claimed and matched reference class slices. These
+    diagnostic groups overlap and must not be summed as disjoint populations.
+    """
+    ontology = load()
+    refs = {lb["object"]: lb for lb in labels}
+    if len(refs) != len(labels):
+        raise ValueError("Reference Labels must contain one aggregate row per object class")
+    present = {obj: lb for obj, lb in refs.items() if lb.get("count") != 0}
+    rows, positions, attributes, presence, changes = [], [], [], [], []
+    unscored, matched_types = [], {}
+    claimed_counts: dict[str, list[int | None]] = {}
+    resolved = {}
+    for cl in caption["objects"]:
+        obj = cl["object"]
+        ref = refs.get(obj)
+        # A greenhouse is a building; neither a road nor a sibling class implies a railroad.
+        parent_match = False
+        if ref is None and obj in ontology.classes:
+            candidates = [
+                lb
+                for name, lb in present.items()
+                if name in ontology.classes and ontology.classes[name].parent == obj
+            ]
+            if len(candidates) == 1:
+                ref, parent_match = candidates[0], True
+        if class_id is not None and class_id not in (obj, (ref or {}).get("object")):
+            continue
+        row = {
+            "claim": cl,
+            "verdict": "not verifiable",
+            "outcome": "not_verifiable",
+            "omitted_fields": [name for name in ("count", "position") if cl.get(name) is None],
+        }
+        if ref is None:
+            row["reason"] = (
+                "No independent evidence for this class; missing map records are not absence"
+            )
+            unscored.append(obj)
+        elif ref.get("count") == 0:
+            if not ref.get("absence_verified") or not ref.get("source"):
+                row["reason"] = "Zero count without explicit independently verified absence"
+                unscored.append(obj)
+            else:
+                row |= {
+                    "verdict": "false positive",
+                    "outcome": "contradicted",
+                    "reason": "Explicit absence evidence",
+                    "presence": 0.0,
+                }
+                presence.append(0.0)
+        else:
+            credit = 0.5 if parent_match else 1.0
+            row |= {
+                "verdict": "matched",
+                "outcome": "supported",
+                "presence": credit,
+                "reference_object": ref["object"],
+                "ref_position": ref.get("position"),
+                "class_credit": credit,
+            }
+            presence.append(credit)
+            matched_types[ref["object"]] = max(matched_types.get(ref["object"], 0), credit)
+            resolved[cl["id"]] = ref
+            _score_positive_fields(row, cl, ref)
             positions.append(row["position"])
-        # Change Cases: a Claim's change against its label's, where the label's is known.
-        if ref.get("change") in ("appeared", "disappeared", "unchanged"):
-            row["change"] = 1.0 if cl.get("change") == ref["change"] else 0.0
-            changes.append(row["change"])
-        for key, value in (cl.get("attributes") or {}).items():
-            if key in ref["attributes"]:
-                ok = 1.0 if value == ref["attributes"][key] else 0.0
-                row.setdefault("attributes", {})[key] = ok
-                attributes.append(ok)
+            attributes.extend(row.get("attributes", {}).values())
+            if "change" in row:
+                changes.append(row["change"])
+            if parent_match and cl.get("count") is not None:
+                row["unknown_fields"].append("count")
+            if not parent_match:
+                claimed_counts.setdefault(obj, []).append(cl.get("count"))
         rows.append(row)
 
-    # A Caption may split one type over several Claims ("3 turbines north, 2 south"); the
-    # count is their total against the label's.
-    # Likewise a type with any Claim that doesn't say how many isn't count-scored.
-    claimed_counts: dict[str, int | None] = {}
-    for cl in claims:
-        n, total = cl.get("count"), claimed_counts.get(cl["object"], 0)
-        claimed_counts[cl["object"]] = None if n is None or total is None else total + n
-    count_by_type = {}
-    for obj, n in claimed_counts.items():
-        ref = refs.get(obj)
-        if ref is not None and ref["count"] is not None and n is not None:
-            count_by_type[obj] = {"claimed": n, "reference": ref["count"]}
-            counts.append(_count_score(n, ref["count"]))
+    counts, count_by_type, count_scores = _score_counts(claimed_counts, refs, rows)
 
-    claimed_types = set(claimed_counts)
-    missed = [lb["object"] for lb in labels if lb["object"] not in claimed_types]
-    matched = sum(r["verdict"] == "matched" for r in rows)
-    # With no gradable Claims, precision is perfect on an empty Chip and undefined otherwise
-    # (recall carries the miss).
-    precision = matched / len(claims) if claims else (None if labels else 1.0)
-    recall = (len(labels) - len(missed)) / len(labels) if labels else None
+    rel_rows, rel_unscored = _score_relations(caption, rows, resolved, class_id)
 
-    type_of = {o["id"]: o["object"] for o in caption["objects"]}
-    rel_rows, rel_unscored = [], []
-    for r in caption["relations"]:
-        s, o = type_of.get(r["subject"]), type_of.get(r["object"])
-        if r["relation"] not in DIRECTIONAL or s not in refs or o not in refs or s == o:
-            rel_unscored.append(r)
-            continue
-        ok = r["relation"] in directions(refs[s]["position"], refs[o]["position"])
-        rel_rows.append({"subject": s, "relation": r["relation"], "object": o, "ok": ok})
-    relations = _mean([1.0 if x["ok"] else 0.0 for x in rel_rows])
-
+    if class_id is not None:
+        present = {
+            obj: ref for obj, ref in present.items() if obj == class_id or obj in matched_types
+        }
+    missed = sorted(set(present) - set(matched_types))
+    recall = sum(matched_types.values()) / len(present) if present else None
     components = {
-        "precision": precision,
+        "precision": _mean(presence),
         "recall": recall,
         "count": _mean(counts),
         "position": _mean(positions),
         "attributes": _mean(attributes),
-        "relations": relations,
-        # Only Change Cases' labels carry a known change, so a Fixed Case has none to score.
+        "relations": _mean(float(r["ok"]) for r in rel_rows),
         "change": _mean(changes),
     }
-    total = len(caption["objects"])
+    total = len(rows)
     return {
         "correctness": _mean(v for k, v in components.items() if k != "recall"),
         "coverage": recall,
+        "specificity": _specificity(rows, present, count_scores),
         **components,
-        "unscored_share": len(unkeyed) / total if total else 0.0,
+        "unscored_share": len(unscored) / total if total else 0.0,
         "rows": rows,
         "counts": count_by_type,
         "missed": missed,
-        "unscored": [o["object"] for o in unkeyed],
+        "unscored": unscored,
         "relation_rows": rel_rows,
         "relations_unscored": rel_unscored,
+        "denominators": {
+            "claims": total,
+            "presence_evaluated": len(presence),
+            "unknown_claims": len(unscored),
+            "reference_types": len(present),
+            "counts_evaluated": sum(x is not None for x in counts),
+            "positions_evaluated": sum(x is not None for x in positions),
+            "attributes_evaluated": len(attributes),
+            "relations_evaluated": len(rel_rows),
+        },
+        "evidence_policy": "open-world; map counts lower bounds unless count_complete; exact cells",
     }

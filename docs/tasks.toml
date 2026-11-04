@@ -845,7 +845,7 @@ tier = "Must"
 status = "done"
 closes = ["CAP-10"]
 start = "src/clayzer/grounding.py; caption-plan.md §8"
-notes = "Done 2026-11-04: Chips offset so the site can be in any cell; grounding split into correctness and coverage. Follow-up: centre's neighbour credit (next task)."
+notes = "Done 2026-11-04: Chips offset so the site can be in any cell; grounding split into correctness and coverage. Follow-up: centre's neighbour credit (next task). Output Score handoff 2026-11-04 [PASS]: Correctness/coverage separation retained; open-world evidence, exact cells, incomplete map counts and explicit denominators implemented in grounding.py and tested in test_grounding.py/test_output_score.py. Historical Baseline untouched."
 context = "Done 2026-11-04: Chips are offset so a positive's site can land in any cell, and grounding is two numbers, correctness and coverage."
 done_when = [
   "The vague prompt fails the gate on coverage",
@@ -922,7 +922,8 @@ step = "output"
 title = "RSICD benchmark: ~100 test images for fidelity and retrieval against human captions"
 area = "Evaluation"
 tier = "Must"
-status = "todo"
+status = "blocked"
+notes = "Output Score handoff 2026-11-04 [BLOCKED]: Local RSICD test-split adapter (default limit 100), caption deduplication, query relevance and source/version provenance tested with synthetic fixtures in test_output_score.py. Upstream RSICD conversion/import is complete and remains teammate-owned; independent benchmark evaluation and imagery/license clearance remain outstanding. No real benchmark scores were produced by this contribution."
 closes = ["CAP-07", "CAP-09", "CAP-11", "CAP-17"]
 start = "caption-plan.md §3 RSICD rules (download at run time, never commit)"
 context = "RSICD gives human-written captions to measure fidelity and retrieval against. It has no license and commercial-map imagery: download at run time, never commit images or captions, and cite Lu et al. 2017. Two-thirds of its captions repeat; de-duplicate per image before using them as retrieval queries. Start with about 100 test images."
@@ -977,10 +978,10 @@ step = "output"
 title = "Label preparation time per label set (definition still asked of Clay)"
 area = "Evaluation"
 tier = "Must"
-status = "doing"
+status = "done"
 closes = ["CAP-13"]
 start = "Case prep_seconds; caption-plan.md §9"
-notes = "Recorded per Case and summed per Batch; the definition is a question for Clay."
+notes = "Recorded per Case and summed per Batch; the definition is a question for Clay. Output Score handoff 2026-11-04 [PASS]: Assumption stated in plan section 10 and output-score.md: legacy prep_seconds is total Case-building wall time including imagery; explicit reference-only time supported separately. Caption-generation pipeline time, units, scope, method and observed denominators reported; missing values remain null."
 context = "Clay's fifth criterion. Each Case records `prep_seconds` (building it) and Batches sum them. Clay hasn't said whether it means preparing Reference Labels or producing Captions (which are Clay v2's training labels); the question is in plan §9."
 done_when = [
   "The definition confirmed with Clay, or the assumption stated in the plan",
@@ -992,13 +993,17 @@ refs = [
   "docs/caption-design.md §2.1 (CAP-13)",
 ]
 
+
+see_it = "docs/output-score.md; uv run python scripts/output_score_demo.py --output /tmp/clayzer-output-demo"
+changes = ["src/clayzer/output_score.py: explicit timing scope, units, provenance and missing measurements", "src/clayzer/batch.py: observed denominators and separate caption-generation time"]
 [[task]]
 id = "vrsbench"
 step = "output"
 title = "VRSBench test split as a grounding benchmark (object boxes → counts, positions)"
 area = "Evaluation"
 tier = "Should"
-status = "todo"
+status = "blocked"
+notes = "Output Score handoff 2026-11-04 [BLOCKED]: Normalized instance-box adapter and explicit category crosswalk tested with synthetic fixtures. Distinct instance ids, covered grid cells and conservative incomplete counts recorded. Raw release conversion, imagery/license clearance and real scoring remain blocked."
 closes = ["CAP-10", "CAP-17"]
 start = "caption-plan.md §3 What scores what"
 context = "VRSBench's test split (9,350 images) has human-checked object references with boxes over 26 categories, so counts and 3x3 positions can be computed: a grounding benchmark on other people's images. Annotations are CC BY 4.0 but the DOTA images are academic-only: download at run time, never commit."
@@ -1019,7 +1024,8 @@ step = "output"
 title = "Calibrate the fidelity Judge with blind Calibration Labels on caption Runs"
 area = "Evaluation"
 tier = "Should"
-status = "todo"
+status = "blocked"
+notes = "Output Score handoff 2026-11-04 [BLOCKED]: Blind export, validated human-label import, rubric hash and MAE/RMSE/bias/agreement metrics implemented and offline-tested in calibration.py. No 20 real blind labels or human agreement results are available."
 closes = ["REQ-19"]
 start = "GLOSSARY.md Calibration Label"
 context = "The fidelity Judge is itself a model, so its verdicts need checking. People give blind Calibration Labels to a sample of Runs (same rubric, no Judge verdict shown), and agreement is reported. The Sandbox has this (`bb ui --calibrate`); port it or reuse its approach. The Trace now records the Judge's full prompt, response, and reasoning."
@@ -1043,7 +1049,7 @@ tier = "Must"
 status = "blocked"
 closes = ["CAP-07", "CAP-08"]
 start = "caption-plan.md §9"
-notes = "Waiting on Clay for the data; RSICD and Answer Key queries stand in meanwhile."
+notes = "Waiting on Clay for the data; RSICD and Answer Key queries stand in meanwhile. Output Score handoff 2026-11-04 [BLOCKED]: Imported-caption engine and frozen official query/relevance interface implemented and offline-tested. Clay examples and evaluation set are still absent; no official results or style-similarity rubric claimed."
 after = ["questions-for-clay"]
 context = "The briefs say Clay has example captions and a retrieval evaluation set. When they arrive, add them as references: fidelity and style against the examples, recall@k on Clay's queries. RSICD and Answer Key queries stand in meanwhile."
 done_when = [
@@ -1140,7 +1146,8 @@ step = "output"
 title = "Score an imported caption set on the same criteria, with no Harness run"
 area = "Evaluation"
 tier = "Must"
-status = "todo"
+status = "doing"
+notes = "Output Score handoff 2026-11-04 [PARTIAL]: clayzer evaluate scores normalized JSONL with the shared native engine, independent Cases, optional image judge and recorded text embeddings; all five criteria retain unavailable states. Offline demo passes. Preserves the upstream geospatial/GeoParquet and RSICD importers; mocked import integrations pass. Live caption evaluation and the midday freeze remain unverified."
 closes = ["CAP-20"]
 start = "docs/caption-design.md §3.6; src/clayzer/batch.py"
 after = ["caption-importer", "claims-from-text"]
@@ -1161,7 +1168,8 @@ step = "output"
 title = "A dataset-level verdict: stratified sample, Wilson 95% intervals per rate and per stratum, cheap checks on the whole set"
 area = "Evaluation"
 tier = "Should"
-status = "todo"
+status = "doing"
+notes = "Output Score handoff 2026-11-04 [PARTIAL]: Dataset diagnostics include class/region/terrain sampling, per-class scores, denominators, duplication, unknown evidence and Wilson intervals only for binary outcomes. No real stratified human/Judge sample or defensible population quality verdict is available."
 closes = ["CAP-21"]
 start = "docs/caption-design.md §3.6"
 after = ["score-imported"]
@@ -1183,7 +1191,7 @@ step = "report"
 title = "A caption dataset card: duplication, coverage, vocabulary spread, per-class error patterns"
 area = "Evaluation"
 tier = "Should"
-status = "todo"
+status = "done"
 closes = ["CAP-22"]
 start = "docs/caption-design.md §3.6"
 after = ["stratified-verdict"]
@@ -1198,13 +1206,17 @@ refs = [
   "docs/caption-design.md §2.1 (CAP-22)",
 ]
 
+notes = "Step 7 2026-11-04: versioned JSON/HTML cards reuse existing Output Score diagnostics, show duplication, vocabulary/length, class/region/terrain counts, separate correctness/coverage, evidence denominators, specificity, overlapping strata, model-opinion/retrieval availability and explicit limits. Ontology confusers are review candidates; parent mappings are not misrepresented as visual confusions."
+see_it = "Imported output-score.html links dataset-card.html; app Dataset cards (#/datasets) reads data/datasets/<set-id>/."
+changes = ["src/clayzer/dataset_card.py: descriptive card from existing evaluation evidence", "src/clayzer/imported_score.py: write linked card alongside imported Output Score", "src/clayzer/ui/app.py: read-only dataset card list and allow-listed files", "tests/test_dataset_card.py: empty/duplicate/partial/unknown/overlapping data and safe API outputs"]
 [[task]]
 id = "class-partial-credit"
 step = "output"
 title = "Partial credit in grounding when a Claim names a parent or sibling of the label's class"
 area = "Evaluation"
 tier = "Should"
-status = "todo"
+status = "doing"
+notes = "Output Score handoff 2026-11-04 [PARTIAL]: Direct superclass generalization only: building over greenhouse gets 0.5 presence and coverage credit; sibling similarity and unsupported specialization stay unknown. Tests pass. Historical Baseline rescoring/re-acceptance was not performed."
 closes = ["CAP-10"]
 start = "src/clayzer/grounding.py"
 after = ["ontology-in-code"]
@@ -1226,7 +1238,8 @@ step = "output"
 title = "Retrieval: expand queries with each class's synonyms and measure recall@k with and without"
 area = "Evaluation"
 tier = "Should"
-status = "todo"
+status = "done"
+notes = "Output Score handoff 2026-11-04 [PASS]: Ontology synonyms expand frozen query text; retrieval returns canonical and expanded Recall@K/MRR separately with saved embeddings. Tested with scripted providers; no claim of real retrieval improvement."
 closes = ["CAP-09", "CAP-06"]
 start = "src/clayzer/retrieval.py"
 after = ["ontology-in-code"]
@@ -1243,6 +1256,9 @@ refs = [
 
 # ── Platform ─────────────────────────────────────────────────────────────────
 
+
+see_it = "docs/output-score.md; uv run python scripts/output_score_demo.py --output /tmp/clayzer-output-demo"
+changes = ["src/clayzer/retrieval.py: ontology queries, synonym comparison and replayable embeddings"]
 [[task]]
 id = "s3-store"
 step = "capture"
@@ -1327,7 +1343,7 @@ step = "report"
 title = "Recorded-Trace replay: rescore stored Captions without calling the Harness"
 area = "Platform"
 tier = "Must"
-status = "todo"
+status = "done"
 closes = ["REQ-09"]
 start = "batches/<id>/captions.jsonl"
 context = "The brief's fallback: a recorded Trace can be scored and reported with no model, MCP server, credentials, or network, with Judge verdicts replayed from saved results. `clayzer rescore` already re-scores stored Captions; extend it so reports rebuild fully offline, and prove it with the network off."
@@ -1341,6 +1357,9 @@ refs = [
   "src/clayzer/batch.py (rescore)",
 ]
 
+notes = "Step 7 2026-11-04: clayzer replay reads only explicit local files and writes a new disjoint output directory. Recomputes deterministic grounding/workflow and summaries, retains recorded Fidelity/retrieval, preserves failure statuses, warns on missing evidence/evaluator changes, and hashes inputs. Tests block sockets, Bedrock, boto3, embeddings and MCP; verify original hashes and deterministic repeated exports."
+see_it = "uv run python scripts/report_demo.py --output /tmp/clayzer-report-demo-new; see docs/report-handoff.md"
+changes = ["src/clayzer/replay.py: non-destructive offline replay into an isolated LocalStore", "src/clayzer/cli.py: replay command and ui --local-root for an offline read-only demo", "tests/test_replay.py: network prohibition, identities, missing/invalid inputs, historical and updated 63-Case formats"]
 [[task]]
 id = "iam"
 step = "ship"
@@ -1592,7 +1611,7 @@ step = "report"
 title = "Link each Run in the Clayzer app to its X-Ray trace (store the OpenTelemetry trace id in the Trace)"
 area = "Platform"
 tier = "Should"
-status = "todo"
+status = "doing"
 closes = ["AWS-05"]
 start = "RunInfo.metadata in src/clayzer/trace.py; the Run view in the web app"
 after = ["xray", "run-report"]
@@ -1606,6 +1625,9 @@ refs = [
   "src/clayzer/ui/app.py",
 ]
 
+notes = "Step 7 2026-11-04 [PARTIAL]: report-side X-Ray links validate RunInfo.metadata.otel trace_id, aws_region and exported_to=xray. Context round-trips through existing Trace serialization and offline replay. Missing/malformed context says unavailable. Live capture/export verification is BLOCKED on the teammate supplying a genuine exported recording; no trace ID fabricated or deployment performed."
+see_it = "Each standalone Run report shows Open exported trace in AWS X-Ray only with recorded export context; otherwise an unavailable reason."
+changes = ["src/clayzer/trace_link.py: validated report-side deep link contract", "src/clayzer/run_report.py: JSON/HTML trace navigation and explicit missing reason", "tests/test_trace_link.py: synthetic context validation and replay round-trip; no live export claim"]
 [[task]]
 id = "bedrock-invocation-logging"
 step = "capture"
@@ -1663,7 +1685,8 @@ step = "output"
 title = "Read OBJECTS, KEYED, the OSM mapping, and the retrieval QUERIES from the ontology instead of code lists"
 area = "Platform"
 tier = "Should"
-status = "todo"
+status = "doing"
+notes = "Output Score handoff 2026-11-04 [PARTIAL]: Output Score KEYED and retrieval QUERIES now read the shared ontology. Harness/OSM mappings remain owned by other steps and retain existing drift tests; no unrequested edits to those modules."
 closes = ["CAP-10"]
 start = "src/clayzer/ontology.py"
 after = ["ontology-review"]
@@ -1857,7 +1880,7 @@ step = "report"
 title = "Report verified Claims per dollar and per GPU-second next to cost per Caption"
 area = "Evaluation"
 tier = "Could"
-status = "todo"
+status = "doing"
 closes = ["CAP-12", "CAP-10"]
 start = "src/clayzer/report.py"
 context = "Clay cares about cost and quality together. One number joins them, and it fixes a known weakness: grounding rewards vaguer Captions (fewer Claims scores higher), but a vague Caption earns few verified Claims. Uses the token and timing data Runs already record."
@@ -1872,6 +1895,9 @@ refs = [
   "src/clayzer/grounding.py",
 ]
 
+notes = "Step 7 2026-11-04 [PARTIAL]: per-Run evidence-yield interface deduplicates object Claims, retains parent credit and separates supported fields from accuracy. Dollar ratios require explicit verified USD/model/region/source/method/date observations; GPU ratios require measured GPU seconds. All real ratios remain unavailable. Batch/Compare aggregation and real Bedrock pricing verification are not implemented; no token-to-GPU inference."
+see_it = "Run JSON scores.evidence_yield and the Run report cost evidence section; see docs/report-handoff.md for limits."
+changes = ["src/clayzer/report_cost.py: descriptive claim/field accounting and measured-cost interface", "src/clayzer/run_report.py: per-Run accounting with unavailable reasons", "tests/test_report_cost.py: unknown cost, deduplication, partial credit, omitted fields and synthetic cost observations"]
 [[task]]
 id = "resolution-ladder"
 step = "harness"
@@ -2025,7 +2051,8 @@ step = "output"
 title = "Cheap evaluation at scale: deterministic first, a small Judge next, Opus only on disagreement"
 area = "Evaluation"
 tier = "Could"
-status = "todo"
+status = "blocked"
+notes = "Output Score handoff 2026-11-04 [BLOCKED]: Deferred: no calibrated small/large Judge agreement data or real GPU/evaluation costs. Priority A/B external evidence is incomplete; no speculative cascade or million-caption cost estimates implemented."
 closes = ["CAP-21", "CAP-11"]
 start = "src/clayzer/judge.py"
 after = ["stratified-verdict", "judge-calibration"]

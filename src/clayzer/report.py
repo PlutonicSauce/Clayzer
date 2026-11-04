@@ -1,5 +1,7 @@
 """The Markdown report for a Batch. Each criterion is reported on its own (CAP-15)."""
 
+from clayzer.grounding import COMPARABILITY_NOTE, SCORE_SCOPE_NOTE, specificity_note
+
 
 def _f(x, digits: int = 2) -> str:
     return "—" if x is None else f"{x:.{digits}f}"
@@ -35,7 +37,22 @@ def render(b: dict) -> str:
     if s.get("stopped"):
         lines += ["", (f"**Stopped early:** {s['stopped']}. Resume with "
                       f"`clayzer batch --resume {cfg.batch_id}`.")]  # fmt: skip
+    if s.get("replay"):
+        replay = s["replay"]
+        lines += [
+            "",
+            "**OFFLINE REPLAY** — no models called. Grounding and Workflow are recomputed where evidence is available; recorded Fidelity and retrieval retained.",
+            f"Recorded evaluator: `{replay['original_scorer']}`; current: `{replay['current_scorer']}`.",
+        ]
+        lines += [f"- Replay warning: {w}" for w in replay["warnings"]]
     lines += [
+        "",
+        (
+            f"**{SCORE_SCOPE_NOTE}** Count and position fields may be omitted or unevaluated; "
+            "see each Run's field coverage."
+        ),
+        "",
+        COMPARABILITY_NOTE,
         "",
         "| Criterion | Score | Note |",
         "|---|---|---|",
@@ -48,11 +65,12 @@ def render(b: dict) -> str:
             f"| Grounding coverage | {_f(batch['coverage'])} | how much of the Answer Key "
             "Captions mention |"
         ),
-        f"| Fidelity | {_f(batch['fidelity'])} | image-aware Judge |",
+        f"| Fidelity | {_f(batch['fidelity'])} | model opinion; self-judged: {batch.get('fidelity_self_judged', 'not recorded')} |",
         f"| Retrieval | {_ms(batch['retrieval_mrr'])} | MRR per Repeat, mean ± Spread |",
-        f"| Label preparation time | {_f(batch['label_prep_seconds'], 1)} s | building all Cases |",
+        f"| Label preparation time | {_f(batch['label_prep_seconds'], 1)} s | observed Case/reference preparation (includes imagery for legacy Cases); {batch.get('label_preparation', {}).get('observed_cases', 'unknown')} measured |",
         (
-            f"| Cost (partial) | {_f(batch['seconds_per_caption'], 1)} s, "
+            "| GPU cost | unavailable | Bedrock hides GPU seconds, count and type |\n"
+            f"| Operational usage | {_f(batch['seconds_per_caption'], 1)} s, "
             f"{_f(batch['tokens_per_caption'], 0)} tokens per Caption | Bedrock hides GPU time |"
         ),
         "",
@@ -68,6 +86,12 @@ def render(b: dict) -> str:
             f"| {c['runs']} | {faults} |"
         )
 
+    lines += [
+        "",
+        "Unknown reference evidence is excluded from correctness, never counted as absence.",
+        "Recall@1 is fraction of relevant documents retrieved, not the top-result hit rate.",
+    ]
+    lines += [f"- Retrieval caveat: {w}" for w in batch.get("retrieval_warnings", [])]
     captions = {(c["case_id"], c["repeat"]): c for c in b["captions"]}
     for case_id in s["cases"]:
         lines += ["", f"### {case_id}", ""]
@@ -84,5 +108,6 @@ def render(b: dict) -> str:
                 f"- Repeat {r['repeat']}: correctness {_f(g['correctness'])}, coverage "
                 f"{_f(g['coverage'])}, fidelity {_f(fid)}. {text}"
             )
+            lines.append(f"  {specificity_note(g)}")
     lines.append("")
     return "\n".join(lines)

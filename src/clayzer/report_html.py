@@ -6,9 +6,11 @@ every piece of text is escaped.
 """
 
 import base64
+import json
 from html import escape
 
 from clayzer.grid import GRID
+from clayzer.grounding import COMPARABILITY_NOTE, SCORE_SCOPE_NOTE, specificity_note
 
 CELL = 512 / 3
 
@@ -31,6 +33,11 @@ h3 { font-size: 13px; margin: 14px 0 4px; text-transform: uppercase; letter-spac
 .sub { color: var(--muted); margin: 4px 0 0; }
 code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
 main { padding: 8px 28px 40px; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; max-width: 100%; }
+td { overflow-wrap: anywhere; }
+nav { margin: 8px 0 16px; }
+a:focus-visible, summary:focus-visible { outline: 3px solid var(--warn); outline-offset: 3px; }
+aside[role=note] { background: #fbf4e6; border: 1px solid #e3cfa8; padding: 12px; margin: 12px 0; }
 .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px;
   margin: 8px 0 24px; }
 .card { border: 1px solid var(--evaluation-line); background: var(--evaluation); border-radius: 8px;
@@ -109,12 +116,19 @@ def _chip_svg(png: bytes | None, labels: list[dict], rows: list[dict]) -> str:
     img = base64.b64encode(png).decode() if png else ""
     parts = [
         '<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img">',
+        "<title>Image with independent reference cells and Caption Claims</title>"
+        if png
+        else "<title>Image unavailable; independent reference cells only</title>",
         f'<image href="data:image/png;base64,{img}" width="512" height="512"/>',
         (
             '<g class="grid" stroke="#fffdfb" stroke-opacity=".7" stroke-width="1.5"'
             ' stroke-dasharray="6 5">'
         ),
     ]
+    if not png:
+        parts.append(
+            '<text x="256" y="256" text-anchor="middle" fill="#6b6461">Image unavailable</text>'
+        )
     for k in (1, 2):
         parts.append(f'<line x1="{k * CELL}" y1="0" x2="{k * CELL}" y2="512"/>')
         parts.append(f'<line x1="0" y1="{k * CELL}" x2="512" y2="{k * CELL}"/>')
@@ -123,7 +137,7 @@ def _chip_svg(png: bytes | None, labels: list[dict], rows: list[dict]) -> str:
     # Reference Labels: a dashed outline on every cell some label covers, and each type named
     # in its main cell. Each label's full cell list is in the table beside the Chip.
     parts.append('<g class="refs">')
-    covered = {cell for lb in labels for cell in lb["cells"]}
+    covered = {cell for lb in labels for cell in lb.get("cells", []) if cell in GRID}
     for cell in sorted(covered, key=GRID.index):
         i = GRID.index(cell)
         parts.append(
@@ -133,6 +147,8 @@ def _chip_svg(png: bytes | None, labels: list[dict], rows: list[dict]) -> str:
         )
     ref_rows: dict[str, int] = {}
     for lb in labels:
+        if lb.get("position") not in GRID:
+            continue
         x, y = _cell_xy(lb["position"])
         n = ref_rows.get(lb["position"], 0)
         ref_rows[lb["position"]] = n + 1
@@ -152,11 +168,13 @@ def _chip_svg(png: bytes | None, labels: list[dict], rows: list[dict]) -> str:
     per_cell: dict[str, int] = {}
     for row in rows:
         cl = row["claim"]
+        if cl.get("position") not in GRID:
+            continue  # Unstated positions must not be drawn at an invented grid cell.
         x, y = _cell_xy(cl["position"])
         n = per_cell.get(cl["position"], 0)
         per_cell[cl["position"]] = n + 1
         y = y - CELL / 2 + 22 + 20 * n
-        if row["verdict"] == "false positive":
+        if row["verdict"] == "false positive" or row.get("outcome") == "contradicted":
             color = "#a1352b"
         else:
             color = "#2f6b3a" if row.get("position") == 1.0 else "#8a5b0e"
@@ -182,10 +200,12 @@ def _claim_table(g: dict, labels: list[dict]) -> str:
     for row in g["rows"]:
         cl = row["claim"]
         attrs = " ".join(f"{k}={v}" for k, v in (cl.get("attributes") or {}).items())
-        claim = f"{cl['count']} × {_short(cl['object'])} at {cl['position']} {attrs}".strip()
-        if cl.get("change"):  # a Change Case's Claim
+        count_text = f"{cl['count']} × " if cl.get("count") is not None else ""
+        position_text = f" at {cl['position']}" if cl.get("position") is not None else ""
+        claim = f"{count_text}{_short(cl['object'])}{position_text} {attrs}".strip()
+        if cl.get("change"):
             claim += f" ({cl['change']})"
-        ref = refs.get(cl["object"])
+        ref = refs.get(row.get("reference_object", cl["object"]))
         if ref:
             ref_attrs = " ".join(f"{k}={v}" for k, v in ref["attributes"].items())
             count = f"{ref['count']} × " if ref["count"] is not None else ""
@@ -195,11 +215,19 @@ def _claim_table(g: dict, labels: list[dict]) -> str:
                 + (f" ({ref['change']})" if ref.get("change") else "")
                 + f" · {ref['source']}"
             )
-            verdict = '<span class="badge b-ok">matched</span>'
+            badge = "b-bad" if row.get("outcome") == "contradicted" else "b-ok"
+            explanation = row.get("outcome", "matched")
+            if row.get("unknown_fields"):
+                explanation += "; unverified: " + ", ".join(row["unknown_fields"])
+            if row.get("omitted_fields"):
+                explanation += "; not stated: " + ", ".join(row["omitted_fields"])
+            verdict = f'<span class="badge {badge}">' + escape(explanation) + "</span>"
         else:
             reference = "none"
-            verdict = '<span class="badge b-bad">false positive</span>'
-        if "change" in row:  # scored only where the label's change is known
+            verdict = (
+                '<span class="badge b-na">' + escape(row.get("outcome", row["verdict"])) + "</span>"
+            )
+        if "change" in row:
             ok = row["change"] == 1.0
             verdict += f' <span class="badge {"b-ok" if ok else "b-bad"}">change {"right" if ok else "wrong"}</span>'
         out.append(
@@ -214,14 +242,17 @@ def _claim_table(g: dict, labels: list[dict]) -> str:
             "<td></td></tr>"
         )
     for obj in g["unscored"]:
+        if any(r["claim"]["object"] == obj for r in g["rows"]):
+            continue
         out.append(
             f"<tr><td>{escape(_short(obj))}</td><td><span class='badge b-na'>unscored</span></td>"
             "<td>no Answer Key covers this type</td><td></td></tr>"
         )
-    out.append("</table>")
+    out.append(f"</table><p role='note'><strong>{escape(specificity_note(g))}</strong></p>")
     if g.get("counts"):
         counts = "; ".join(
-            f"{_short(o)}: {c['claimed']} claimed, {c['reference']} in the Answer Key"
+            f"{_short(o)}: {c['claimed'] if c['claimed'] is not None else 'not stated'} claimed, "
+            f"{c['reference']} in the Answer Key"
             for o, c in g["counts"].items()
         )
         out.append(f'<p class="sub">Counts: {escape(counts)}</p>')
@@ -369,7 +400,7 @@ def render_html(b: dict, store) -> str:
         ("Grounding correctness", _f(batch["correctness"]),
          f"of what was claimed, how much is right; {_f(unscored, 0)}% of Claims unscored", ""),
         ("Grounding coverage", _f(batch["coverage"]), "how much of the Answer Key is mentioned", ""),
-        ("Fidelity", _f(batch["fidelity"]), "image-aware Judge", ""),
+        ("Fidelity", _f(batch["fidelity"]), "model opinion" + ("; SELF-JUDGED" if batch.get("fidelity_self_judged") else ""), ""),
         (
             "Retrieval",
             _f(mrr["mean"]),
@@ -377,13 +408,14 @@ def render_html(b: dict, store) -> str:
             "",
         ),
         ("Label preparation", f"{_f(batch['label_prep_seconds'], 0)} s",
-         f"building {len(cfg.case_ids)} Cases", " platform"),
-        ("Cost (partial)", f"{_f(batch['seconds_per_caption'], 1)} s",
-         f"{_f(batch['tokens_per_caption'], 0)} tokens per Caption; no GPU time on Bedrock",
+         f"Case-building time (includes imagery); {batch.get('label_preparation', {}).get('observed_cases', 'unknown')} measured", " platform"),
+        ("GPU cost", "Unavailable",
+         f"Operational latency {_f(batch['seconds_per_caption'], 1)} s; {_f(batch['tokens_per_caption'], 0)} tokens per Caption. Bedrock exposes no GPU seconds, count or type",
          " platform"),
     ]  # fmt: skip
     html = [
         "<!doctype html><html lang='en'><head><meta charset='utf-8'>",
+        "<meta name='viewport' content='width=device-width, initial-scale=1'>",
         f"<title>Caption Batch {escape(cfg.batch_id)}</title>",
         f"<style>{STYLE}</style></head><body>",
         f"<header><h1>Caption Batch {escape(cfg.batch_id)}</h1>",
@@ -400,12 +432,30 @@ def render_html(b: dict, store) -> str:
             f"{runs['sandbox_failures']} Sandbox Failures · {runs['planned']} planned</p>"
         ),
     ]
+    replay = s.get("replay")
+    if replay:
+        html.append(
+            "<aside role='note'><h2>OFFLINE REPLAY</h2>"
+            f"<p>Recorded evaluator: {escape(replay['original_scorer'])}; current: "
+            f"{escape(replay['current_scorer'])}. Deterministic scores recomputed; "
+            "Fidelity and retrieval retained only when recorded. No models called.</p>"
+            + "<ul>"
+            + "".join(f"<li>{escape(w)}</li>" for w in replay["warnings"])
+            + "</ul><p><a href='replay.json'>Replay provenance and input hashes</a></p></aside>"
+        )
     if s.get("stopped"):
         html.append(
             f"<p class='badge b-warn'>Stopped early: {escape(s['stopped'])}. Resume with "
             f"clayzer batch --resume {escape(cfg.batch_id)}</p>"
         )
-    html += ["</header><main><div class='cards'>"]
+    html += [
+        (
+            f"<p role='note'><strong>{escape(SCORE_SCOPE_NOTE)}</strong> "
+            "Count and position details can be omitted or unevaluated; see each Run's field coverage.</p>"
+        ),
+        f"<p role='note'>{escape(COMPARABILITY_NOTE)}</p>",
+        "</header><main><div class='cards'>",
+    ]
     for title, big, note, cls in cards:
         html.append(
             f"<div class='card{cls}'><small>{title}</small><div class='big'>{big}</div>"
@@ -419,8 +469,8 @@ def render_html(b: dict, store) -> str:
             "<label><input type='checkbox' data-hide='hide-refs' checked> Reference Labels</label>"
             "<label><input type='checkbox' data-hide='hide-grid' checked> 3×3 grid</label>"
             "<span class='legend'><span><i style='background:#2f6b3a'></i>Claim in the right cell"
-            "</span><span><i style='background:#8a5b0e'></i>wrong cell</span>"
-            "<span><i style='background:#a1352b'></i>false positive</span>"
+            "</span><span><i style='background:#8a5b0e'></i>unknown or partial</span>"
+            "<span><i style='background:#a1352b'></i>contradicted</span>"
             "<span><i style='border:2px dashed #2f6b3a'></i>Reference Label cells</span></span>"
             "<span>The Chip shows Repeat 1's Claims.</span></div>"
         ),
@@ -453,10 +503,12 @@ def render_html(b: dict, store) -> str:
                 first["grounding"]["rows"] if first else [],
             ),
             (
-                f"<div class='meta mono'>{escape(chip['id'])} · NAIP {escape(chip['date'])} · "
+                f"<div class='meta mono'>{escape(chip['id'])} · {escape(chip['date'])} · "
                 f"{escape(chip['source'])}</div></div><div>"
             ),
             f"<h2>{escape(case_id)}</h2>",
+            "<details><summary>Independent reference provenance</summary>"
+            + f"<pre>{escape(json.dumps({'answer_keys': case.get('answer_keys'), 'labels': case.get('reference_labels'), 'chip': chip}, indent=2))}</pre></details>",
             (
                 f"<p class='sub'>{summ['runs']} scored Runs · {summ['harness_faults']} Harness "
                 f"Faults · {summ['sandbox_failures']} Sandbox Failures · mean ± Spread across "

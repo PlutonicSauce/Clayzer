@@ -64,14 +64,19 @@ def test_no_claims_submitted_is_a_sandbox_failure():
 
 def test_grounding_skips_counts_and_positions_the_text_didnt_give():
     labels = [{"object": "solar_array", "count": 2, "position": "south_east",
-               "cells": ["south_east"], "attributes": {}}]  # fmt: skip
+               "cells": ["south_east"], "attributes": {}, "count_complete": True}]  # fmt: skip
     vague = {"objects": [{"id": "o1", "object": "solar_array", "count": None, "position": None}],
              "relations": []}  # fmt: skip
     g = grounding(vague, labels)
-    assert g["position"] is None and g["count"] is None and g["counts"] == {}
+    assert g["position"] is None and g["count"] is None
+    assert g["counts"] == {"solar_array": {"claimed": None, "reference": 2}}
+    assert g["denominators"]["counts_evaluated"] == 0
     exact = {"objects": [{"id": "o1", "object": "solar_array", "count": 2,
                           "position": "south_east"}], "relations": []}  # fmt: skip
     assert grounding(exact, labels)["position"] == 1.0 and grounding(exact, labels)["count"] == 1.0
+    # A map lower bound is not an exhaustive count, even when the claimed total equals it.
+    incomplete = [{**labels[0], "count_complete": False}]
+    assert grounding(exact, incomplete)["count"] is None
     assert g["coverage"] == grounding(exact, labels)["coverage"]  # presence still counts
 
 

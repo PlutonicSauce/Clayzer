@@ -91,7 +91,17 @@ def _print_summary(summary: dict) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    load_env()
+    # Local report commands must work without loading credentials or a configured S3 store.
+    args = argv if argv is not None else sys.argv[1:]
+    command_args = args[2:] if args[:1] == ["--region"] else args
+    if command_args and command_args[0].startswith("--region="):
+        command_args = command_args[1:]
+    local_report = command_args[:1] in (["replay"], ["evaluate"]) or (
+        command_args[:1] == ["ui"]
+        and any(x.split("=", 1)[0] == "--local-root" for x in command_args)
+    )
+    if not local_report:
+        load_env()
     settings = Settings.from_env()
 
     p = argparse.ArgumentParser(prog="clayzer")
@@ -136,6 +146,19 @@ def main(argv: list[str] | None = None) -> int:
     rs = sub.add_parser("rescore", help="score a Batch's stored Captions again, no model calls")
     rs.add_argument("batch_id")
 
+    replay = sub.add_parser(
+        "replay", help="rebuild a local recorded Batch into a fresh directory; no network"
+    )
+    replay.add_argument(
+        "source", type=Path, help="directory containing batch.json and frozen Cases"
+    )
+    replay.add_argument(
+        "--data", type=Path, help="local data/ or fixtures/caption directory with Chips"
+    )
+    replay.add_argument(
+        "--output", type=Path, help="new output directory; defaults to a fresh temporary directory"
+    )
+
     tr = sub.add_parser("trace", help="show one Run's Trace, Step by Step")
     tr.add_argument("batch_id")
     tr.add_argument("case_id")
@@ -170,6 +193,11 @@ def main(argv: list[str] | None = None) -> int:
                     help="let the /label page save hand-made labels into labels/")  # fmt: skip
     ui.add_argument("--host", default="127.0.0.1")
     ui.add_argument("--port", type=int, default=8770)
+    ui.add_argument(
+        "--local-root",
+        type=Path,
+        help="read a local replay/demo root (data/ and batches/), ignoring S3 and .env",
+    )
 
     im = sub.add_parser("import", help="a Caption Set from any source becomes Cases")
     im.add_argument(
@@ -219,7 +247,44 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("--max-calls", type=int, default=100,
                     help="stop before starting if it would take more LGND calls")  # fmt: skip
 
+    ev = sub.add_parser(
+        "evaluate", help="score normalized JSONL captions offline, without a Harness"
+    )
+    ev.add_argument("input", type=Path)
+    ev.add_argument("--output", type=Path, required=True)
+    ev.add_argument("--cases", type=Path, help="independent frozen Cases as JSONL")
+    ev.add_argument("--queries", type=Path, help="frozen query/relevance JSON array")
+    ev.add_argument("--recording", type=Path, help="saved matching text embedding recording")
+
     a = p.parse_args(argv)
+    if a.cmd == "replay":
+        from clayzer.replay import replay
+
+        try:
+            target = replay(a.source, data=a.data, output=a.output)
+        except ValueError as exc:
+            p.error(str(exc))
+        print(
+            target
+            / "batches"
+            / json.loads((a.source / "batch.json").read_text())["batch_id"]
+            / "report.html"
+        )
+        return 0
+    if a.cmd == "evaluate":
+        from clayzer.imported_score import evaluate, write_evaluation
+
+        rows = parse_jsonl(a.input.read_bytes())
+        cases = {c["id"]: c for c in parse_jsonl(a.cases.read_bytes())} if a.cases else None
+        report = evaluate(
+            rows,
+            cases=cases,
+            queries=json.loads(a.queries.read_text()) if a.queries else None,
+            recording=json.loads(a.recording.read_text()) if a.recording else None,
+        )
+        write_evaluation(report, a.output)
+        print(a.output / "output-score.html")
+        return 0
     if a.cmd in ("login", "tools"):
         return _tools_command(a)
     if a.cmd == "verifier" and a.action == "routes":
@@ -230,6 +295,15 @@ def main(argv: list[str] | None = None) -> int:
         for cls, r in routes.routes.items():
             print(f"  {cls:<14} {r['method']:<14} {r.get('reason', '')}")
         return 0
+
+    if a.cmd == "ui" and a.local_root:
+        settings = replace(
+            settings,
+            store_url=None,
+            data_dir=a.local_root / "data",
+            batches_dir=a.local_root / "batches",
+            baselines_dir=a.local_root / "baselines",
+        )
     store = settings.store()
     key = cases_key(a.region)
 
