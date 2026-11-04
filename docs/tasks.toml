@@ -158,7 +158,15 @@ step = "case"
 title = "Use USPVDB polygons, not centroids, for solar positions and cells"
 area = "Data and Cases"
 tier = "Should"
-status = "todo"
+status = "done"
+notes = "Done 2026-11-04: solar labels come from USPVDB's array polygons (the GeoJSON download, v4.0 2026-04-14, cached in ~/.cache/clayzer and recorded on each Case as `answer_keys`). A cell counts when the panels cover at least 2% of it, and a site centred outside the Chip counts where its panels reach in. All 30 solar Cases relabelled: most large sites now cover every cell. Negatives are refused when a polygon reaches within 300 m (neg-18 was, and is replaced). Existing Batches keep the labels they froze; the next Baseline uses the new ones."
+see_it = "A solar Case's page (#/cases/fixed-dev-uspvdb-400117, Pine Tree Solar): the solar_array label lists every cell the panels cover."
+changes = [
+  "src/clayzer/answer_keys.py: uspvdb_outlines() loads the polygons; usgs_labels measures each cell they cover, falls back to the centroid without one, and keeps the turbine query to the Chip",
+  "src/clayzer/cases.py: positives search for arrays around the Chip, negatives are refused when a polygon is near, and each Case records its USPVDB version",
+  "fixtures/caption/cases/caption-dev.jsonl: the 30 solar Cases relabelled, and neg-18 replaced",
+  "tests/test_answer_keys.py: a multi-cell array, an array centred outside the Chip, the centroid fallback, and an edge sliver",
+]
 closes = ["CAP-10"]
 start = "src/clayzer/answer_keys.py usgs_labels"
 context = "Solar labels use the USPVDB centroid today, so an array that covers several cells is labelled in one, and a correct Claim in another of its cells scores as a neighbour. The USPVDB GeoJSON download has the array polygons: clip each to the Chip and record every cell it covers, as OSM labels already do."

@@ -20,8 +20,21 @@ NEGATIVE_BUFFER_DEG = 0.003
 
 
 def _labels(chip: Chip) -> list[dict]:
-    solar, turbines = ak.usgs_near(chip.bbox, 0.0)
+    # Wider than the Chip: a large array centred outside it can still cover part of it.
+    solar, turbines = ak.usgs_near(chip.bbox, ak.SOLAR_SEARCH_DEG, turbine_buffer_deg=0.0)
     return ak.usgs_labels(chip, solar, turbines) + ak.osm_labels(chip, ak.overpass(chip.bbox))
+
+
+def _solar_nearby(chip: Chip) -> list[str]:
+    """USPVDB sites whose array polygon reaches within NEGATIVE_BUFFER_DEG of the Chip."""
+    from shapely.geometry import box
+
+    w, s, e, n = chip.bbox
+    around = box(w, s, e, n).buffer(NEGATIVE_BUFFER_DEG)
+    solar, _ = ak.usgs_near(chip.bbox, ak.SOLAR_SEARCH_DEG, turbine_buffer_deg=0.0)
+    outlines = ak.uspvdb_outlines()[1] if solar else {}
+    return [f"uspvdb {x['case_id']}" for x in solar
+            if x["case_id"] in outlines and outlines[x["case_id"]].intersects(around)]  # fmt: skip
 
 
 def _case(case_id: str, region: str, chip: Chip, labels: list[dict], started: float) -> dict:
@@ -40,6 +53,10 @@ def _case(case_id: str, region: str, chip: Chip, labels: list[dict], started: fl
             }
         ],
         "reference_labels": labels,
+        # Which release of each Answer Key the labels came from, where it's versioned.
+        "answer_keys": {"uspvdb": ak.uspvdb_outlines()[0]}
+        if any(lb["source"] == "uspvdb" for lb in labels)
+        else {},
         "prep_seconds": round(time.monotonic() - started, 1),
     }
 
@@ -74,9 +91,11 @@ def build_negative(
     item = find_naip(lon, lat)
     chip = cut_chip(item, lon, lat, f"{state.lower()}-neg-{n}", store, naip_source)
     solar, turbines = ak.usgs_near(chip.bbox, NEGATIVE_BUFFER_DEG)
-    if solar or turbines:
-        found = [f"uspvdb {s['case_id']}" for s in solar]
-        found += [f"uswtdb {t['case_id']}" for t in turbines]
+    found = [f"uspvdb {s['case_id']}" for s in solar]
+    found += [f"uswtdb {t['case_id']}" for t in turbines]
+    # A large array's centroid can be far away while its panels reach the Chip.
+    found += [f for f in _solar_nearby(chip) if f not in found]
+    if found:
         for suffix in (".png", ".json"):
             store.delete(f"chips/{chip.id}{suffix}")
         raise ValueError(f"not a negative: USGS records nearby ({', '.join(found[:5])})")
