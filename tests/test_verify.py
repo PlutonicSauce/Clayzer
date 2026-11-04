@@ -41,8 +41,12 @@ class FakeLgnd:
         word = next((w for w in self.verdicts if w in args["claim"].lower()), None)
         if word is None:
             return ToolResult("ServiceUnavailable: try later", True, "ServiceUnavailableException")
-        return ToolResult(json.dumps({"verdict": self.verdicts[word],
-                                      "places": [{"reason": f"looked for {word}"}]}), False)  # fmt: skip
+        # LGND's own shape: places as a table of columns and rows.
+        places = {
+            "columns": ["node", "answer", "reason"],
+            "rows": [[args["nodes"][0], "?", f"looked for {word}"]],
+        }
+        return ToolResult(json.dumps({"verdict": self.verdicts[word], "places": places}), False)
 
 
 def draft():

@@ -64,6 +64,17 @@ Where a Chip clearly contradicts its labels (houses OSM never mapped, a dry wash
 water), record the fix in `fixtures/caption/cases/label-corrections.toml`. Every build applies
 it, so the fix survives a rebuild; hand-added labels have `source = "manual"` and no count.
 
+**Setting spread.** A gate can only see what its Cases show. `clayzer spread` labels each
+Case's surroundings (one cell of its Chip without its subject) with an LGND settings classifier
+and reports, for solar, wind and negative Cases, how many sit in each setting, an evenness from
+0 (all one) to 1 (even), and the settings with none. `--suggest` searches LGND for each gap and
+prints `clayzer case` commands for the nearest USGS sites, at least 1 km from every Case.
+
+```sh
+uv run clayzer spread              # about one LGND call per Case the first time
+uv run clayzer spread --suggest    # plus one search per gap
+```
+
 ## The evaluation loop
 
 A **Run** is one Harness execution on one Case; a **Batch** runs every Case several times
@@ -171,6 +182,27 @@ check catches wrong objects far better than a Claim one cell off.
 ```sh
 uv run clayzer batch --repeats 3 --verify --label verify
 ```
+
+**A verifier per class.** `ontology/verifiers.toml` routes each object class's Claims to the
+verifier that works for it: `imagery_check` (above, the default), `classifier` (the cell's image
+is labelled by an LGND classifier built from the file's text examples, one call for all such
+Claims; built once per LGND account, the first time a Batch needs it), or `none` (not checked,
+kept as skipped). Calibration measures both verifiers on the development Cases and chooses:
+
+```sh
+uv run clayzer verifier calibrate            # report only; about 50 LGND calls the first time
+uv run clayzer verifier calibrate --write    # also rewrite the routes; commit the file
+uv run clayzer verifier routes               # what each class uses now, and why
+```
+
+It writes Claims of its own (one per Case per class, at cells the Reference Labels settle) and
+reports, per class, the share of true Claims each verifier keeps and false Claims it removes.
+A verifier gets the route only if it beats keeping every Claim. Probes where the verifier and
+the label disagree are listed for a look by eye: a label is often what's wrong. Image lookups
+are cached in the store (`lgnd/lookups.json`), and every command that spends LGND calls says
+how many first and stops above `--max-calls` (default 100; the free tier allows 150 a day).
+Reports go to `calibration/verifiers/<time>/`. Batches record the routes' hash
+(`verifiers_sha`), so Compare shows when they changed.
 
 ## Importing a Caption Set
 
