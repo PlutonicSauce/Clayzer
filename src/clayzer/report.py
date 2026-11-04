@@ -1,6 +1,12 @@
 """The Markdown report for a Batch. Each criterion is reported on its own (CAP-15)."""
 
 
+def lookalike_line(lookalikes: dict) -> str:
+    """How often each look-alike kind fooled the captioner, e.g. "greenhouse 3 of 4 Runs"."""
+    return ", ".join(f"{name.replace('_', ' ')} {k['fooled']} of {k['runs']} Runs"
+                     for name, k in lookalikes.items())  # fmt: skip
+
+
 def _f(x, digits: int = 2) -> str:
     return "—" if x is None else f"{x:.{digits}f}"
 
@@ -60,6 +66,16 @@ def render(b: dict) -> str:
             f"{_f(batch.get('verified_claims_per_caption'), 1)} per Caption at "
             f"${_f(batch.get('usd_per_caption'), 5)} each; per GPU-second "
             f"{_f(batch.get('verified_claims_per_gpu_second'))} |"
+        ),
+        *(
+            [
+                (
+                    f"| Fooled by look-alikes | {lookalike_line(batch['lookalikes'])} | Runs "
+                    "whose Caption called a look-alike what it imitates |"
+                )
+            ]
+            if batch.get("lookalikes")
+            else []
         ),
         "",
         "## Cases",

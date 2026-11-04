@@ -143,8 +143,23 @@ def _metric_samples(saved, scored, label, *, legacy_scores_only=False):
         )
         if not stripped_workflow:
             check_stats(saved.get(metric), values, label + " " + metric)
-        counts[metric] = sum(v is not None for v in values)
+        counts[metric] = sum(
+            v is not None or (metric == "correctness" and _nothing_to_grade(r))
+            for v, r in zip(values, scored, strict=True)
+        )
     return counts
+
+
+def _nothing_to_grade(row):
+    """A graded Run whose Caption made no gradable Claims: correctness is undefined, not missing.
+
+    Grounding leaves precision (and so correctness) None only then; coverage still carries the
+    miss. A Run that was never graded has no grounding and still counts as a missing sample.
+    """
+    g = row.get("grounding")
+    return (
+        row["status"] == OK and isinstance(g, dict) and "precision" in g and g["precision"] is None
+    )
 
 
 def validate_rows(batch):

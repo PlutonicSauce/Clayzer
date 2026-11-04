@@ -43,6 +43,7 @@ from clayzer import harness, lgnd, provenance, verifiers
 from clayzer.cases import parse_jsonl, to_jsonl
 from clayzer.config import Settings, bedrock
 from clayzer.cost import per, run_cost, verified_claims
+from clayzer.faults import HARNESS_CODES
 from clayzer.grounding import grounding
 from clayzer.judge import fidelity
 from clayzer.retrieval import retrieval
@@ -99,6 +100,8 @@ class BatchConfig:
     # A hash of ontology/verifiers.toml, the route each class's Claims are verified by; None
     # without verification.
     verifiers_sha: str | None = None
+    # A replayed Batch: the recorded Batch whose Captions it rescored (replay), else None.
+    replayed_from: str | None = None
     # Settings this version doesn't know, from a Batch another branch wrote to the shared store.
     extra: dict = field(default_factory=dict)
 
@@ -163,6 +166,27 @@ def _classify(e: Exception) -> str:
     return SANDBOX_FAILURE
 
 
+def _harness_fault(base: dict, case: dict, cfg: BatchConfig, tracer, error: str, step: dict):
+    """A Run whose Harness produced no usable Caption: scored 0, since it's the fault of the
+    system under test (module docstring)."""
+    empty = {"text": "", "objects": [], "relations": [], "uncertain": []}
+    result = {
+        **base, "status": HARNESS_FAULT, "error": error,
+        "grounding": {
+            **grounding(empty, case["reference_labels"]),
+            "correctness": 0.0,
+            "coverage": 0.0 if case["reference_labels"] else None,
+        },
+        "fidelity": {"score": 0.0, "issues": ["no Caption"]} if cfg.judge_model else None,
+        "seconds_to_caption": step.get("seconds"),
+        "caption_tokens": (step.get("usage") or {}).get("totalTokens"),
+    }  # fmt: skip
+    result["faults"] = tracer.finish(HARNESS_FAULT, None, error)
+    result["workflow"] = workflow_score(tracer.run, tracer.steps)
+    result["cost"], result["verified_claims"] = run_cost(tracer.steps), 0
+    return result, {**base, **empty}
+
+
 def _run_one(
     client, cfg: BatchConfig, prompt: str, case: dict, repeat: int, store, toolbox=None,
     verifier=None, chip_shas: dict[str, str] | None = None,
@@ -218,24 +242,14 @@ def _run_one(
                 toolbox, cfg.max_turns, verifier, footprint,
             )  # fmt: skip
         except harness.HarnessFault as e:
-            empty = {"text": "", "objects": [], "relations": [], "uncertain": []}
-            result = {
-                **base, "status": HARNESS_FAULT, "error": str(e),
-                "grounding": {
-                    **grounding(empty, case["reference_labels"]),
-                    "correctness": 0.0,
-                    "coverage": 0.0 if case["reference_labels"] else None,
-                },
-                "fidelity": {"score": 0.0, "issues": ["no Caption"]} if cfg.judge_model else None,
-                "seconds_to_caption": e.step["seconds"],
-                "caption_tokens": e.step["usage"].get("totalTokens"),
-            }  # fmt: skip
-            result["faults"] = tracer.finish(HARNESS_FAULT, None, str(e))
-            result["workflow"] = workflow_score(tracer.run, tracer.steps)
-            result["cost"], result["verified_claims"] = run_cost(tracer.steps), 0
-            return result, {**base, **empty}
+            return _harness_fault(base, case, cfg, tracer, str(e), e.step)
         except (ClientError, BotoCoreError) as e:
             status = _classify(e)
+            # A request the captioner's model rejected or answered malformed is the system under
+            # test failing, as faults.py attributes it (ADR-0003): scored 0, not retried.
+            code = e.response["Error"]["Code"] if isinstance(e, ClientError) else None
+            if code in HARNESS_CODES:
+                return _harness_fault(base, case, cfg, tracer, str(e)[:500], {})
             faults = tracer.finish(status, None, str(e)[:500])
             return {**base, "status": status, "error": str(e)[:500], "faults": faults}, None
 
@@ -463,6 +477,29 @@ def _retrieval(client, cfg: BatchConfig, cases: list[dict], captions: list[dict]
 COMPONENTS = ("precision", "recall", "count", "position", "attributes", "relations")
 
 
+def _lookalikes(cases: list[dict], results: list[dict]) -> dict | None:
+    """Per look-alike kind (fixtures/caption-lookalike): in how many Runs a Caption claimed the
+    thing the Case imitates, which grounding already marks a false positive. None without any."""
+    by_id = {c["id"]: c for c in cases if c.get("lookalike")}
+    if not by_id:
+        return None
+    kinds: dict[str, dict] = {}
+    for r in results:
+        case = by_id.get(r["case_id"])
+        if case is None or r["status"] == SANDBOX_FAILURE:
+            continue
+        of = case["lookalike"]["of"]
+        rows = (r.get("grounding") or {}).get("rows", [])
+        fooled = any(x["verdict"] == "false positive" and x["claim"]["object"] == of for x in rows)
+        k = kinds.setdefault(
+            case["lookalike"]["kind"], {"of": of, "cases": set(), "runs": 0, "fooled": 0}
+        )
+        k["cases"].add(case["id"])
+        k["runs"] += 1
+        k["fooled"] += fooled
+    return {name: {**k, "cases": len(k["cases"])} for name, k in sorted(kinds.items())}
+
+
 def summarize(cfg: BatchConfig, cases: list[dict], results: list[dict], retr: list[dict]) -> dict:
     by_case: dict[str, list[dict]] = {c["id"]: [] for c in cases}
     for r in results:
@@ -528,6 +565,8 @@ def summarize(cfg: BatchConfig, cases: list[dict], results: list[dict], retr: li
                 "harness_faults": sum(r["status"] == HARNESS_FAULT for r in results),
                 "sandbox_failures": sum(r["status"] == SANDBOX_FAILURE for r in results),
             },
+            # Look-alike negatives a Caption mistook for what they imitate; not a gated metric.
+            "lookalikes": _lookalikes(cases, results),
             # Failed Steps by who's to blame (ADR-0003), over every Run including failed ones.
             "step_faults": {
                 k: sum((r.get("faults") or {}).get(k, 0) for r in results)
@@ -535,6 +574,28 @@ def summarize(cfg: BatchConfig, cases: list[dict], results: list[dict], retr: li
             },
         },
     }
+
+
+def _regrade(r: dict, cap: dict | None, labels: list[dict], trace: bytes | None) -> None:
+    """Ground one scored Run again against labels, and take its Workflow Score and cost from its
+    Trace (Runs from before Traces get none). Harness Faults stay scored as 0."""
+    from clayzer.trace import loads
+
+    if r["status"] == OK and cap is not None:
+        r["grounding"] = grounding(cap, labels)
+    elif r["status"] == HARNESS_FAULT:
+        empty = {"text": "", "objects": [], "relations": [], "uncertain": []}
+        r["grounding"] = {
+            **grounding(empty, labels),
+            "correctness": 0.0,
+            "coverage": 0.0 if labels else None,
+        }
+    if r["status"] in (OK, HARNESS_FAULT):
+        r["verified_claims"] = verified_claims(r["grounding"])
+        if trace is not None:
+            run, steps = loads(trace)
+            r["workflow"] = workflow_score(run, steps)
+            r["cost"] = run_cost(steps)
 
 
 def rescore(batch_id: str, store) -> dict:
@@ -547,29 +608,15 @@ def rescore(batch_id: str, store) -> dict:
     """
     from dataclasses import replace
 
-    from clayzer.trace import loads, trace_key
+    from clayzer.trace import trace_key
 
     b = load(store, batch_id)
     labels = {c["id"]: c["reference_labels"] for c in b["cases"]}
     captions = {(c["case_id"], c["repeat"]): c for c in b["captions"]}
     for r in b["results"]:
-        cap = captions.get((r["case_id"], r["repeat"]))
-        if r["status"] == OK and cap is not None:
-            r["grounding"] = grounding(cap, labels[r["case_id"]])
-        elif r["status"] == HARNESS_FAULT:
-            empty = {"text": "", "objects": [], "relations": [], "uncertain": []}
-            r["grounding"] = {
-                **grounding(empty, labels[r["case_id"]]),
-                "correctness": 0.0,
-                "coverage": 0.0 if labels[r["case_id"]] else None,
-            }
-        if r["status"] in (OK, HARNESS_FAULT):
-            r["verified_claims"] = verified_claims(r["grounding"])
         tkey = trace_key(batch_id, r["case_id"], r["repeat"])
-        if r["status"] in (OK, HARNESS_FAULT) and store.exists(tkey):
-            run, steps = loads(store.get(tkey))
-            r["workflow"] = workflow_score(run, steps)
-            r["cost"] = run_cost(steps)
+        trace = store.get(tkey) if store.exists(tkey) else None
+        _regrade(r, captions.get((r["case_id"], r["repeat"])), labels[r["case_id"]], trace)
     cfg = replace(b["config"], scorer_version=SCORER_VERSION)
     store.put(
         _key(batch_id, "batch.json"), (json.dumps(asdict(cfg), indent=2) + "\n").encode(), JSON
@@ -581,6 +628,109 @@ def rescore(batch_id: str, store) -> dict:
     store.put(_key(batch_id, "summary.json"), (json.dumps(summary, indent=2) + "\n").encode(), JSON)
     write_reports(store, batch_id)
     return summary
+
+
+def _rerank(rows: list[dict], cases: list[dict]) -> tuple[list[dict], list[str]]:
+    """Retrieval rows rescored for new Reference Labels, offline. A stored row keeps each
+    query's full ranking, which depends only on Caption text, so only relevance changes. A query
+    that had nothing relevant before was never ranked; it's returned as not replayable."""
+    from clayzer.retrieval import QUERIES
+
+    labels = {c["id"]: {lb["object"] for lb in c["reference_labels"]} for c in cases}
+    out, missing = [], set()
+    for row in rows:
+        k = next((key for key in row if key.startswith("recall@")), "recall@1")
+        n = int(k.split("@")[1])
+        stored = {q["query"]: q for q in row["queries"]}
+        docs = stored[next(iter(stored))]["ranked"] if stored else []
+        queries = []
+        for query, target in QUERIES.items():
+            relevant = {cid for cid in docs if target in labels.get(cid, set())}
+            if not relevant:
+                continue
+            if query not in stored:
+                missing.add(query)
+                continue
+            ids = stored[query]["ranked"]
+            first = next(i for i, cid in enumerate(ids) if cid in relevant)
+            queries.append({"query": query, "relevant": sorted(relevant), "ranked": ids,
+                            "reciprocal_rank": 1 / (first + 1),
+                            k: len(relevant & set(ids[:n])) / len(relevant)})  # fmt: skip
+        m = len(queries)
+        out.append({"repeat": row["repeat"], "queries": queries,
+                    "mrr": sum(q["reciprocal_rank"] for q in queries) / m if m else None,
+                    k: sum(q[k] for q in queries) / m if m else None})  # fmt: skip
+    return out, sorted(missing)
+
+
+def replay(batch_id: str, store, cases: list[dict], label: str = "", reports: bool = True) -> str:
+    """A new Batch from a recorded one, scored against `cases`: the same Cases and Chips with
+    updated Reference Labels. No model, MCP server, credentials, or network beyond the store
+    (REQ-09). Returns the new Batch's id.
+
+    The Harness never sees Reference Labels (ADR-0006) and the Judge doesn't either, so the
+    recorded Captions, Traces, fidelity verdicts, summaries, and narratives all stand. Grounding
+    and the Workflow Score are recomputed, and retrieval is re-ranked from the stored rankings.
+    Raises if the Cases or their Chips differ, or a retrieval query can't be replayed.
+    """
+    from dataclasses import replace
+
+    from clayzer.narrate import narrative_key
+    from clayzer.summarize import summary_key
+    from clayzer.trace import trace_key
+
+    b = load(store, batch_id)
+    old = {c["id"]: c for c in b["cases"]}
+    new = {c["id"]: c for c in cases}
+    if set(old) != set(new):
+        raise ValueError(f"replay needs the same Cases: {sorted(set(old) ^ set(new))[:5]} differ")
+    for cid, c in new.items():
+        if [x["uri"] for x in c["chips"]] != [x["uri"] for x in old[cid]["chips"]]:
+            raise ValueError(f"{cid}'s Chips differ from the recorded Batch's")
+    retr, missing = _rerank(b["retrieval"], cases)
+    if missing:
+        raise ValueError(f"can't replay retrieval for {missing}: nothing was relevant before")
+
+    label = re.sub(r"[^A-Za-z0-9_-]+", "-", label).strip("-")[:40]
+    new_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ") + (f"-{label}" if label else "")
+    frozen = to_jsonl(cases)
+    cfg = replace(b["config"], batch_id=new_id, label=label, scorer_version=SCORER_VERSION,
+                  created=datetime.now(UTC).isoformat(timespec="seconds"),
+                  cases_sha=_sha(frozen), replayed_from=batch_id)  # fmt: skip
+    captions = {(c["case_id"], c["repeat"]): c for c in b["captions"]}
+    results = []
+    for r in b["results"]:
+        r = dict(r)
+        labels, cap = (
+            new[r["case_id"]]["reference_labels"],
+            captions.get((r["case_id"], r["repeat"])),
+        )
+        tkey = trace_key(batch_id, r["case_id"], r["repeat"])
+        trace = store.get(tkey) if store.exists(tkey) else None
+        if trace is not None:
+            store.put(trace_key(new_id, r["case_id"], r["repeat"]), trace, NDJSON)
+        _regrade(r, cap, labels, trace)
+        for key in (summary_key, narrative_key):
+            src = key(batch_id, r["case_id"], r["repeat"])
+            if store.exists(src):
+                store.put(key(new_id, r["case_id"], r["repeat"]), store.get(src), JSON)
+        results.append(r)
+
+    store.put(_key(new_id, "batch.json"), (json.dumps(asdict(cfg), indent=2) + "\n").encode(), JSON)
+    store.put(_key(new_id, "cases.jsonl"), frozen, NDJSON)
+    for name in ("prompt.txt", "judge-prompt.txt", "chips.json"):
+        if store.exists(_key(batch_id, name)):
+            store.put(_key(new_id, name), store.get(_key(batch_id, name)))
+    store.put(_key(new_id, "results.jsonl"), to_jsonl(results), NDJSON)
+    store.put(_key(new_id, "captions.jsonl"), to_jsonl(b["captions"]), NDJSON)
+    store.put(_key(new_id, "retrieval.jsonl"), to_jsonl(retr), NDJSON)
+    summary = summarize(cfg, cases, results, retr)
+    summary["stopped"] = (b["summary"] or {}).get("stopped")
+    summary["replayed_from"] = batch_id
+    store.put(_key(new_id, "summary.json"), (json.dumps(summary, indent=2) + "\n").encode(), JSON)
+    if reports:
+        write_reports(store, new_id)
+    return new_id
 
 
 def load_summaries(store, batch_id: str, results: list[dict]) -> dict:

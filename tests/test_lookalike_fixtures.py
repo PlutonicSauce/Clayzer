@@ -1,67 +1,66 @@
-"""The look-alike negatives (fixtures/caption-lookalike): complete, labelled honestly, shareable."""
+"""The look-alike negatives in the development set: labelled honestly, and counted in reports."""
 
-import json
 from pathlib import Path
 
+from clayzer.batch import _lookalikes
 from clayzer.cases import parse_jsonl
 
-ROOT = Path(__file__).parents[1] / "fixtures" / "caption-lookalike"
-CASES = parse_jsonl((ROOT / "cases" / "caption-dev-lookalike.jsonl").read_bytes())
+ROOT = Path(__file__).parents[1] / "fixtures" / "caption"
+DEV = parse_jsonl((ROOT / "cases" / "caption-dev.jsonl").read_bytes())
+LOOKALIKES = [c for c in DEV if c.get("lookalike")]
 
 
-def test_there_are_enough_and_each_has_its_chip():
-    assert len(CASES) >= 8
-    uris = {c["chips"][0]["uri"] for c in CASES}
-    on_disk = {f"chips/{f.name}" for f in (ROOT / "chips").glob("*.png")}
-    assert uris == on_disk, "every Case has its Chip and no Chip is orphaned"
-    for c in CASES:
-        assert (ROOT / "chips" / f"{c['chips'][0]['id']}.json").exists()
-
-
-def test_each_says_what_it_imitates_and_how_it_was_found():
-    kinds = {c["lookalike"]["kind"] for c in CASES}
-    assert kinds == {"greenhouse", "parking_lot", "reflective_roof"}
-    for c in CASES:
+def test_the_development_set_has_its_lookalikes():
+    assert len(LOOKALIKES) >= 8
+    assert {c["lookalike"]["kind"] for c in LOOKALIKES} == {
+        "greenhouse",
+        "parking_lot",
+        "reflective_roof",
+    }
+    for c in LOOKALIKES:
         assert (
             c["lookalike"]["of"] == "solar_array"
             and "search_place_find" in c["lookalike"]["found_by"]
         )
-        assert c["id"].startswith("fixed-dev-lookalike-neg-") and c["region"] == "dev-lookalike"
+        assert c["id"].startswith("fixed-dev-lookalike-neg-") and c["region"] == "dev"
 
 
 def test_none_has_a_solar_or_wind_label():
-    for c in CASES:
+    for c in LOOKALIKES:
         assert not {lb["object"] for lb in c["reference_labels"]} & {
             "solar_array",
             "wind_turbine",
         }, c["id"]
 
 
-def test_chip_names_never_collide_with_the_development_negatives():
-    dev = parse_jsonl((ROOT.parent / "caption" / "cases" / "caption-dev.jsonl").read_bytes())
-    assert not {c["chips"][0]["id"] for c in CASES} & {c["chips"][0]["id"] for c in dev}
+def test_chip_names_are_unique_across_the_set():
+    ids = [c["chips"][0]["id"] for c in DEV]
+    assert len(ids) == len(set(ids))
 
 
-def test_nothing_private_or_signed_is_committed():
-    for f in [ROOT / "cases" / "caption-dev-lookalike.jsonl", *(ROOT / "chips").glob("*.json")]:
-        text = f.read_text()
-        for bad in (
-            "sig=",
-            "token",
-            "X-Amz",
-            "amazonaws.com",
-            "planetarycomputer.microsoft.com/api/sas",
-        ):
-            assert bad not in text, (f.name, bad)
-    json.loads((ROOT / "chips" / f"{CASES[0]['chips'][0]['id']}.json").read_text())
-
-
-def test_no_chip_is_partly_blank():
-    import numpy as np
-    from PIL import Image
-
-    from clayzer.chips import MAX_BLANK, blank_share
-
-    for case in CASES:
-        img = np.asarray(Image.open(ROOT / case["chips"][0]["uri"]).convert("RGB"))
-        assert blank_share(np.moveaxis(img, -1, 0)) <= MAX_BLANK, case["id"]
+def test_a_batch_summary_counts_each_kind_it_fooled():
+    greenhouse, roof = (
+        LOOKALIKES[0],
+        next(c for c in LOOKALIKES if c["lookalike"]["kind"] == "reflective_roof"),
+    )
+    solar = {"verdict": "false positive", "claim": {"object": "solar_array"}}
+    results = [
+        {"case_id": greenhouse["id"], "status": "ok", "grounding": {"rows": [solar]}},
+        {"case_id": greenhouse["id"], "status": "ok", "grounding": {"rows": []}},
+        {"case_id": roof["id"], "status": "ok", "grounding": {"rows": []}},
+        {"case_id": roof["id"], "status": "sandbox_failure"},  # no valid score: left out
+        {
+            "case_id": DEV[0]["id"],
+            "status": "ok",
+            "grounding": {"rows": [solar]},
+        },  # not a look-alike
+    ]
+    got = _lookalikes(DEV, results)
+    assert got[greenhouse["lookalike"]["kind"]] == {
+        "of": "solar_array",
+        "cases": 1,
+        "runs": 2,
+        "fooled": 1,
+    }
+    assert got["reflective_roof"] == {"of": "solar_array", "cases": 1, "runs": 1, "fooled": 0}
+    assert _lookalikes([c for c in DEV if not c.get("lookalike")], results) is None
