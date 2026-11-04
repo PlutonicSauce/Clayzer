@@ -112,8 +112,15 @@ def test_the_real_task_board_and_glossary_parse():
     assert {"Case", "Chip", "Batch", "Baseline", "Spread"} <= terms
 
 
-def test_launch_runs_a_batch_in_the_background(client, tmp_path):
+def test_launch_runs_a_batch_in_the_background(client, tmp_path, monkeypatch):
     import time
+
+    from test_listen import FakePolly
+
+    from clayzer import listen
+    from clayzer.store import LocalStore
+
+    monkeypatch.setattr(listen, "polly", FakePolly)
 
     # A second app over the fixture's store, with launching allowed.
     del client
@@ -134,6 +141,10 @@ def test_launch_runs_a_batch_in_the_background(client, tmp_path):
         time.sleep(0.05)
     assert jobs[-1]["state"] == "done", jobs[-1]["lines"]
     assert any(b["batch_id"] == job["batch_id"] for b in launcher.get("/api/batches").json())
+    # It ends with a spoken summary, made against the fixture's Baseline.
+    assert any(line.startswith("spoken summary: ") for line in jobs[-1]["lines"])
+    store = LocalStore(tmp_path / "data", tmp_path / "batches")
+    assert store.exists(listen.audio_key(job["batch_id"]))
 
 
 def test_the_data_sources_parse_and_point_at_real_code(client):

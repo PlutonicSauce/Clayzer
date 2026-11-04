@@ -400,3 +400,5 @@ abbr { text-decoration: underline dotted; cursor: help; }
 .chip-fig.zoomed img { image-rendering: pixelated; }
 .case-card a img:hover { outline: 3px solid var(--decision); outline-offset: -3px; }
 @media (max-width: 900px) { .case-view { grid-template-columns: 1fr; } }
+
+audio { width: 100%; max-width: 32rem; }
