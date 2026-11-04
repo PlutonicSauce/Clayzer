@@ -32,6 +32,7 @@ import hashlib
 import json
 import re
 import statistics
+import time
 from contextlib import nullcontext
 from dataclasses import asdict, dataclass, field, fields
 from datetime import UTC, datetime
@@ -45,15 +46,16 @@ from clayzer.config import Settings, bedrock
 from clayzer.cost import per, run_cost, verified_claims
 from clayzer.faults import HARNESS_CODES
 from clayzer.grounding import grounding
-from clayzer.judge import fidelity
-from clayzer.retrieval import retrieval
+from clayzer.judge import fidelity, self_judging
+from clayzer.output_score import VERSION, preparation, score_caption
+from clayzer.retrieval import freeze_queries, retrieval
 from clayzer.summarize import SummarySink
 from clayzer.trace import RunInfo, StoreSink, Tracer, watch_retries
 from clayzer.workflow import score as workflow_score
 
 # Bump when grounding or summary logic changes, so the regression gate warns that scores from
 # before and after aren't comparable.
-SCORER_VERSION = "grounding-4+workflow-1"  # exact-cell position; the Workflow Score
+SCORER_VERSION = VERSION + "+workflow-1"  # correctness and coverage; the Workflow Score
 
 OK, HARNESS_FAULT, SANDBOX_FAILURE = "ok", "harness_fault", "sandbox_failure"
 EXPIRED = {
@@ -98,6 +100,7 @@ class BatchConfig:
     ontology_version: str | None = None
     ontology_sha: str | None = None
     chips_sha: str | None = None
+    retrieval_queries_sha: str | None = None
     code_commit: str | None = None
     code_dirty: bool | None = None
     summary_model: str | None = None
@@ -264,10 +267,12 @@ def _run_one(
                 verifier = None
             footprint = {"bbox": chip["bbox"], "date": chip.get("date")} if verifier else None
             onto_ctx = _ontology_context(cfg, chip) if cfg.ontology_context else None
+            caption_started = time.monotonic()
             cap, step = harness.caption(
                 client, cfg.caption_model, chip["id"], png, prompt, tracer, uri,
                 toolbox, cfg.max_turns, verifier, footprint, onto_ctx,
             )  # fmt: skip
+            step["seconds"] = round(time.monotonic() - caption_started, 2)
         except harness.HarnessFault as e:
             return _harness_fault(base, case, cfg, tracer, str(e), e.step)
         except (ClientError, BotoCoreError) as e:
@@ -281,18 +286,38 @@ def _run_one(
             return {**base, "status": status, "error": str(e)[:500], "faults": faults}, None
 
         cap = {**base, **cap}
+        output = score_caption(
+            cap,
+            case,
+            judge_model=cfg.judge_model,
+            generator=cfg.caption_model,
+            seconds=step["seconds"],
+            tokens=step["usage"].get("totalTokens"),
+        )
         result = {
             **base, "status": OK, "error": None,
-            "grounding": grounding(cap, case["reference_labels"]),
-            "fidelity": None,
+            **output,
             "seconds_to_caption": step["seconds"],
             "caption_tokens": step["usage"].get("totalTokens"),
             "verification": step.get("verification"),
         }  # fmt: skip
         if cfg.judge_model:
             try:
-                verdict, _ = fidelity(client, cfg.judge_model, cap, png, tracer, uri)
-                result["fidelity"] = verdict
+                result.update(
+                    score_caption(
+                        cap,
+                        case,
+                        client=client,
+                        judge_model=cfg.judge_model,
+                        generator=cfg.caption_model,
+                        png=png,
+                        tracer=tracer,
+                        image_key=uri,
+                        seconds=step["seconds"],
+                        tokens=step["usage"].get("totalTokens"),
+                        judge_fn=fidelity,
+                    )
+                )
             except (ClientError, BotoCoreError, RuntimeError) as e:
                 if isinstance(e, ClientError | BotoCoreError):
                     _classify(e)
@@ -360,6 +385,19 @@ def create(
     frozen = to_jsonl(cases)
     judge_prompt = provenance.judge_prompt().encode()
     chips = (json.dumps(provenance.chip_manifest(store, cases), indent=2) + "\n").encode()
+    queries = to_jsonl(
+        freeze_queries(
+            [
+                {
+                    "case_id": c["id"],
+                    "objects": [
+                        lb["object"] for lb in c["reference_labels"] if lb.get("count") != 0
+                    ],
+                }
+                for c in cases
+            ]
+        )
+    )
     onto_version, onto_sha = provenance.ontology_version()
     commit, dirty = provenance.code_version()
     from clayzer.narrate import summary_model
@@ -387,6 +425,7 @@ def create(
         ontology_version=onto_version,
         ontology_sha=onto_sha,
         chips_sha=_sha(chips),
+        retrieval_queries_sha=_sha(queries),
         code_commit=commit,
         code_dirty=dirty,
         summary_model=summary_model(),
@@ -398,6 +437,7 @@ def create(
     store.put(_key(batch_id, "prompt.txt"), prompt.encode(), "text/plain")
     store.put(_key(batch_id, "cases.jsonl"), frozen, NDJSON)
     store.put(_key(batch_id, "chips.json"), chips, JSON)
+    store.put(_key(batch_id, "retrieval-queries.jsonl"), queries, NDJSON)
     if judge:
         store.put(_key(batch_id, "judge-prompt.txt"), judge_prompt, "text/plain")
     return batch_id
@@ -414,6 +454,13 @@ def resume(batch_id: str, settings: Settings, store, progress=print, narrate: bo
     if cfg.judge_prompt_sha and _sha(provenance.judge_prompt().encode()) != cfg.judge_prompt_sha:
         # Finishing with a different rubric would mix two Judges in one Batch.
         raise ValueError(f"the Judge's rubric changed since {batch_id} started; start a new Batch")
+    query_key = _key(batch_id, "retrieval-queries.jsonl")
+    query_body = store.get(query_key) if store.exists(query_key) else None
+    if cfg.retrieval_queries_sha and (
+        query_body is None or _sha(query_body) != cfg.retrieval_queries_sha
+    ):
+        raise ValueError("Frozen retrieval queries are missing or changed")
+    queries = parse_jsonl(query_body) if query_body is not None else None
     if cfg.change_prompt_sha and _sha(harness.CHANGE_PROMPT.encode()) != cfg.change_prompt_sha:
         raise ValueError(f"the change prompt changed since {batch_id} started; start a new Batch")
     client = bedrock(settings)  # models come from the Batch's own config, not the settings
@@ -459,7 +506,7 @@ def resume(batch_id: str, settings: Settings, store, progress=print, narrate: bo
             store.put(_key(batch_id, "results.jsonl"), to_jsonl(results), NDJSON)
             store.put(_key(batch_id, "captions.jsonl"), to_jsonl(captions), NDJSON)
 
-    retr = [] if stopped else _retrieval(client, cfg, cases, captions)
+    retr = [] if stopped else _retrieval(client, cfg, cases, captions, queries)
     if narrate and not stopped:
         from clayzer.narrate import narrate_batch
 
@@ -487,9 +534,14 @@ def _one_line(r: dict) -> str:
     )
 
 
-def _retrieval(client, cfg: BatchConfig, cases: list[dict], captions: list[dict]) -> list[dict]:
+def _retrieval(
+    client, cfg: BatchConfig, cases: list[dict], captions: list[dict], queries=None
+) -> list[dict]:
     """Retrieval over each Repeat's Captions: one corpus per Repeat, like one captioning pass."""
-    labels = {c["id"]: {lb["object"] for lb in c["reference_labels"]} for c in cases}
+    labels = {
+        c["id"]: {lb["object"] for lb in c["reference_labels"] if lb.get("count") != 0}
+        for c in cases
+    }
     rows = []
     for repeat in range(1, cfg.repeats + 1):
         docs = [
@@ -498,7 +550,9 @@ def _retrieval(client, cfg: BatchConfig, cases: list[dict], captions: list[dict]
             if c["repeat"] == repeat and c["text"]
         ]
         if len(docs) > 1:
-            rows.append({"repeat": repeat, **retrieval(client, cfg.embed_model, docs)})
+            rows.append(
+                {"repeat": repeat, **retrieval(client, cfg.embed_model, docs, queries=queries)}
+            )
     return rows
 
 
@@ -558,9 +612,11 @@ def summarize(cfg: BatchConfig, cases: list[dict], results: list[dict], retr: li
 
     scored = [r for r in results if r["status"] != SANDBOX_FAILURE]
     mrr = [row["mrr"] for row in retr if row["mrr"] is not None]
-    # The rubric's measure: how often the right Caption is the top result for a query.
+    # Recall is fraction of relevant captions found, hit rate is whether any was found.
     top1 = [row["recall@1"] for row in retr if row.get("recall@1") is not None]
-    prep = [c.get("prep_seconds") for c in cases if c.get("prep_seconds") is not None]
+    hit1 = [row["hit@1"] for row in retr if row.get("hit@1") is not None]
+    measurements = [preparation(c)["reference_preparation"] for c in cases]
+    prep = [m["value"] for m in measurements if m.get("value") is not None]
     # Verified Claims per dollar and per GPU-second, over the Runs whose cost is known: Runs
     # from before Traces, or with an unpriced model, are left out of both sums (CAP-12).
     priced = [r for r in scored if (r.get("cost") or {}).get("usd") is not None]
@@ -575,9 +631,44 @@ def summarize(cfg: BatchConfig, cases: list[dict], results: list[dict], retr: li
             "fidelity": _mean(c["fidelity"]["mean"] for c in per_case.values()),
             "retrieval_mrr": {"mean": _mean(mrr), "spread": _spread(mrr)},
             "retrieval_recall_at_1": {"mean": _mean(top1), "spread": _spread(top1)},
+            "retrieval_hit_at_1": {"mean": _mean(hit1), "spread": _spread(hit1)},
             "unscored_share": _mean(c["unscored_share"] for c in per_case.values()),
-            "label_prep_seconds": sum(c.get("prep_seconds") or 0 for c in cases),
+            "label_prep_seconds": sum(prep) if prep else None,
             "label_prep_seconds_per_case": _mean(prep),
+            "label_preparation": {
+                "measurements": measurements,
+                "observed_cases": len(prep),
+                "total_cases": len(cases),
+                "units": "seconds",
+                "by_scope": {
+                    scope: {
+                        "observed_cases": sum(
+                            m["scope"] == scope and m.get("value") is not None for m in measurements
+                        ),
+                        "sum_seconds": sum(
+                            m["value"]
+                            for m in measurements
+                            if m["scope"] == scope and m.get("value") is not None
+                        )
+                        if any(
+                            m["scope"] == scope and m.get("value") is not None for m in measurements
+                        )
+                        else None,
+                    }
+                    for scope in ("case_build", "reference_labels")
+                },
+                "scope": "case_build_or_explicit_reference_labels",
+                "caption_generation_seconds": _mean(r.get("seconds_to_caption") for r in scored),
+            },
+            "cost": {
+                "gpu_seconds": None,
+                "gpu_count": None,
+                "gpu_type": None,
+                "status": "unavailable: hosted Bedrock does not expose GPU metrics",
+            },
+            "fidelity_kind": "model_opinion",
+            "fidelity_self_judged": self_judging(cfg.caption_model, cfg.judge_model),
+            "retrieval_warnings": sorted({w for row in retr for w in row.get("warnings", [])}),
             # Cost is partial on Bedrock: time to output and tokens, no GPU time (CAP-12).
             "seconds_per_caption": _mean(r.get("seconds_to_caption") for r in scored),
             "tokens_per_caption": _mean(r.get("caption_tokens") for r in scored),
@@ -806,12 +897,13 @@ def resummarize(batch_id: str, store) -> int:
 def write_reports(store, batch_id: str) -> None:
     from clayzer.report import render
     from clayzer.report_html import render_html
+    from clayzer.report_safety import redact
 
     b = load(store, batch_id)
     b["summaries"] = load_summaries(store, batch_id, b["results"])
     b["narratives"] = load_narratives(store, batch_id, b["results"])
-    store.put(_key(batch_id, "report.md"), render(b).encode(), "text/markdown")
-    html = render_html(b, store).encode()
+    store.put(_key(batch_id, "report.md"), redact(render(b)).encode(), "text/markdown")
+    html = redact(render_html(b, store)).encode()
     store.put(_key(batch_id, "report.html"), html, "text/html; charset=utf-8")
     from clayzer.run_report import write_run_reports
 

@@ -147,7 +147,9 @@ def _ontology_command(a, settings) -> int:
     print(f"built {len(protos.centroids)} class prototypes (dim {protos.dim}) → {out}")
     print(f"  kept (Layer B classes seen in the data): {kept}")
     if dropped:
-        print(f"  dropped (outside LAYER_B_CLASSES for this embedding resolution): {', '.join(dropped)}")
+        print(
+            f"  dropped (outside LAYER_B_CLASSES for this embedding resolution): {', '.join(dropped)}"
+        )
     print(f"  CIRCULARITY: built on region {build_region!r}; do NOT score this region with it")
     return 0
 
@@ -174,7 +176,25 @@ def _print_summary(summary: dict) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    load_env()
+    # Local report commands must work without loading credentials or a configured S3 store.
+    args = argv if argv is not None else sys.argv[1:]
+    command_args = args[2:] if args[:1] == ["--region"] else args
+    if command_args and command_args[0].startswith("--region="):
+        command_args = command_args[1:]
+    local_replay = command_args[:1] == ["replay"] and (
+        any(x.split("=", 1)[0] in {"--data", "--output"} for x in command_args)
+        or (len(command_args) > 1 and ("/" in command_args[1] or Path(command_args[1]).is_dir()))
+    )
+    local_report = (
+        local_replay
+        or command_args[:1] == ["evaluate"]
+        or (
+            command_args[:1] == ["ui"]
+            and any(x.split("=", 1)[0] == "--local-root" for x in command_args)
+        )
+    )
+    if not local_report:
+        load_env()
     settings = Settings.from_env()
 
     p = argparse.ArgumentParser(prog="clayzer")
@@ -225,6 +245,24 @@ def main(argv: list[str] | None = None) -> int:
 
     rs = sub.add_parser("rescore", help="score a Batch's stored Captions again, no model calls")
     rs.add_argument("batch_id")
+
+    replay = sub.add_parser(
+        "replay", help="rebuild a local recorded Batch into a fresh directory; no network"
+    )
+    replay.add_argument(
+        "source",
+        help="recorded Batch id, or local directory containing batch.json and frozen Cases",
+    )
+    replay.add_argument(
+        "--data", type=Path, help="local data/ or fixtures/caption directory with Chips"
+    )
+    replay.add_argument(
+        "--output", type=Path, help="new output directory; defaults to a fresh temporary directory"
+    )
+
+    replay.add_argument("--cases", metavar="KEY", help="updated Case file for a stored Batch")
+    replay.add_argument("--label", default="replay", help="name for the updated-Case Batch")
+    replay.add_argument("--no-reports", action="store_true", help="skip stored Batch reports")
 
     tr = sub.add_parser("trace", help="show one Run's Trace, Step by Step")
     tr.add_argument("batch_id")
@@ -279,6 +317,11 @@ def main(argv: list[str] | None = None) -> int:
                     help="let the /label page save hand-made labels into labels/")  # fmt: skip
     ui.add_argument("--host", default="127.0.0.1")
     ui.add_argument("--port", type=int, default=8770)
+    ui.add_argument(
+        "--local-root",
+        type=Path,
+        help="read a local replay/demo root (data/ and batches/), ignoring S3 and .env",
+    )
 
     on = sub.add_parser("ontology", help="the data-driven Object Ontology (ADR-0010)")
     on_sub = on.add_subparsers(dest="action", required=True)
@@ -312,12 +355,6 @@ def main(argv: list[str] | None = None) -> int:
     bp.add_argument("--embedding-model", default="clay-v1", help="the embedding model id")
     bp.add_argument("--out", type=Path, help="output path (default ontology/prototypes/vN.json)")
     on_sub.add_parser("show", help="print the current prototype index, if built")
-    rp2 = sub.add_parser("replay", help="a recorded Batch rescored against updated Cases, offline")
-    rp2.add_argument("batch_id")
-    rp2.add_argument("--cases", metavar="KEY",
-                     help="the store's Case file to score against (default: the region's)")  # fmt: skip
-    rp2.add_argument("--label", default="replay", help="a short name for the new Batch")
-    rp2.add_argument("--no-reports", action="store_true", help="skip the per-Run reports")
 
     im = sub.add_parser("import", help="a Caption Set from any source becomes Cases")
     im.add_argument(
@@ -374,7 +411,44 @@ def main(argv: list[str] | None = None) -> int:
     co.add_argument("cases", nargs="+", type=Path, help="Case files (.jsonl)")
     co.add_argument("--json", type=Path, help="also write every Case's result here")
 
+    ev = sub.add_parser(
+        "evaluate", help="score normalized JSONL captions offline, without a Harness"
+    )
+    ev.add_argument("input", type=Path)
+    ev.add_argument("--output", type=Path, required=True)
+    ev.add_argument("--cases", type=Path, help="independent frozen Cases as JSONL")
+    ev.add_argument("--queries", type=Path, help="frozen query/relevance JSON array")
+    ev.add_argument("--recording", type=Path, help="saved matching text embedding recording")
+
     a = p.parse_args(argv)
+    if a.cmd == "replay" and (a.data or a.output or Path(a.source).is_dir() or "/" in a.source):
+        from clayzer.replay import replay
+
+        try:
+            target = replay(Path(a.source), data=a.data, output=a.output)
+        except ValueError as exc:
+            p.error(str(exc))
+        print(
+            target
+            / "batches"
+            / json.loads((Path(a.source) / "batch.json").read_text())["batch_id"]
+            / "report.html"
+        )
+        return 0
+    if a.cmd == "evaluate":
+        from clayzer.imported_score import evaluate, write_evaluation
+
+        rows = parse_jsonl(a.input.read_bytes())
+        cases = {c["id"]: c for c in parse_jsonl(a.cases.read_bytes())} if a.cases else None
+        report = evaluate(
+            rows,
+            cases=cases,
+            queries=json.loads(a.queries.read_text()) if a.queries else None,
+            recording=json.loads(a.recording.read_text()) if a.recording else None,
+        )
+        write_evaluation(report, a.output)
+        print(a.output / "output-score.html")
+        return 0
     if a.cmd in ("login", "tools"):
         return _tools_command(a)
     if a.cmd == "ontology":
@@ -387,6 +461,15 @@ def main(argv: list[str] | None = None) -> int:
         for cls, r in routes.routes.items():
             print(f"  {cls:<14} {r['method']:<14} {r.get('reason', '')}")
         return 0
+
+    if a.cmd == "ui" and a.local_root:
+        settings = replace(
+            settings,
+            store_url=None,
+            data_dir=a.local_root / "data",
+            batches_dir=a.local_root / "batches",
+            baselines_dir=a.local_root / "baselines",
+        )
     store = settings.store()
     key = cases_key(a.region)
 
@@ -676,10 +759,10 @@ def main(argv: list[str] | None = None) -> int:
         from clayzer import batch as batches
 
         cases_file = a.cases or key
-        new_id = batches.replay(a.batch_id, store, load_cases(store, cases_file), a.label,
+        new_id = batches.replay(a.source, store, load_cases(store, cases_file), a.label,
                                 reports=not a.no_reports)  # fmt: skip
         print(
-            f"replayed {a.batch_id} against {store.url(cases_file)} as {new_id}, with no model calls"
+            f"replayed {a.source} against {store.url(cases_file)} as {new_id}, with no model calls"
         )
         _print_summary(batches.load(store, new_id)["summary"])
         return 0

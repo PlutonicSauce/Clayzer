@@ -118,6 +118,8 @@ def test_prompt_context_focus_narrows_to_those_classes():
 def test_prompt_context_is_empty_when_nothing_applies():
     # A focus of classes with no confusers and no exemplars yields no block.
     assert prompt_context(ONT, focus=["vegetation"], include_confusers=False) == ""
+
+
 def test_every_class_says_what_it_covers():
     for cls in ONT.classes.values():
         assert cls.definition, f"{cls.id} has no definition"

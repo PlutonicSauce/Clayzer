@@ -63,6 +63,8 @@ def test_load_precomputed_reads_jsonl(tmp_path):
     p.write_text('{"chip_id": "c-1", "embedding": [0.5, 0.5]}\n')
     source = emb.load_precomputed(p)
     assert source.embed_chip({"id": "c-1"}, None) == [0.5, 0.5]
+
+
 def test_geohash_matches_the_partitions_our_regions_fall_in():
     assert emb.geohash(-118.2, 35.0) == "9q"  # Mojave / Tehachapi
     assert emb.geohash(-100.0, 31.0) == "9v"  # Texas

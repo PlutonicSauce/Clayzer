@@ -163,10 +163,12 @@ function scorecard(B) {
   const grounding = criterion(1, "Grounding", "Does the caption match what's on the ground?",
     meter("Right", B.correctness, "of what the captions claim checks out against the map (USGS, OSM)") +
     meter("Enough", B.coverage, "of what the map shows gets mentioned") +
-    (B.unscored_share ? `<p class="crit-note">${pct(B.unscored_share)} of claims are about things no map covers yet (like vegetation), so they aren't scored.</p>` : ""),
+    `<p class="crit-note"><strong>A score of 100% does not establish full caption quality.</strong>
+      Counts and positions may be omitted or unevaluated; inspect each Run's field coverage.</p>` +
+    (B.unscored_share ? `<p class="crit-note">${pct(B.unscored_share)} of claims lack independent reference evidence and are not scored. Missing map records do not prove absence.</p>` : ""),
     '<span class="badge b-warn">most important</span>');
   const fidelity = criterion(2, "Fidelity", "Would a reviewer agree with the caption?",
-    meter("", B.fidelity, "the Judge's rating of each caption against its image"));
+    meter("", B.fidelity, `model opinion against the image${B.fidelity_self_judged ? "; SELF-JUDGED" : ""}`));
   const retrieval = criterion(3, "Retrieval quality", "Can you find the right caption by searching for it?",
     meter("", B.retrieval_top1, `of searches put the right caption first <span class="sub">· ranking score (MRR) ${pct(B.retrieval?.mean)}</span>`));
   const cost = criterion(4, "Cost", "How fast is captioning, and on what hardware?",
@@ -177,7 +179,7 @@ function scorecard(B) {
   const prep = criterion(5, "Label preparation time", "How long does it take to prepare the labels?",
     `<div class="figure"><b>≈ ${secs(B.label_prep_seconds_per_case)}</b> per Case
        <span class="sub">(${secs(B.label_prep_seconds)} for ${plural(B.cases, "Case")})</span></div>
-     <p class="crit-note">Time to build each Case's Reference Labels. Whether Clay means this or the time to
+     <p class="crit-note">Observed time to build each Case, including imagery and reference queries; missing timings are unavailable. Whether Clay means this or the time to
      write the Captions is a question for Clay.</p>`);
   const how = `<div class="crit how-worked">
     <div class="crit-head"><span class="crit-n">+</span><span class="crit-name">And how it worked</span></div>
@@ -199,7 +201,7 @@ function chipFigure(sc) {
     if (i < 0) return "";
     const n = (per[c.position] = (per[c.position] || 0) + 1) - 1;
     const x = (i % 3) * C + 8, y = Math.floor(i / 3) * C + 10 + n * 26;
-    const cls = c.verdict !== "matched" ? "bad" : c.position_score === 1 ? "good" : "near";
+    const cls = c.outcome === "not_verifiable" ? "near" : c.outcome === "contradicted" || c.verdict !== "matched" ? "bad" : c.position_score === 1 ? "good" : "near";
     const label = `${c.count} × ${c.object.replace(/_/g, " ")}`;
     return `<g class="pill ${cls}"><rect x="${x}" y="${y}" width="${C - 16}" height="22" rx="11"/>
       <text x="${x + (C - 16) / 2}" y="${y + 15}" text-anchor="middle">${esc(label)}</text></g>`;
@@ -227,10 +229,10 @@ function showcaseCard(list, i, batchId = "") {
         <button type="button" class="btn secondary" id="sc-next" aria-label="Show another caption">Show another →</button></span></div>
     ${chipFigure(sc)}
     <blockquote>${esc(sc.text)}</blockquote>
-    <p class="showcase-score"><b>${sc.right} of ${sc.gradable}</b> Claims check out exactly
+    <p class="showcase-score"><b>${sc.right} of ${sc.gradable}</b> Claims match the mapped object and position; other details may be unverified
       ${missed.length ? `· missed: ${esc(missed.join(", "))}` : "· nothing missed"}</p>
     <p class="legend-row"><span><i class="dot good"></i>right, right place</span>
-      <span><i class="dot near"></i>right, wrong cell</span> <span><i class="dot bad"></i>not there</span>
+      <span><i class="dot near"></i>unknown or partial</span> <span><i class="dot bad"></i>contradicted</span>
       <span><i class="sq"></i>where the map says things are</span></p>
     <p class="sub">${esc(sc.chip.id)} · NAIP ${esc(sc.chip.date)} ·
       <a href="#/runs/${esc(batchId)}/${esc(sc.case_id)}/${esc(sc.run_id.split("#")[1])}">open this Run</a></p></div>`;
@@ -668,6 +670,20 @@ document.addEventListener("keydown", (ev) => {
   if (document.getElementById("case-fig")) CASE_KEYS.draw();
 });
 
+async function datasetsPage(id) {
+  const me = SEQ;
+  const cards = await api("/api/datasets");
+  if (stale(me)) return;
+  if (id) {
+    const safe = encodeURIComponent(id);
+    $view.innerHTML = `<p><a href="#/datasets">← Dataset cards</a> · <a href="/api/datasets/${safe}/dataset-card.json">JSON</a> · <a href="/api/datasets/${safe}/output-score.html" target="_blank" rel="noopener">Output Score report</a></p>
+      <iframe sandbox="" title="Dataset card ${esc(id)}" src="/api/datasets/${safe}/dataset-card.html" style="width:100%;height:80vh;border:1px solid var(--line)"></iframe>`;
+    return;
+  }
+  $view.innerHTML = `<h1>Dataset cards</h1><p>Imported caption sets with descriptive diagnostics and separate Output Scores.</p>
+    ${cards.length ? `<ul>${cards.map((c) => `<li><a href="#/datasets/${encodeURIComponent(c.id)}">${esc(c.name || c.id)}</a> · ${esc(c.captions)} captions · ${esc(c.scorer_version)}</li>`).join("")}</ul>` : '<p>No imported cards in this store. Save an offline evaluation under <code>data/datasets/&lt;set-id&gt;/</code> (see docs/report-handoff.md).</p>'}`;
+}
+
 async function batchesPage() {
   const me = SEQ;
   const [list, jobs] = await Promise.all([api("/api/batches"), api("/api/jobs")]);
@@ -739,6 +755,7 @@ function provValue(key, v) {
   if (v === null || v === undefined) return key === "judge_model" || key === "judge_prompt_sha" ? "off" : "—";
   if (typeof v === "boolean") return v ? "yes" : "no";
   if (Array.isArray(v)) return v.length ? v.join(", ") : key === "tools" ? "none (single-call Harness)" : "—";
+  if (typeof v === "object") return `<details><summary>Recorded metadata</summary><pre>${esc(JSON.stringify(v, null, 2))}</pre></details>`;
   const text = String(v);
   if (/^[0-9a-f]{40}$/.test(text)) return `<code title="${esc(text)}">${esc(text.slice(0, 12))}</code>`;
   if (/^[0-9a-f]{12}$/.test(text)) return `<code>${esc(text)}</code>`;
@@ -771,6 +788,8 @@ function provenancePanel(p) {
   const base = p.baseline_id;
   const unrecorded = p.settings.filter((s) => !s.recorded).length;
   return `<h2 id="provenance">Provenance</h2>
+    <p class="crit-note">Batches measured with different scorers, queries or Judge rubrics are not comparable;
+      a gate PASS alone does not establish performance improvement.</p>
     <p class="sub">Everything this Batch was run and judged with, so any score can be traced back to its
       inputs.${base ? ` Compared with the Baseline, <code>${esc(base)}</code>.` : ""}
       ${unrecorded ? ` ${unrecorded} items weren't recorded: this Batch predates provenance recording.` : ""}</p>
@@ -830,7 +849,7 @@ async function batchPage(id, section) {
     <code>${esc(c.cases_sha)}</code> · <a href="#/batches/${esc(id)}/provenance">full provenance</a></p>
     ${listenHtml}
     ${gateHtml}
-    ${provenancePanel(prov)}
+    <details ${section === "provenance" ? "open" : ""}><summary>Provenance and recorded files</summary>${provenancePanel(prov)}</details>
     <h2>Report</h2>
     <p class="sub">The same self-contained report the CLI writes; <a href="/api/batches/${encodeURIComponent(id)}/report.html" target="_blank">open it on its own</a>.</p>
     <iframe class="report" sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox" src="/api/batches/${encodeURIComponent(id)}/report.html" title="Batch report"></iframe>`;
@@ -1370,6 +1389,7 @@ async function route() {
     else if (page === "cases") await casesPage();
     else if (page === "batches" && parts[1]) await batchPage(parts[1], parts[2]);
     else if (page === "batches") await batchesPage();
+    else if (page === "datasets") await datasetsPage(parts[1]);
     else if (page === "compare") await comparePage(parts[1], parts[2]);
     else if (page === "runs") await runPage(parts[1], parts[2], parts[3] || "1");
     else if (page === "sources") await sourcesPage();
