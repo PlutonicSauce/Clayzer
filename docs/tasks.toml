@@ -290,11 +290,19 @@ step = "case"
 title = "Importer: a caption set becomes Cases, with Answer Keys attached by location and date"
 area = "Data and Cases"
 tier = "Must"
-status = "doing"
+status = "done"
 closes = ["CAP-20"]
 start = "docs/caption-design.md §3.6; src/clayzer/cases.py"
 after = ["import-format"]
-notes = "Built 2026-11-04: `clayzer import` (src/clayzer/importer.py), JSON Lines and GeoParquet (import extra). Checked on our own Captions: the Baseline Batch's 12 Captions imported back give the same Reference Labels as the current Case builder on all 4 Cases (one differs from that old Batch's Case only because solar labels now come from USPVDB polygons). Waiting on the RSICD test: RSICD isn't on hand (and is never committed); unlocated rows like RSICD's are supported and tested offline."
+see_it = "`uv run clayzer rsicd --split test`, then `uv run clayzer import data/rsicd-test.jsonl --name rsicd-test`: 5,465 Cases, none located, none skipped."
+changes = [
+  "src/clayzer/rsicd.py: RSICD's human captions as a Caption Set, one row per caption, downloaded once into the cache and never committed",
+  "src/clayzer/cli.py: `clayzer rsicd --split --limit --out`, and the import summary counts Cases whose resolution is unknown",
+  "src/clayzer/importer.py: `gsd_m` and `datetime` may be null when unknown; a located row still needs its date; too_small is null, not empty, when it can't be checked; a row's `scene` is kept",
+  "docs/caption-design.md: §3.6 says when `gsd_m` and `datetime` may be null, and adds the optional `scene` column",
+  "tests/test_rsicd.py: the conversion, and RSICD rows imported as unlocated Cases",
+]
+notes = "Built 2026-11-04: `clayzer import` (src/clayzer/importer.py), JSON Lines and GeoParquet (import extra). Checked on our own Captions: the Baseline Batch's 12 Captions imported back give the same Reference Labels as the current Case builder on all 4 Cases (one differs from that old Batch's Case only because solar labels now come from USPVDB polygons). Done 2026-11-04 with the RSICD test: `clayzer rsicd` converts its human captions to the format, and the whole test split (5,465 captions of 1,093 images) imports with none skipped, as unlocated Cases. RSICD has no date or published resolution, so the format now allows `gsd_m` and `datetime` to be null when unknown, and the too-small check reports that it couldn't be made rather than passing. Clay's own format is still to confirm (import-format)."
 context = "Each record of an imported caption set becomes a Case; Answer Keys attach by footprint and date exactly as for our Chips (a label only counts if the site existed by the acquisition date), and ADR-0006 still applies. Captions may be Sentinel-2 rather than NAIP: compare each class's `min_visible_m` in the ontology with the row's `gsd_m` and flag Claims about objects too small to see. Build and test on RSICD's Reference Captions converted to the format, and on our own Caption files."
 done_when = [
   "`clayzer import <file>` creates Cases from GeoParquet or JSON Lines",

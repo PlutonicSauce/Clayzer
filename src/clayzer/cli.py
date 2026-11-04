@@ -176,6 +176,13 @@ def main(argv: list[str] | None = None) -> int:
     im.add_argument("--export", type=Path, metavar="JSONL",
                     help="with --from-batch: also write the Caption Set itself to this file")  # fmt: skip
 
+    rs = sub.add_parser("rsicd", help="RSICD's human captions as a Caption Set file, to import")
+    rs.add_argument("--split", choices=["train", "val", "test"], default="test")
+    rs.add_argument("--limit", type=int, help="only the split's first N images (5 captions each)")
+    rs.add_argument(
+        "--out", type=Path, help="JSON Lines to write (default data/rsicd-<split>.jsonl)"
+    )
+
     ex = sub.add_parser("extract", help="the Claims a caption's text makes; or calibrate that")
     ex.add_argument("text", nargs="?", help="a caption")
     ex.add_argument("--check", metavar="BATCH_ID",
@@ -408,11 +415,26 @@ def main(argv: list[str] | None = None) -> int:
         store.put(import_key(name), to_jsonl(result.cases), "application/x-ndjson")
         located = sum(c["located"] for c in result.cases)
         small = sum(1 for c in result.cases if c["imported"]["too_small"])
+        unknown = sum(1 for c in result.cases if c["imported"]["too_small"] is None)
         print(f"  {len(result.cases)} Cases ({located} located), {len(result.skipped)} skipped, "
-              f"{small} with Claims possibly too small for their imagery")  # fmt: skip
+              f"{small} with Claims possibly too small for their imagery"
+              + (f", {unknown} with no imagery resolution to check against" if unknown else ""))  # fmt: skip
         for s in result.skipped[:10]:
             print(f"  skipped {s['caption_id']}: {s['reason']}")
         return 0 if result.cases else 1
+
+    if a.cmd == "rsicd":
+        from clayzer import rsicd
+
+        rows = rsicd.rows(json.loads(rsicd.captions_file().read_text()), a.split, a.limit)
+        out = a.out or settings.data_dir / f"rsicd-{a.split}.jsonl"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text("".join(json.dumps(r) + "\n" for r in rows))
+        images = len({r["chip_id"] for r in rows})
+        print(f"{len(rows)} captions of {images} RSICD {a.split} images → {out}")
+        print("  never commit it (no license stated; cite Lu et al. 2017). Next:")
+        print(f"  uv run clayzer import {out} --name rsicd-{a.split}")
+        return 0
 
     if a.cmd == "extract":
         from clayzer.config import bedrock

@@ -49,7 +49,9 @@ def test_rows_are_checked():
     assert "missing gsd_m" in problems({k: v for k, v in row().items() if k != "gsd_m"})
     assert "only fixed captions" in problems(row(kind="change"))[0]
     assert "GeoJSON Polygon" in problems(row(geometry={"type": "Point", "coordinates": [0, 0]}))[0]
-    assert problems(row(gsd_m=0)) == ["gsd_m must be a positive number"]
+    assert problems(row(gsd_m=0)) == ["gsd_m must be a positive number, or null when unknown"]
+    assert problems(row(geometry=None, gsd_m=None, datetime=None)) == []  # RSICD-like
+    assert "needs its datetime" in problems(row(datetime=None))[0]  # labels attach by date
 
 
 def test_a_footprint_becomes_a_grid_in_its_utm_zone():
@@ -96,6 +98,7 @@ def test_claims_too_small_for_the_imagery_are_flagged():
     flagged = too_small(claims, 10)
     assert [f["object"] for f in flagged] == ["wind_turbine"] and flagged[0]["min_visible_m"] < 10
     assert too_small(claims, 0.6) == [] and too_small(None, 10) == []
+    assert too_small(claims, None) is None  # resolution unknown: not checked, not passed
 
 
 @pytest.mark.skipif(importlib.util.find_spec("pyarrow") is None, reason="needs the import extra")
