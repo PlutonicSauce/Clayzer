@@ -20,8 +20,9 @@
 #   queries           retrieval queries whose right answers are Chips containing this class
 #   rsicd_scenes      RSICD scene classes whose images imply this class is present (scene-level:
 #                     usable for retrieval and fidelity, never as grounding)
-#   land_cover        matching classes in NLCD (US) and ESA WorldCover; from general knowledge,
-#                     check against the published legends before relying on them
+#   land_cover        matching classes in NLCD (US) and ESA WorldCover, as each legend names them;
+#                     checked 2026-11-04 against the MRLC NLCD legend and the WorldCover v2.0 user
+#                     manual. `note` says where a legend's classes only partly match the class
 #
 # Version 0.1 (2026-11-03): matches the classes in harness.OBJECTS, grounding.KEYED,
 # answer_keys.osm_object, and retrieval.QUERIES as they were on that date.
@@ -257,7 +258,7 @@ confusers = ["vegetation", "bare_ground"]
 min_visible_m = 20
 queries = ["find farmland"]
 rsicd_scenes = ["farmland", "meadow"]
-land_cover = { nlcd = ["81 Pasture/Hay", "82 Cultivated Crops"], worldcover = ["Cropland"] }
+land_cover = { nlcd = ["81 Pasture/Hay", "82 Cultivated Crops"], worldcover = ["Cropland"], note = "WorldCover's Cropland is annual crops only: it maps orchards as Tree cover, vineyards as Shrubland, and pastures as Grassland, so WorldCover misses part of this class. NLCD's Cultivated Crops includes orchards and vineyards." }
 
 [[class]]
 id = "vegetation"
@@ -270,7 +271,7 @@ synonyms = ["trees", "shrubs", "scrub", "woodland"]
 confusers = ["field"]
 min_visible_m = 5
 rsicd_scenes = ["forest", "park"]
-land_cover = { nlcd = ["41 Deciduous Forest", "42 Evergreen Forest", "43 Mixed Forest", "52 Shrub/Scrub", "71 Grassland/Herbaceous"], worldcover = ["Tree cover", "Shrubland", "Grassland"] }
+land_cover = { nlcd = ["41 Deciduous Forest", "42 Evergreen Forest", "43 Mixed Forest", "51 Dwarf Scrub", "52 Shrub/Scrub", "71 Grassland/Herbaceous", "72 Sedge/Herbaceous", "73 Lichens", "74 Moss", "90 Woody Wetlands", "95 Emergent Herbaceous Wetlands"], worldcover = ["Tree cover", "Shrubland", "Grassland", "Herbaceous wetland", "Mangroves", "Moss and lichen"], note = "NLCD 51 and 72 to 74 are Alaska only. WorldCover's Grassland includes pastures, and its Tree cover includes orchards and plantations, which are field here. Most Mojave desert is NLCD 52 Shrub/Scrub, not 31 Barren Land, so NLCD calls much of what Captions call bare desert vegetation." }
 
 [[class]]
 id = "bare_ground"
@@ -283,7 +284,7 @@ synonyms = ["bare soil", "desert", "dirt", "sand", "dry lake bed", "playa"]
 confusers = ["parking_lot", "field"]
 min_visible_m = 20
 rsicd_scenes = ["bareland", "desert"]
-land_cover = { nlcd = ["31 Barren Land"], worldcover = ["Bare / sparse vegetation"] }
+land_cover = { nlcd = ["31 Barren Land (Rock/Sand/Clay)"], worldcover = ["Bare / sparse vegetation"], note = "NLCD's Barren Land has under 15% vegetation; WorldCover's Bare / sparse vegetation never has more than 10% at any time of year. Desert scrub above those is vegetation in both." }
 
 # Candidate, kept as one by ontology-review (2026-11-04). For: Captions call fixed-dev-neg-1 a
 # construction site in 13 of its 19 stored Captions, and Chips show it (a graded site, racks

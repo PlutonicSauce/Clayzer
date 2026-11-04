@@ -317,8 +317,11 @@ dashed classes are candidates, not yet claimable.
 **Today vs planned.** The file matches the code's existing lists exactly, and
 `tests/test_ontology.py` keeps them matched. Still to do: have the code read its lists from the
 file, add partial credit to grounding, expand retrieval with synonyms, and put look-alikes in the
-prompt (plan §7). Land-cover crosswalks come from general knowledge and need checking against the
-published NLCD and WorldCover legends.
+prompt (plan §7). The land-cover crosswalks were checked on 2026-11-04 against the MRLC NLCD
+legend and the WorldCover v2.0 user manual, and `tests/test_ontology.py` keeps their names to
+those legends. They only partly match: WorldCover counts pasture as grassland and orchards as
+tree cover, and NLCD calls most Mojave desert Shrub/Scrub, so a land-cover score would disagree
+with Captions that call it bare ground (each class's `note`).
 
 ### 3.6 Evaluating caption data from any source
 
