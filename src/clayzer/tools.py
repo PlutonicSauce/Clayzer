@@ -104,10 +104,10 @@ class ToolView:
     def server_for(self, name: str) -> str | None:
         return next((s.server for s in self.specs if s.name == name), None)
 
-    def call(self, name: str, arguments: dict) -> ToolResult:
+    def call(self, name: str, arguments: dict, timeout: float | None = None) -> ToolResult:
         if self.server_for(name) is None:
             return ToolResult(f"unknown tool {name!r}", True, "UnknownTool")
-        return self.box.call(name, arguments)
+        return self.box.call(name, arguments, timeout)
 
 
 class Toolbox:
@@ -234,18 +234,18 @@ class Toolbox:
         model is offered its own tools, and the verifier's stay out of its prompt."""
         return ToolView(self, [s for s in self.specs if s.server in servers])
 
-    def call(self, name: str, arguments: dict) -> ToolResult:
+    def call(self, name: str, arguments: dict, timeout: float | None = None) -> ToolResult:
         """Call a tool. Failures come back as results, not exceptions: a failing tool is data
-        for the evaluation, and the model sees the error and can recover."""
+        for the evaluation, and the model sees the error and can recover. `timeout` overrides
+        the Toolbox's for this call (building an LGND classifier takes minutes)."""
         server = self.server_for(name)
         if server is None:
             return ToolResult(f"unknown tool {name!r}", True, "UnknownTool")
+        timeout = timeout or self.call_timeout
         try:
-            result = self._run(self._sessions[server].call_tool(name, arguments), self.call_timeout)
+            result = self._run(self._sessions[server].call_tool(name, arguments), timeout)
         except TimeoutError:
-            return ToolResult(
-                f"{name} timed out after {self.call_timeout:.0f} s", True, "TimeoutError"
-            )
+            return ToolResult(f"{name} timed out after {timeout:.0f} s", True, "TimeoutError")
         except Exception as e:  # noqa: BLE001 - see docstring
             return ToolResult(f"{type(e).__name__}: {e}", True, type(e).__name__)
         parts = [
