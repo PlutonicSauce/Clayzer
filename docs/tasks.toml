@@ -288,6 +288,34 @@ refs = [
   "ontology/objects.toml",
 ]
 
+[[task]]
+id = "dataset-corroboration"
+step = "case"
+title = "Corroborate and enrich Case Reference Labels with SkyScript and MegaEarth"
+area = "Data and Cases"
+tier = "Could"
+status = "todo"
+closes = []
+start = "fixtures/caption/cases/caption-dev.jsonl; then the SkyScript repo and the MegaEarth dataset card"
+after = ["dev-cases"]
+context = "Our Reference Labels come from USGS and OSM, and nothing outside them checks those labels today. Two public datasets could. SkyScript (wangzhecheng/skyscript) pairs remote-sensing images, including a NAIP subset, with captions templated from OSM tags. MegaEarth (Mead0w1ark/megaearth-osm-sentinel2 on Hugging Face) pairs Sentinel-2 windows with OSM labels over 485 classes, split by geography. For each Case, find any image that overlaps its Chip and compare their labels with ours. Both label from OSM, so agreeing on an OSM class mostly shows the OSM snapshots match. The useful checks are USGS-labelled solar and wind (an outside source agreeing), and disagreement in either direction, which marks a Case to look at by eye. The second aim is enrichment: their labels can add objects our Answer Keys miss in a Chip, and their samples can suggest new Case locations for classes we have few of. An added label has to map to an ontology class (a missing class goes through ontology-review first), records which dataset it came from, and is checked by eye before it becomes a Reference Label. Sentinel-2 is 10 m against NAIP's 0.6 m, so only large objects compare. Neither dataset's captions are gold (caption-plan.md §3). Check each license first; download at run time, never commit."
+done_when = [
+  "Each dataset's license and coverage checked and added to docs/sources.toml",
+  "A script that, for each development Case, finds overlapping SkyScript or MegaEarth samples and lists where their labels agree or disagree with our Reference Labels",
+  "Disagreements reviewed by eye; any wrong Reference Label fixed or the Case replaced",
+  "Labels they add that our Answer Keys miss mapped to ontology classes, checked by eye, and added to the Cases with their source recorded",
+  "Candidate Case locations from their samples listed for classes with few Cases",
+  "Nothing from either dataset in git",
+]
+refs = [
+  "docs/caption-plan.md §3 (What scores what; SkyScript not gold)",
+  "docs/caption-design.md §1 (Auxiliary datasets row)",
+  "docs/tech-hackathon.md (datasets table)",
+  "docs/sources.toml",
+  "src/clayzer/answer_keys.py",
+  "ontology/objects.toml",
+]
+
 # ── Captioning ──────────────────────────────────────────────────────────────────────────
 
 [[task]]
