@@ -203,3 +203,38 @@ def test_run_report_endpoints(client):
     assert c.get(f"/api/batches/{bid}/runs/{name}.json").json()["status"] == "ok"
     assert c.get(f"/api/batches/{bid}/runs/nope--r9.json").status_code == 404
     assert c.get(f"/api/batches/{bid}/runs/x..y.html").status_code == 400
+
+
+def test_how_it_works_links_point_at_real_doc_sections():
+    import re
+    from pathlib import Path
+
+    from clayzer.ui.docs import allowed, anchors
+
+    js = (Path(__file__).parents[1] / "src/clayzer/ui/static/app.js").read_text()
+    links = re.findall(r'href: "/docs/([^"#]+)(?:#([^"]+))?"', js)
+    assert len(links) >= 20
+    docs = allowed()
+    for path, anchor in links:
+        assert path in docs, f"{path} isn't a served doc"
+        if anchor:
+            assert anchor in anchors(path), f"{path} has no section #{anchor}"
+
+
+def test_docs_are_served_and_nothing_else_is(client):
+    c, _ = client
+    plan = c.get("/docs/docs/caption-plan.md").text
+    assert '<pre class="mermaid">' in plan and 'id="3-data"' in plan
+    assert 'href="/docs/docs/caption-design.md' in plan  # links between docs stay in the app
+    assert (
+        "ADR-0006"
+        in c.get("/docs/docs/adr/0006-answer-keys-are-hidden-from-caption-inputs.md").text
+    )
+    for bad in (
+        "/docs/.env",
+        "/docs/src/clayzer/config.py",
+        "/docs/../.env",
+        "/docs/docs/tasks.toml",
+    ):
+        assert c.get(bad).status_code == 404, bad
+    assert c.get("/docs", follow_redirects=False).status_code in (302, 307)

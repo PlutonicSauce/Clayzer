@@ -165,10 +165,6 @@ main { padding: 18px 28px 48px; max-width: 1280px; }
 .mission-top b { font-variant-numeric: tabular-nums; }
 .mission .meter-bar span { background: linear-gradient(90deg, #7fae86, #2f6b3a); }
 .mission small { display: block; margin-top: 4px; }
-.grab-title { margin-top: 18px; }
-.grab { list-style: none; margin: 4px 0 0; padding: 0; }
-.grab li { display: flex; justify-content: space-between; gap: 10px; align-items: baseline;
-  padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
 @media (max-width: 900px) {
   .home-score, .home-row { grid-template-columns: 1fr; gap: 22px; }
 }
@@ -245,6 +241,8 @@ main { padding: 18px 28px 48px; max-width: 1280px; }
   margin: 2px 0 0; padding: 0; list-style: none; }
 .how-code code { display: inline-block; padding: 4px 10px; border-radius: 6px;
   background: #f6f1ee; border: 1px solid var(--line); font-size: 12.5px; }
+.how-docs { margin: 2px 0 0; padding-left: 18px; font-size: 14.5px; line-height: 1.7; }
+.how-docs a { color: #2d5a66; }
 .how-tasks { align-self: start; margin-top: 10px; padding: 4px 16px 16px; border-radius: 10px;
   background: #faf7f5; border: 1px solid var(--line); }
 .how-task { padding: 10px 0; border-bottom: 1px solid var(--line); }

@@ -409,6 +409,21 @@ def create_app(settings: Settings, region: str = "dev", allow_launch: bool = Fal
     def index():
         return FileResponse(STATIC / "index.html")
 
+    @app.get("/docs", include_in_schema=False)
+    def docs_index():
+        from fastapi.responses import RedirectResponse
+
+        return RedirectResponse("/docs/docs/caption-plan.md")
+
+    @app.get("/docs/{path:path}", response_class=HTMLResponse, include_in_schema=False)
+    def doc(path: str):
+        from clayzer.ui.docs import render
+
+        page = render(path)
+        if page is None:
+            raise HTTPException(404, "not one of the project's docs")
+        return HTMLResponse(page)
+
     @app.get("/favicon.ico", include_in_schema=False)
     def favicon():
         # Browsers ask the root for it on pages without a <link rel="icon">, like reports.
