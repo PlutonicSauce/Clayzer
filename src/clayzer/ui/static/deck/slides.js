@@ -55,66 +55,27 @@ function Architecture() {
   </div>`;
 }
 
-function Generation() {
+// One "approach" slide that carries the three novel ideas (originality) as it explains how a
+// caption is written and scored. Merged from the old Generation, Evaluation, and What's-new
+// slides to keep the deck to 8.
+function Approach() {
   return html`<div>
-    <${Kicker}>Step 1–2 · writing the caption<//>
-    <h2>Captions that know where things are</h2>
-    <div class="flow">
-      <div class="step"><b>Chip</b><span>512 × 512 px NAIP, 0.6 m</span></div>
-      <div class="arrow">→</div>
-      <div class="step"><b>Caption Harness</b><span>Nova Pro on Bedrock</span></div>
-      <div class="arrow">→</div>
-      <div class="step"><b>Verify-then-write</b><span>each Claim checked at its cell</span></div>
-      <div class="arrow">→</div>
-      <div class="step"><b>Caption</b><span>objects, counts, 3 × 3 positions, relations</span></div>
-    </div>
-    <p class="big">Before a Claim is written, the Harness checks it against LGND Geo's imagery
-      search at the Claim's own grid cell. A Claim the imagery can't support is dropped or moved —
-      so the caption is grounded as it is written, not only scored afterwards.</p>
-    <p class="source">Positions use a 3 × 3 grid and a fixed relation vocabulary (ADR-0007), so
-      "solar array, centre" is checkable, not prose.</p>
-  </div>`;
-}
-
-const CRITERIA = [
-  ["Grounding", "Does it match what is on the ground: objects, attributes, counts?", "most important"],
-  ["Fidelity", "Does an LLM judge rate it an accurate account of the image?", ""],
-  ["Retrieval", "Can the caption be found from a text query alone?", ""],
-  ["Cost", "Throughput and time to output, in GPU time", ""],
-  ["Label prep time", "How long it takes to prepare the labels", ""],
-];
-
-function Evaluation() {
-  return html`<div>
-    <${Kicker}>Step 3 · scoring the caption<//>
-    <h2>Every Claim checked against open data</h2>
-    <div class="criteria">
-      ${CRITERIA.map(([name, q, tag]) => html`<div class="criterion">
-        <b>${name}</b>${tag && html`<span class="tag">${tag}</span>`}<p>${q}</p>
-      </div>`)}
-    </div>
-    <p class="big">We score Clay's five criteria, and the captioner never sees the answer keys
-      (ADR-0006), so grounding can't be gamed. Grounding is two numbers — correctness and
-      coverage — so a terse caption can't win by saying less.</p>
-    <p class="source">Answer keys: USGS solar and wind databases, OpenStreetMap. It scores any
-      caption set, not only ours, and a gate decides if a change actually helped.</p>
-  </div>`;
-}
-
-function Original() {
-  return html`<div>
-    <${Kicker}>What's new<//>
+    <${Kicker}>Our approach · what's new<//>
     <h2>Three things you won't find in a plain VLM prompt</h2>
     <div class="criteria">
-      <div class="criterion"><b>Verify-then-write</b><p>The model's Claims are checked against
-        imagery <i>as the caption is written</i>, not graded after. Wrong Claims never ship.</p></div>
-      <div class="criterion"><b>Hidden answer keys</b><p>The captioner never sees the ground
-        truth, so a high score is earned, not gamed. Correctness and coverage, kept apart.</p></div>
+      <div class="criterion"><b>Verify-then-write</b><p>Each Claim is checked against imagery at
+        its own 3 × 3 grid cell <i>as the caption is written</i> — wrong Claims are dropped or
+        moved, not graded after.</p></div>
+      <div class="criterion"><b>Hidden answer keys</b><p>The captioner never sees the ground truth
+        (USGS, OpenStreetMap), so a high score is earned. Grounding is two numbers, so a terse
+        caption can't win by saying less.</p></div>
       <div class="criterion"><b>A verdict on any set</b><p>Point it at anyone's captions and get
-        trust, failure modes, and cost — a dataset card, not just a number.</p></div>
+        trust, failure modes, and cost — a dataset card and a gate, not just a number.</p></div>
     </div>
-    <p class="big">The hackathon asked for an eval sandbox. We built one that also makes the
+    <p class="big">The brief asked for an evaluation sandbox. We built one that also makes the
       captions better and proves it with a regression gate — the loop, not a one-off score.</p>
+    <p class="source">Captions on Bedrock (Nova Pro); fidelity judged by Opus 5.5; retrieval by
+      Titan embeddings. Clay's five criteria, each reported on its own.</p>
   </div>`;
 }
 
@@ -174,23 +135,6 @@ function Scale() {
   </div>`;
 }
 
-function Access() {
-  return html`<div>
-    <${Kicker}>Made to be understood<//>
-    <h2>Readable by anyone in the room</h2>
-    <div class="criteria">
-      <div class="criterion"><b>Listen</b><p>Press <b>A</b>, or the Listen button, and any slide
-        reads itself aloud — for a non-technical listener or anyone who finds dense slides hard.</p></div>
-      <div class="criterion"><b>See, don't read</b><p>Claims land on a 3 × 3 grid over the image;
-        right cell green, wrong cell amber. The result is a picture, not a paragraph.</p></div>
-      <div class="criterion"><b>High contrast</b><p>Large type, strong contrast, and motion
-        dropped for anyone who asks for reduced motion.</p></div>
-    </div>
-    <p class="source">The whole deck is one self-contained page served from the app — no network,
-      no slides to email around.</p>
-  </div>`;
-}
-
 function Next() {
   return html`<div class="title-slide closing">
     <${Kicker}>What it means for Clay<//>
@@ -199,41 +143,36 @@ function Next() {
       where it fails, what it costs to fix. Point it at Clay's own pipeline next.</p>
     <p class="team">The ask: Clay's real caption set and its rubric weights, so the verdict is
       Clay's, not our stand-in's.</p>
+    <p class="access-note">Any slide reads itself aloud — press <b>A</b> or the Listen button.</p>
   </div>`;
 }
 
+// Eight slides, exactly 8:00. The story architecture, the three novel ideas, scale, and the
+// demo each get their own slide; writing + scoring + originality are merged into Approach, and
+// the accessibility note rides on the closing slide (the Listen feature is on every slide).
 export const SLIDES = [
-  { title: "Clayzer", seconds: 20, theme: "dark", component: Title,
+  { title: "Clayzer", seconds: 25, theme: "dark", component: Title,
     spoken: "Clayzer. Give us your caption set, and we tell you how much of it you can trust, where it fails, and what it costs to make better.",
     notes: ["Say the one-line pitch, then move on.", "8:00 total. T starts the timer, A reads a slide aloud."] },
-  { title: "The problem", seconds: 45, component: Problem,
+  { title: "The problem", seconds: 55, component: Problem,
     spoken: "Clay's new model learns from written descriptions of satellite images that nobody has checked. In a real run, a caption described a wind farm with turbines to the north. The official database says sixteen turbines, to the south. Wrong count, wrong place. That kind of plausible, wrong caption quietly poisons training.",
     notes: ["Read the wrong caption, then the answer key: 16 turbines, south.", "Make it concrete — this is the hook."] },
-  { title: "How it works", seconds: 65, component: Architecture,
+  { title: "How it works", seconds: 75, component: Architecture,
     spoken: "Here is the whole journey. One aerial image comes in on the left. Step one, a model on AWS writes a caption. Step two, before each statement is kept, we check it against the imagery. Step three, we score it against open map data the model never saw. Step four, a gate decides whether it is good enough. What comes out on the right is a verdict you can trust. The same path works for one image or a million.",
     notes: ["Walk it as a story: one image in on the left, a verdict out on the right.", "Point at each numbered stop. End on: same path scales to millions."] },
-  { title: "Writing the caption", seconds: 50, component: Generation,
-    spoken: "The novel step is verify-then-write. Before a claim is written into the caption, the system checks it against imagery at that exact spot on a three-by-three grid. A claim the imagery cannot support is dropped or moved. So the caption is grounded as it is written, not only scored afterwards.",
-    notes: ["One idea: verify-then-write grounds each Claim as it's written.", "The 3×3 grid makes positions checkable, not prose."] },
-  { title: "Scoring the caption", seconds: 45, component: Evaluation,
-    spoken: "We score Clay's five criteria. The captioner never sees the answer keys, so a good grounding score is earned, not gamed. And grounding is two numbers, correctness and coverage, so a caption cannot win by just saying less.",
-    notes: ["Grounding matters most, and the captioner never sees the answer keys.", "Two numbers stop a terse caption winning by saying less."] },
-  { title: "What's new", seconds: 40, component: Original,
-    spoken: "Three things set this apart. We verify claims as the caption is written. We hide the answer keys so scores are earned. And we give a full verdict on anyone's caption set, not just a number. The brief asked for an eval sandbox; we built one that also makes captions better and proves it.",
-    notes: ["The originality slide: verify-then-write, hidden keys, verdict on any set.", "Land: we built the loop, not a one-off score."] },
-  { title: "Live demo", seconds: 90, component: Demo,
+  { title: "Our approach · what's new", seconds: 70, component: Approach,
+    spoken: "Three things set this apart from a plain prompt. First, verify-then-write: each claim is checked against imagery at its own spot as the caption is written, so wrong claims are dropped, not graded after. Second, the captioner never sees the answer keys, so a good score is earned, and grounding is two numbers so it can't win by saying less. Third, it gives a full verdict on anyone's caption set, with a dataset card and a gate, not just a number.",
+    notes: ["This carries originality: verify-then-write, hidden keys, verdict on any set.", "Land: we built the loop that makes captions better, not a one-off score."] },
+  { title: "Live demo", seconds: 100, component: Demo,
     spoken: "Now the proof. A case: the image and what is really there. Its caption, with each claim marked supported or not, right on the image. The report, five criteria side by side. The dataset card, showing where captions go wrong. And compare to baseline: the gate says better, worse, or inconclusive.",
     notes: ["The core of the pitch. Case → Caption → report → dataset card → gate.", "Keep the recorded Batch open as the offline fallback."] },
-  { title: "Results", seconds: 40, component: Results,
+  { title: "Results", seconds: 50, component: Results,
     spoken: "On our committed baseline: correctness zero point five eight, coverage zero point six seven, fidelity zero point five four, retrieval zero point eight nine. The headline: the gate caught a vague prompt whose coverage collapsed from zero point six seven to zero point two seven, and stopped it. That is the evaluation doing its job.",
     notes: ["Numbers from the committed Baseline base-v2.", "Lead with the gate catching the vague prompt: coverage 0.67 → 0.27."] },
-  { title: "Scale & impact", seconds: 45, component: Scale,
+  { title: "Scale & impact", seconds: 60, component: Scale,
     spoken: "Will it scale? Clay has already published fifteen point two billion embeddings — that is the scale its captions must reach. Everything here is serverless: Bedrock, S3, and Step Functions fan out over images with no server to outgrow. Cheap checks run on the whole set; the costly judge only on a sample. The impact: Clay can trust a caption set before training on it, instead of finding out after a continental-scale run.",
     notes: ["Answer the scale question head on: 15.2B embeddings is the target.", "Impact: a bad caption caught here is a wrong lesson the model never learns."] },
-  { title: "Made to be understood", seconds: 20, component: Access,
-    spoken: "This is built to be understood by anyone in the room. Press A and any slide reads itself aloud. Claims are shown on the image, not buried in text. Large type, strong contrast, and reduced motion for those who want it.",
-    notes: ["Demo the A key here — let a slide read itself.", "See-don't-read: the grid is the accessibility win, not just the audio."] },
-  { title: "What it means for Clay", seconds: 20, theme: "dark", component: Next,
-    spoken: "What it means for Clay: hand Clayzer a caption set, get a verdict — how much to trust, where it fails, what it costs to fix. Then point it at Clay's own pipeline. Our ask is Clay's real caption set and its rubric weights.",
-    notes: ["Close on the ask: Clay's real caption set and its rubric weights."] },
+  { title: "What it means for Clay", seconds: 45, theme: "dark", component: Next,
+    spoken: "What it means for Clay: hand Clayzer a caption set, get a verdict — how much to trust, where it fails, what it costs to fix. Then point it at Clay's own pipeline. Our ask is Clay's real caption set and its rubric weights. And any slide here reads itself aloud — press A.",
+    notes: ["Close on the ask: Clay's real caption set and its rubric weights.", "Mention the Listen feature (A) as the accessibility point."] },
 ];
