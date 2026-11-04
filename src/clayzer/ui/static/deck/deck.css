@@ -1,0 +1,97 @@
+/* The site's palette (see ../style.css), sized for a 1600 × 900 stage. */
+:root {
+  --ink: #252323; --muted: #6b6461; --paper: #fffdfb; --line: #e4dbd6;
+  --data: #efe8e3; --data-line: #cebeb5;
+  --captions: #f4dcd4; --captions-line: #e8beb2;
+  --evaluation: #dfe9df; --evaluation-line: #c9d7c9;
+  --platform: #dde7e9; --platform-line: #c9d6d8;
+  --delivery: #f3e6cf; --delivery-line: #e3cfa8;
+  --decision: #9a4a35; --ok: #2f6b3a;
+  --night: #0e0d0c;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--night); overflow: hidden; }
+body { color: var(--ink); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+
+.viewport { position: fixed; inset: 0; cursor: default; user-select: none; }
+.stage { position: absolute; left: 50%; top: 50%; transform-origin: center; overflow: hidden;
+  background: var(--paper); box-shadow: 0 0 0 1px rgba(255, 253, 251, .06); }
+.slide { position: absolute; inset: 0; padding: 72px 96px 80px; display: flex; flex-direction: column; }
+.slide > div { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.progress { position: absolute; left: 0; bottom: 0; height: 6px; background: var(--decision);
+  transition: width .25s ease; }
+.pageno { position: absolute; right: 32px; bottom: 22px; font-size: 18px; color: var(--muted);
+  font-variant-numeric: tabular-nums; }
+
+.kicker { margin: 0 0 14px; font-size: 20px; font-weight: 600; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--decision); }
+h1 { margin: 0; font-size: 150px; line-height: 1; letter-spacing: -.03em; }
+h2 { margin: 0 0 36px; font-size: 58px; line-height: 1.1; letter-spacing: -.015em;
+  text-wrap: balance; max-width: 1300px; }
+p { margin: 0 0 18px; }
+.big { font-size: 30px; line-height: 1.45; max-width: 760px; }
+.source { margin-top: 22px; font-size: 21px; color: var(--muted); }
+.source a { color: var(--decision); }
+
+/* Dark title and closing slides over the site's hero image. */
+.slide.dark { color: var(--paper);
+  background: var(--night) url("/static/hero.jpg") right center / cover no-repeat; }
+.slide.dark::before { content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg, rgba(14, 13, 12, .96) 0%, rgba(14, 13, 12, .85) 40%,
+    rgba(14, 13, 12, .3) 75%, rgba(14, 13, 12, .1) 100%); }
+.slide.dark > div { position: relative; }
+.slide.dark .kicker { color: var(--captions-line); }
+.slide.dark ~ .pageno { color: rgba(255, 253, 251, .6); }
+.title-slide { justify-content: center; max-width: 1000px; }
+.title-slide .lede { margin-top: 34px; font-size: 38px; line-height: 1.4; color: rgba(255, 253, 251, .88); }
+.title-slide .team { margin-top: 40px; font-size: 22px; color: rgba(255, 253, 251, .6); }
+
+.two-col { display: grid !important; grid-template-columns: 1.15fr 1fr; gap: 64px; align-items: center; }
+
+/* Unwritten content: obvious in rehearsal, never mistaken for a finished slide. */
+.placeholder { position: relative; margin-top: 8px; padding: 46px 36px 28px; border-radius: 16px;
+  border: 3px dashed var(--decision); background: repeating-linear-gradient(-45deg,
+    rgba(154, 74, 53, .035) 0 14px, transparent 14px 28px); }
+.placeholder-tag { position: absolute; top: -18px; left: 26px; padding: 4px 14px; border-radius: 999px;
+  background: var(--decision); color: var(--paper); font-size: 18px; font-weight: 700;
+  letter-spacing: .06em; text-transform: uppercase; }
+.placeholder-body { font-size: 25px; line-height: 1.45; color: #4a4240; }
+.placeholder-body ol { margin: 0 0 14px; padding-left: 32px; }
+.placeholder-body li { margin-bottom: 8px; }
+.slide.dark .placeholder { background: rgba(14, 13, 12, .55); border-color: var(--captions-line); }
+.slide.dark .placeholder-tag { background: var(--captions-line); color: var(--ink); }
+.slide.dark .placeholder-body { color: rgba(255, 253, 251, .85); }
+
+.flow { display: flex; align-items: stretch; gap: 22px; margin-bottom: 44px; }
+.step { flex: 1; padding: 22px 26px; border-radius: 14px; background: var(--captions);
+  border: 2px solid var(--captions-line); display: flex; flex-direction: column; gap: 6px; }
+.step b { font-size: 30px; }
+.step span { font-size: 22px; color: var(--muted); }
+.flow .arrow { align-self: center; font-size: 44px; color: var(--muted); }
+
+.criteria { display: grid; grid-template-columns: repeat(5, 1fr); gap: 18px; }
+.criterion { padding: 20px 20px 10px; border-radius: 14px; background: var(--evaluation);
+  border: 2px solid var(--evaluation-line); }
+.criterion:first-child { background: #cfe0cf; border-color: var(--ok); }
+.criterion b { font-size: 26px; }
+.criterion .tag { display: block; margin-top: 4px; font-size: 15px; font-weight: 700;
+  letter-spacing: .06em; text-transform: uppercase; color: var(--ok); }
+.criterion p { margin-top: 10px; font-size: 19px; line-height: 1.4; color: #3e3a39; }
+.criteria + .source { margin: 16px 0 34px; }
+
+/* Architecture diagram: colours live in diagram.js as SVG attributes. */
+.arch-slide h2 { margin-bottom: 18px; }
+.arch { width: 100%; flex: 1; min-height: 0; font-family: inherit; }
+.legend { display: flex; gap: 40px; margin-top: 10px; font-size: 19px; color: var(--muted); }
+.legend i { display: inline-block; width: 30px; height: 16px; margin-right: 8px; vertical-align: -2px;
+  border-radius: 4px; border: 2px solid #6b6461; }
+.legend i.planned { border-style: dashed; border-color: #a59d99; }
+
+/* Presenter notes, over the bottom of the window (N). */
+.notes { position: fixed; left: 0; right: 0; bottom: 0; max-height: 40vh; overflow: auto;
+  padding: 14px 24px 18px; background: rgba(20, 18, 17, .94); color: var(--paper);
+  font-size: 16px; line-height: 1.5; border-top: 1px solid rgba(255, 253, 251, .15); }
+.notes-head { display: flex; justify-content: space-between; gap: 20px; color: rgba(255, 253, 251, .65);
+  font-variant-numeric: tabular-nums; }
+.notes-head .late { color: #f0a58f; font-weight: 700; }
+.notes ul { margin: 10px 0 0; padding-left: 20px; }
