@@ -162,7 +162,7 @@ preparation time join later (Should and Could).
 | | Includes | Rubric criteria it serves |
 |---|---|---|
 | **Must** | Fixed Cases from USGS solar and wind sites, with NAIP Chips; ~60 Cases per region; **OSM Reference Labels for roads, buildings, water, and land use** in every Case, so most Claims are scored; the share of Claims no Answer Key covers, reported per Batch; Nova Pro captions, Opus 5.5 judges; grounding, fidelity, retrieval; ~100 RSICD test images as a human-caption benchmark for fidelity and retrieval; **verify-then-write over MCP, with LGND Geo's imagery check as the verifier**, so caption Runs get Trace summaries and a Workflow Score; **label preparation time** (wall-clock time to build each Case set and to caption it); **cost, partial**: time to output per Caption on Bedrock, marked partial because Bedrock hides GPU use; reports, Batches, gate, recorded-Trace replay, demo Stories; on AWS: Bedrock for captioning, judging, and Titan embeddings, a private S3 bucket per account, least-privilege IAM (AWS-01 to AWS-03, AWS-13); **score caption sets from any source**: an importer turns a caption set with image locations into Cases and scores them with no Harness run (CAP-20) | Grounding, Fidelity, Retrieval, Label prep time, Cost (partial) |
-| **Should** | VLM comparison on GPU cost (2+ open VLMs on a GPU instance); Change Cases from USGS installation years and Global Renewables Watch construction dates; full RSICD test split (1,093 images); **VRSBench test split as a grounding benchmark** (human-checked object boxes give counts and 3×3 positions); **LEVIR-CC / LEVIR-MCI as a change benchmark** (human change captions plus building and road change masks); on AWS: a SageMaker GPU endpoint for open VLMs (AWS-04), Traces in X-Ray and run metrics in CloudWatch through ADOT (AWS-05, AWS-06), one CDK app for the stack (AWS-07), the UI on App Runner (AWS-08); the code reads its object lists from the Object Ontology, with partial credit in grounding, synonym-expanded retrieval, and look-alikes in the prompt (ADR-0008); a dataset-level verdict with stratified sampling and confidence intervals (CAP-21); a caption dataset card with duplication, coverage, vocabulary, and per-class error patterns (CAP-22) | Cost, Grounding (fixed and change) |
+| **Should** | VLM comparison on GPU cost (2+ open VLMs on a GPU instance); Change Cases from USGS installation years and Global Renewables Watch construction dates; full RSICD test split (1,093 images); **VRSBench test split as a grounding benchmark** (human-checked object boxes give counts and 3×3 positions); **LEVIR-CC / LEVIR-MCI as a change benchmark** (human change captions plus building and road change masks); on AWS: a SageMaker GPU endpoint for open VLMs (AWS-04), Traces in X-Ray and run metrics in CloudWatch through ADOT (AWS-05, AWS-06), one CDK app for the stack (AWS-07), the UI on Fargate behind CloudFront (AWS-08); the code reads its object lists from the Object Ontology, with partial credit in grounding, synonym-expanded retrieval, and look-alikes in the prompt (ADR-0008); a dataset-level verdict with stratified sampling and confidence intervals (CAP-21); a caption dataset card with duplication, coverage, vocabulary, and per-class error patterns (CAP-22) | Cost, Grounding (fixed and change) |
 | **Could** | Agentic captioning: the Harness also uses LGND Geo's search and classifiers to look beyond the Chip; Global Renewables Watch as an Answer Key outside the US; disaster Change Cases from Vantor (used under its own license, never committed); SECOND-CC (land-cover change maps); SkyScript's NAIP subset and MegaEarth for retrieval at scale; LGND embeddings as a second retrieval index (search Chips by embedding, compare with Caption-text retrieval); on AWS: the caption pipeline in Step Functions (AWS-09), Bedrock batch inference (AWS-10), AgentCore for the agentic captioner and its LGND sign-in (AWS-11) | Grounding, Retrieval |
 | **Out** | Training Clay v2; HyperPod or large Trainium clusters; a single combined caption score (rubric weights aren't set); cross-account deployment; a warehouse for Traces (AWS-12) | — |
 
@@ -316,7 +316,7 @@ Solid arrows are hand-offs between areas; their formats are the contracts in sec
 | **Data and Cases** | Chips from NAIP; Reference Labels from USGS and OSM; two-step selection with LGND embeddings; the region split; pre-staging Chips in S3; the RSICD loader; on AWS: the S3 layout and Requester-Pays NAIP staging (AWS-03); the Object Ontology (`ontology/objects.toml`, ADR-0008); the caption-set importer and its documented format (CAP-20) | ________ |
 | **Captioning** | The caption Harness and prompt; structured Caption output; verify-then-write with LGND Geo over MCP, including the Harness's own OAuth sign-in; the VLMs (Nova Pro, Opus 5.5, open VLMs later); on AWS: the SageMaker GPU endpoint (AWS-04), Bedrock batch inference (AWS-10), the AgentCore captioner (AWS-11) | ________ |
 | **Evaluation** | Grounding (objects, counts, positions, attributes), the image-aware Judge for fidelity, retrieval, label preparation time, cost (partial on Bedrock); the Workflow Score's caption expectations; on AWS: CloudWatch metrics for time to output, GPU-seconds, tokens, and Harness Faults (AWS-06); stratified sampling and confidence intervals (CAP-21); the caption dataset card (CAP-22) | ________ |
-| **Platform** | Trace fields (including GPU time); UI views; Batches, Compare, and the gate for the caption Task; on AWS: the CDK app (AWS-07), App Runner hosting (AWS-08), the ADOT export to X-Ray and CloudWatch (AWS-05), the Step Functions pipeline (AWS-09), IAM roles (AWS-13) | ________ |
+| **Platform** | Trace fields (including GPU time); UI views; Batches, Compare, and the gate for the caption Task; on AWS: the CDK app (AWS-07), Fargate hosting (AWS-08), the ADOT export to X-Ray and CloudWatch (AWS-05), the Step Functions pipeline (AWS-09), IAM roles (AWS-13) | ________ |
 | **Demo and delivery** | Caption Stories and the demo pack; calibration labels; the pitch; readiness | ________ |
 
 ## 5. Contracts between the functions
@@ -452,6 +452,20 @@ the prompt.
 4. **Teacher → student on the cost frontier** (Should, needs a GPU). A large VLM captions a seed
    set; a small open VLM is prompted or fine-tuned to match; plot quality against GPU-seconds per
    Caption.
+5. **An agentic Harness** (Must; saved for later on 2026-11-04). A tool-use loop in which the
+   captioner calls geospatial tools over MCP before it writes: RODA and stac-mcp first, then
+   LGND Geo (imagery check, classifiers). This is the briefs' first success criterion (REQ-01),
+   and the tool calls are what the Workflow Score judges. Verify-then-write (1) is one use of it.
+6. **Self-improvement** (Should; saved for later on 2026-11-04). A Proposer reads a failure
+   digest of the latest Batch, proposes one change to the prompt, model, or tools with a
+   hypothesis, runs a Batch, and keeps the change only if the regression gate passes; every
+   attempt goes in an experiment ledger. The Texas test region is never shown to it.
+
+**The core loop** is the brief's "heart of the build": **capture** every Step in a Trace (tool
+calls, arguments, sequence, failures and retries, latency, cost), **summarize** each Trace,
+**score** on two dimensions (Workflow Score from the Trace; Output Score on the five criteria),
+and **report** per Run, with recorded Traces replayable through scoring. The web app's How it
+works page walks through all ten steps, each with its tasks from `docs/tasks.toml`.
 
 **Models.** Amazon Nova Pro writes Captions; Claude Opus 5.5 judges fidelity (an independent
 Judge, since it didn't write them). Opus 5.5 also captions as the first comparison VLM; those
@@ -491,7 +505,7 @@ flowchart LR
   Computer.
 - [ ] **Request a SageMaker GPU instance quota** in the account that will host the endpoint
   (AWS-04). New accounts often start at zero, and increases can take a day or more.
-- [ ] Draft the CDK app (AWS-07): bucket, IAM roles, ADOT collector, App Runner service. `cdk synth`
+- [ ] Draft the CDK app (AWS-07): bucket, IAM roles, ADOT collector, Fargate service behind CloudFront. `cdk synth`
   runs without an account.
 
 ### Day 1: planning, ending with a working skeleton
@@ -532,7 +546,7 @@ recorded into the demo pack. From here on, the demo works even if everything lat
 - Opus 5.5 as a second captioning VLM; score the Texas test region **once**.
 - Should items as time allows: GPU-cost comparison on the SageMaker endpoint (AWS-04), Change
   Cases, full RSICD test split.
-- The UI on App Runner, so the demo is a live URL (AWS-08).
+- The UI on Fargate behind CloudFront, so the demo is a live URL (AWS-08).
 - Demo Stories and the pitch.
 
 ### Caption data evaluation tasks
@@ -576,7 +590,7 @@ v0.1 of [`ontology/objects.toml`](../ontology/objects.toml) matches the code's l
 | ADOT collector; Traces in X-Ray | AWS-05 | Platform | Should | Day 2 morning |
 | CloudWatch metrics per Run: time to output, GPU-seconds, tokens, Harness Faults | AWS-06 | Evaluation | Should | Day 2 afternoon |
 | CDK app for the whole stack, deployable into any teammate's account | AWS-07 | Platform | Should | Drafted before kickoff; deployed Day 1 |
-| UI and API on App Runner from the container image | AWS-08 | Platform | Should | Day 2 afternoon |
+| UI and API on Fargate behind CloudFront from the container image | AWS-08 | Platform | Should | Day 2 afternoon |
 | Caption pipeline as a Step Functions workflow (Distributed Map over Chips) | AWS-09 | Platform | Could | Day 2 afternoon, if time |
 | Bedrock batch inference for large caption runs | AWS-10 | Captioning | Could | After the prompt is settled |
 | AgentCore captioner holding the LGND sign-in | AWS-11 | Captioning | Could | Only after checking AgentCore in an account |
@@ -601,7 +615,7 @@ v0.1 of [`ontology/objects.toml`](../ontology/objects.toml) matches the code's l
 | SageMaker GPU quota is zero in a new account | Request it before kickoff; if it isn't granted, cost stays Partial on Bedrock (CAP-12) |
 | A GPU endpoint left running runs up cost | Delete the endpoint at the end of each session; `cdk destroy` tears down the stack |
 | Teammates' accounts drift apart | One CDK app (AWS-07); each account deploys the same stack |
-| Newer services behave differently from what we expect | AgentCore is Could and checked in an account before any work depends on it; App Runner's availability in us-west-2 confirmed on Day 1, with ECS Fargate as the fallback |
+| Newer services behave differently from what we expect | AgentCore is Could and checked in an account before any work depends on it; App Runner turned out to be denied to the participant role (2026-11-03), so the UI runs on ECS Fargate |
 | The Harness's MCP client and LGND sign-in cost build time | The evaluation loop comes first and doesn't need them; if the MCP client slips, the Harness runs without verification and REQ-01 stays Partial for caption Runs |
 | LGND Geo's usage limits and cost are unknown | Ask Clay (section 9); keep Repeats small while verifying; one imagery check covers up to 30 places |
 | LGND's imagery check is itself a model and may be wrong | Spot-check its verdicts against the Answer Keys on development Cases, as the Judge is calibrated; never use it in scoring |
@@ -658,11 +672,12 @@ decisions is in ADR-0006 and ADR-0007.
 | Order of work | The evaluation loop (Repeats, Batches, Compare, gate) before caption quality; verify-then-write after |
 | Grounding | Two numbers, correctness and coverage, reported and gated separately; positives' Chips offset so the site can be in any cell (decided 2026-11-04) |
 | Regression gate | A drop regresses when it exceeds max(0.05, the Baseline's Spread); a sharp rise in Spread warns (decided 2026-11-04) |
+| Tracing | Hybrid (ADR-0001, confirmed 2026-11-04): JSONL Traces in S3 are the record and feed scoring, replay, and the Clayzer app; an OpenTelemetry export goes through ADOT to X-Ray, with CloudWatch metrics per Run, for the ops view; spans carry no prompt text or outputs |
 | Harness tools | Allowed and forbidden MCP servers listed in section 3 (ADR-0006); a verifier is never a scorer |
 | Rubric coverage | All five criteria in Must (CAP-14): label preparation time measured as wall-clock time; cost partial on Bedrock, full GPU comparison Should |
 | Caption data from any source | The Sandbox scores Clay's own caption sets, not only ours: an importer (Must, CAP-20), a dataset verdict with confidence intervals and a dataset card (Should, CAP-21, CAP-22); training Clay v2 to measure downstream benefit stays out of scope |
 | Object classes | One Object Ontology file (`ontology/objects.toml`, ADR-0008): ~20 classes, at most three levels, a crosswalk over OSM tags and standard land-cover classes; Captions stay free text, only Claims use classes |
-| AWS services | Each maps to a rubric criterion or brief constraint (AWS-01 to AWS-13). Must: Bedrock, Titan, S3, IAM. Should: SageMaker GPU endpoint, ADOT to X-Ray and CloudWatch, CDK, App Runner. Could: Step Functions, batch inference, AgentCore |
+| AWS services | Each maps to a rubric criterion or brief constraint (AWS-01 to AWS-13). Must: Bedrock, Titan, S3, IAM. Should: SageMaker GPU endpoint, ADOT to X-Ray and CloudWatch, CDK, Fargate and CloudFront. Could: Step Functions, batch inference, AgentCore |
 | Traceability | CAP-01 to CAP-19 for caption requirements, REQ-01 to REQ-19 ([caption-design.md §2.3](caption-design.md#23-evaluation-loop-requirements)) for the loop; section 11 maps both |
 | Vocabulary | Chip, Chip Pair, Fixed Case, Change Case, Caption, Claim, Reference Label, Answer Key, Reference Caption |
 
@@ -741,7 +756,7 @@ architecture in §3.4. Tasks are in section 7, "AWS service tasks".
 | AWS-05 | Traces in X-Ray and CloudWatch through ADOT | §2 Should; §7 Day 2 morning | Should |
 | AWS-06 | Per-Run metrics in CloudWatch | §4 Evaluation; §7 AWS tasks | Should |
 | AWS-07 | One CDK app for the stack, in any teammate's account | §7 before kickoff and Day 1 | Should |
-| AWS-08 | UI and API hosted on App Runner | §7 Day 2 afternoon | Should |
+| AWS-08 | UI and API hosted on Fargate behind CloudFront | §7 Day 2 afternoon | Should |
 | AWS-09 | Caption pipeline in Step Functions | §2 Could | Could |
 | AWS-10 | Bedrock batch inference for large runs | §2 Could | Could |
 | AWS-11 | AgentCore captioner with the LGND sign-in | §2 Could; §8 | Could; checked in an account first |

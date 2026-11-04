@@ -99,14 +99,14 @@ teammate has their own hackathon AWS account in us-west-2.
 | AWS-05 | Traces are exported to AWS's own observability, with faults and Soft Failures visible as errors | AWS Distro for OpenTelemetry → AWS X-Ray and Amazon CloudWatch | REQ-04, REQ-11 | *Technical* §Observability; *Vision* §Core Concepts ("observability sandbox") |
 | AWS-06 | Per-Run measurements are published as metrics: time to output, GPU-seconds, tokens, Harness Faults | Amazon CloudWatch metrics | CAP-12, REQ-04 | *Technical* §Observability "Capture" |
 | AWS-07 | One infrastructure-as-code app creates the whole stack in any teammate's account | AWS CDK (CloudFormation) | REQ-16; technical execution | *Technical* §Hackathon Approach ("migration-aware"); judging criteria |
-| AWS-08 | The UI and API run as a hosted service with a URL the judges can open | AWS App Runner (or ECS Fargate) from the existing container image | REQ-12; design | *Vision* §Features In Scope ("Minimal UI"); judging criteria |
+| AWS-08 | The UI and API run as a hosted service with a URL the judges can open | Amazon ECS on Fargate behind an Application Load Balancer, with Amazon CloudFront for the HTTPS URL, from the repo's container image (App Runner is denied to the participant role) | REQ-12; design | *Vision* §Features In Scope ("Minimal UI"); judging criteria |
 | AWS-09 | The caption pipeline (Chips → Captions → scores → report) runs as a managed workflow with parallel fan-out over Chips | AWS Step Functions (Distributed Map) | REQ-08; technical execution | judging criteria |
 | AWS-10 | Large caption runs, once the prompt is settled, use batch inference | Bedrock batch inference | CAP-12 (throughput) | *Technical* §Models |
 | AWS-11 | The agentic captioner can run as a managed agent that holds the LGND sign-in and reaches MCP tools | Amazon Bedrock AgentCore (Runtime, Gateway, Identity, Observability) | REQ-02 (LGND), agentic captioning | judging criteria; *Technical* §Confirmed Data Sources (LGND Geo MCP) |
 | AWS-12 | No disallowed services: no HyperPod or large Trainium, no cross-account deployment, no warehouse (Traces stay files in S3) | — | REQ-17 | *Technical* §Service Disallow List |
 | AWS-13 | Access is least-privilege and short-lived: no credentials in the repo, a role per service, public access blocked on every bucket | AWS IAM | REQ-13, REQ-15 | judging criteria (technical execution); public repo |
 
-Facts about newer services (AgentCore's components, App Runner regions, SageMaker GPU instance
+Facts about newer services (AgentCore's components, SageMaker GPU instance
 types and default quotas) are from general knowledge and must be checked in an account before
 they're relied on.
 
@@ -220,7 +220,7 @@ flowchart LR
         ADOT["ADOT collector"]
         XR["X-Ray<br/>Traces"]
         CW["CloudWatch<br/>metrics and logs"]
-        AR["App Runner<br/>UI and API"]
+        AR["CloudFront → ALB → Fargate<br/>UI and API"]
         AC["AgentCore<br/>agentic captioner,<br/>LGND sign-in"]
     end
     NAIP[("NAIP on AWS<br/>Requester-Pays")]
@@ -261,7 +261,7 @@ flowchart LR
 | SageMaker endpoint (AWS-04) | Hosts open VLMs on one GPU instance | The only way to measure GPU-seconds: Bedrock doesn't expose GPU time. GPU-seconds per Caption = endpoint model latency × the instance's GPU count, labeled with the GPU type |
 | ADOT → X-Ray and CloudWatch (AWS-05, AWS-06) | Traces and metrics in AWS's consoles | The Trace stays the record (ADR-0001); this adds an OpenTelemetry export, with fault and Soft Failure attributes, that lands in AWS's consoles |
 | CDK (AWS-07) | Creates bucket, roles, endpoint, collector, pipeline, and service | Each teammate has a separate account; one app gives everyone the same stack |
-| App Runner (AWS-08) | Hosts the UI and API container | The image already builds; a live URL for the judges |
+| ECS Fargate, ALB, CloudFront (AWS-08) | Hosts the read-only UI and API container | A live HTTPS URL for the judges with no domain or certificate to manage. App Runner was the first choice but the participant role can't use it (checked 2026-11-03). One ARM64 task in a public subnet, no NAT gateway; the load balancer only accepts CloudFront |
 | Step Functions (AWS-09) | Runs the caption pipeline with parallel fan-out | The pipeline is visible as a workflow, and retries and failures are per Chip |
 | AgentCore (AWS-11) | Hosts the agentic captioner and holds the LGND OAuth sign-in | LGND's MCP server is remote and needs OAuth, which a laptop MCP client handles poorly |
 

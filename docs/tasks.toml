@@ -10,11 +10,17 @@
 #           AWS-* (caption-design.md §2.2)
 #   start   where to begin: a file, a command, or a plan section
 #   after   ids of tasks that should land first
+#   context what the task is, why it matters, what exists today, the approach
+#   done_when  checkable acceptance points
+#   refs    files and sections to read first
+#   step    the How it works step the task belongs to: case, harness, capture, summarize,
+#           workflow, output, report, batch, gate, or ship
 
 # ── Data and Cases ──────────────────────────────────────────────────────────────────────
 
 [[task]]
 id = "data-access"
+step = "case"
 title = "Verify data access: USGS, NAIP (Planetary Computer and AWS), OSM, Bedrock"
 area = "Data and Cases"
 tier = "Must"
@@ -22,9 +28,20 @@ status = "done"
 closes = ["CAP-03", "CAP-19", "AWS-03"]
 start = "caption-plan.md §3"
 notes = "Verified 2026-11-03 in one participant account."
+context = "Every source the pipeline reads was checked on 2026-11-03 from a laptop and from one participant account: the USGS PostgREST APIs, NAIP on Planetary Computer and on AWS (Requester-Pays, us-west-2), Overpass for OSM, and Bedrock (Nova Pro, Opus 5.5, Titan Text Embeddings v2). Each teammate has their own account, so each repeats the check there."
+done_when = [
+  "`uv run clayzer case uspvdb 400117` succeeds in your account with `CLAYZER_NAIP_SOURCE=aws`",
+  "A one-Case Batch (`clayzer batch --repeats 1 --only <case-id>`) runs Nova Pro, Opus 5.5, and Titan",
+]
+refs = [
+  "docs/caption-plan.md §3 (Data)",
+  "README.md (Set up, Storage)",
+  "docs/sources.toml",
+]
 
 [[task]]
 id = "dev-cases"
+step = "case"
 title = "Build the ~60 development Cases (40 positive, 20 negative) in Mojave/Tehachapi"
 area = "Data and Cases"
 tier = "Must"
@@ -32,9 +49,24 @@ status = "doing"
 closes = ["CAP-01", "CAP-16"]
 start = "uv run clayzer case uspvdb <id>  ·  src/clayzer/cases.py"
 notes = "4 built. Mix sizes and surroundings; include ordinary land (caption-plan.md §3)."
+context = "The regression gate is only as good as the Case set: with 4 Cases it can't see drops smaller than about 0.1 to 0.2. Build about 60 development Cases in Mojave/Tehachapi: about 40 positives (solar arrays and wind turbines of mixed sizes and surroundings) and about 20 negatives (farmland, towns, desert, look-alikes). Positives start from a USGS record; `clayzer case` offsets the Chip automatically so the site can land in any grid cell, and uses a NAIP image taken after the site was built."
+done_when = [
+  "About 40 positive and 20 negative Cases in `cases/caption-dev.jsonl`",
+  "A spread of small, medium, and large solar arrays, and single and grouped turbines",
+  "Every Case's Reference Labels checked by eye on the web app's Cases page",
+  "A new Baseline accepted on the full set (`clayzer baseline accept`)",
+]
+refs = [
+  "docs/caption-plan.md §3 (two-step selection rules)",
+  "docs/caption-plan.md §5.1 (Case format)",
+  "src/clayzer/cases.py",
+  "src/clayzer/answer_keys.py",
+  "README.md (Build Cases)",
+]
 
 [[task]]
 id = "lookalike-negatives"
+step = "case"
 title = "Find look-alike negatives (greenhouses, parking lots) with LGND Geo's NAIP search"
 area = "Data and Cases"
 tier = "Must"
@@ -42,9 +74,21 @@ status = "todo"
 closes = ["CAP-18"]
 start = "LGND Geo search_place_find; then uv run clayzer case neg <lon> <lat>"
 after = ["dev-cases"]
+context = "Negatives that look like positives test whether the captioner can tell a greenhouse or a parking lot from a solar array. LGND Geo's `search_place_find` takes a text description (\"greenhouse\", \"solar farm\") or an example, inside a bounding box, over NAIP. Keep results USGS doesn't list; `clayzer case neg` refuses a point with a USGS record within about 300 m. The ontology lists each class's look-alikes (`confusers`)."
+done_when = [
+  "At least 8 look-alike negatives (greenhouses, parking lots, reflective roofs)",
+  "Each built with `clayzer case neg <lon> <lat> --n <k>` and checked by eye",
+  "The LGND searches used are noted in the PR",
+]
+refs = [
+  "docs/caption-plan.md §3 (LGND Geo row, two-step selection)",
+  "ontology/objects.toml",
+  "src/clayzer/cases.py (build_negative)",
+]
 
 [[task]]
 id = "fixtures"
+step = "case"
 title = "Commit fixtures/caption/ (Cases + ~50 Chips) with an ODbL notice for OSM labels"
 area = "Data and Cases"
 tier = "Must"
@@ -52,57 +96,212 @@ status = "todo"
 closes = ["REQ-15", "REQ-14"]
 start = "uv run clayzer push --from fixtures/caption (teammates load it into their bucket)"
 after = ["dev-cases"]
+context = "Each teammate has their own AWS account and bucket, so git is how the team shares one Case set. Commit the development Cases and their Chips (NAIP is public domain) under `fixtures/caption/cases/` and `fixtures/caption/chips/`. The Case files carry OSM-derived Reference Labels, so that folder needs an ODbL notice; the rest of the repo stays Apache-2.0. Teammates load the set with `clayzer push --from fixtures/caption`."
+done_when = [
+  "`fixtures/caption/cases/caption-dev.jsonl` and the matching Chip PNG and JSON files committed",
+  "An ODbL notice (\"© OpenStreetMap contributors\") in `fixtures/caption/cases/`",
+  "`clayzer push --from fixtures/caption` fills an empty bucket and a Batch runs on it",
+  "No RSICD, VRSBench, or LEVIR images or captions committed",
+]
+refs = [
+  "docs/caption-plan.md §3 (Storage)",
+  "docs/caption-plan.md §5.3 (Chip storage)",
+  "src/clayzer/cli.py (_push)",
+]
 
 [[task]]
 id = "texas-cases"
+step = "case"
 title = "Build the ~60 Texas test Cases, held out: scored once at the end, never tuned on"
 area = "Data and Cases"
 tier = "Must"
 status = "todo"
 closes = ["CAP-16"]
 start = "uv run clayzer --region test case ..."
+context = "Development Cases get tuned on; the test region shows whether improvements generalize. Build about 60 Cases in Texas the same way, as a separate region (`--region test`), and score them once at the end. Nobody tunes prompts on them, and the Proposer never sees them. LEVIR covers Texas too but has academic-only imagery: benchmark only, never tuning."
+done_when = [
+  "`cases/caption-test.jsonl` with about 40 positives and 20 negatives in Texas",
+  "No Batch runs on them before the final scoring",
+  "The final scoring reported next to the development results",
+]
+refs = [
+  "docs/caption-plan.md §3 (Regions)",
+  "docs/caption-design.md §2.1 (CAP-16)",
+]
 
 [[task]]
 id = "usgs-polygons"
+step = "case"
 title = "Use USPVDB polygons, not centroids, for solar positions and cells"
 area = "Data and Cases"
 tier = "Should"
 status = "todo"
 closes = ["CAP-10"]
 start = "src/clayzer/answer_keys.py usgs_labels"
+context = "Solar labels use the USPVDB centroid today, so an array that covers several cells is labelled in one, and a correct Claim in another of its cells scores as a neighbour. The USPVDB GeoJSON download has the array polygons: clip each to the Chip and record every cell it covers, as OSM labels already do."
+done_when = [
+  "Solar labels' `cells` come from polygons clipped to the Chip",
+  "Pine Tree Solar's label covers the cells its array covers",
+  "Existing Cases rebuilt and Batches rescored; a test for a multi-cell array",
+]
+refs = [
+  "src/clayzer/answer_keys.py (usgs_labels, osm_labels)",
+  "docs/caption-plan.md §3 (USGS row)",
+  "docs/sources.toml",
+]
 
 [[task]]
 id = "change-cases"
+step = "case"
 title = "Change Cases: Chip Pairs from USGS install years and GRW construction dates"
 area = "Data and Cases"
 tier = "Should"
 status = "todo"
 closes = ["CAP-02"]
 start = "caption-plan.md §5.1 (kind = change)"
+context = "The briefs' second task type: two dates of one place (a Chip Pair), and a Caption that says what changed. Build Change Cases where a USGS install year or a Global Renewables Watch construction date falls between two NAIP dates; each Reference Label gets a `change` field (appeared, disappeared, unchanged)."
+done_when = [
+  "`clayzer case` can build `kind = \"change\"` Cases with two Chips",
+  "Reference Labels and Claims carry `change`; grounding scores it",
+  "The Harness captions a Chip Pair; one Change Case runs end to end",
+]
+refs = [
+  "docs/caption-plan.md §5.1",
+  "docs/caption-plan.md §5.2",
+  "docs/caption-design.md §2.1 (CAP-02)",
+  "GLOSSARY.md (Chip Pair, Change Case)",
+]
+
+[[task]]
+id = "import-format"
+step = "case"
+title = "Assume a caption-set import format (GeoParquet, mirroring Clay's published data) and ask Clay to confirm it"
+area = "Data and Cases"
+tier = "Must"
+status = "doing"
+closes = ["CAP-20", "CAP-07"]
+start = "docs/caption-design.md §3.6 (Assumed import format)"
+notes = "Assumed 2026-11-03; confirmation is among the questions for Clay."
+context = "Clay's business driver is that its caption data is untested, so the Sandbox must score any caption set, not only ours. Clay hasn't shared its data, so the importer is built against an assumed format mirroring what Clay already publishes: GeoParquet, one row per caption with caption_id, chip_id, caption, kind, geometry, datetime, sensor, gsd_m, and optional stac_item, image_uri, generator, claims."
+done_when = [
+  "The format documented in caption-design.md §3.6 (done)",
+  "Clay asked to confirm it",
+  "Any difference handled by a small adapter",
+]
+refs = [
+  "docs/caption-design.md §3.6",
+  "docs/caption-plan.md §7 (Caption data evaluation tasks)",
+]
+
+[[task]]
+id = "caption-importer"
+step = "case"
+title = "Importer: a caption set becomes Cases, with Answer Keys attached by location and date"
+area = "Data and Cases"
+tier = "Must"
+status = "todo"
+closes = ["CAP-20"]
+start = "docs/caption-design.md §3.6; src/clayzer/cases.py"
+after = ["import-format"]
+context = "Each record of an imported caption set becomes a Case; Answer Keys attach by footprint and date exactly as for our Chips (a label only counts if the site existed by the acquisition date), and ADR-0006 still applies. Captions may be Sentinel-2 rather than NAIP: compare each class's `min_visible_m` in the ontology with the row's `gsd_m` and flag Claims about objects too small to see. Build and test on RSICD's Reference Captions converted to the format, and on our own Caption files."
+done_when = [
+  "`clayzer import <file>` creates Cases from GeoParquet or JSON Lines",
+  "Answer Keys attached by location and date",
+  "Too-small Claims flagged from the ontology",
+  "Tested on converted RSICD captions and our Captions",
+]
+refs = [
+  "docs/caption-design.md §3.6",
+  "ontology/objects.toml",
+  "src/clayzer/answer_keys.py",
+  "docs/caption-design.md §2.1 (CAP-20)",
+]
+
+[[task]]
+id = "ontology-review"
+step = "case"
+title = "Review the ontology's classes, look-alikes, and minimum sizes; add any class a Case or benchmark needs"
+area = "Data and Cases"
+tier = "Must"
+status = "todo"
+closes = ["CAP-10"]
+start = "ontology/objects.toml"
+context = "ADR-0008: every class a Claim can name is defined once, in ontology/objects.toml (v0.1: 11 claimable classes under five roots, plus candidates). tests/test_ontology.py fails if the code's lists drift from it. Review it as a team: are the look-alikes and minimum visible sizes right, and does any Case or benchmark need a class that's missing?"
+done_when = [
+  "Reviewed with the contracts on Day 1",
+  "Changes made in the file and the tests pass",
+]
+refs = [
+  "docs/caption-design.md §3.5",
+  "docs/adr/0008-object-classes-live-in-one-ontology-file.md",
+  "ontology/objects.toml",
+  "tests/test_ontology.py",
+]
+
+[[task]]
+id = "landcover-crosswalks"
+step = "case"
+title = "Check the ontology's NLCD and WorldCover crosswalks against the published legends"
+area = "Data and Cases"
+tier = "Could"
+status = "todo"
+closes = []
+start = "ontology/objects.toml"
+context = "The ontology maps land-cover classes to NLCD and WorldCover classes from general knowledge. Check them against the published legends before land cover is scored."
+done_when = [
+  "Each crosswalk entry checked against the official legend",
+  "Corrections made in the file",
+]
+refs = [
+  "docs/caption-design.md §3.5",
+  "ontology/objects.toml",
+]
 
 # ── Captioning ──────────────────────────────────────────────────────────────────────────
 
 [[task]]
 id = "skeleton"
+step = "harness"
 title = "Walking skeleton: Chip → Nova Pro Caption → scores → report"
 area = "Captioning"
 tier = "Must"
 status = "done"
 closes = ["CAP-05", "AWS-01", "AWS-02"]
 start = "src/clayzer/harness.py"
+context = "Built 2026-11-03: a NAIP Chip goes to Nova Pro, which returns a Caption with structured Claims through a forced tool call; grounding, fidelity, and retrieval score it; a report shows it."
+done_when = [
+  "Runs end to end on real data",
+]
+refs = [
+  "src/clayzer/harness.py",
+  "README.md",
+]
 
 [[task]]
 id = "lgnd-client"
+step = "harness"
 title = "MCP client in the Harness with its own LGND Geo OAuth sign-in"
 area = "Captioning"
 tier = "Must"
 status = "todo"
 closes = ["REQ-01", "REQ-02"]
 start = "caption-plan.md §1.3; mcp Python SDK OAuth client"
-after = ["eval-loop"]
+after = ["agentic-harness"]
+context = "LGND Geo is OAuth-protected per user (WorkOS AuthKit), and Claude Code's sign-in can't be reused from Python. The Harness needs its own MCP client over streamable HTTP with an OAuth flow (the mcp Python SDK has an OAuth client provider), with the token stored outside the repo. Tried 2026-11-03 through Claude Code: 18 tools; the imagery check confirmed a true Claim and rejected a false one."
+done_when = [
+  "The Harness lists LGND Geo's tools from Python",
+  "The token is cached outside the repo and refreshes",
+  "`search_chip_lat_lon` and `reasoning_imagery_check` called from a test script",
+]
+refs = [
+  "docs/caption-plan.md §1.3",
+  "docs/caption-plan.md §3 (LGND Geo row)",
+  ".mcp.json",
+]
 
 [[task]]
 id = "verify-then-write"
+step = "harness"
 title = "Verify-then-write: check each Claim with LGND's imagery check at its grid cell"
 area = "Captioning"
 tier = "Must"
@@ -110,9 +309,21 @@ status = "todo"
 closes = ["CAP-10", "REQ-01", "CAP-18"]
 start = "caption-plan.md §1.3, §6"
 after = ["lgnd-client", "grounding-fix"]
+context = "The Harness drafts Claims, checks each with LGND Geo's `reasoning_imagery_check` at its grid cell, and writes the Caption only from confirmed Claims; the rest go in `uncertain`. To check a cell, look up the LGND image at the cell's centre with `search_chip_lat_lon` (LGND images are about 160 m across, roughly one cell). The verifier is never an Answer Key and never used in scoring."
+done_when = [
+  "Each check is a `tool` Step in the Trace",
+  "Unconfirmed Claims move to `uncertain`",
+  "A Batch with verification gated against the Baseline, with the result in the PR",
+]
+refs = [
+  "docs/caption-plan.md §1.3",
+  "docs/caption-plan.md §6",
+  "docs/adr/0006-answer-keys-are-hidden-from-caption-inputs.md",
+]
 
 [[task]]
 id = "prompt-loop"
+step = "gate"
 title = "Improve the caption prompt through the loop: one change per Batch, gated"
 area = "Captioning"
 tier = "Must"
@@ -120,18 +331,42 @@ status = "todo"
 closes = ["CAP-01", "CAP-06"]
 start = "uv run clayzer batch --prompt <file> --label <change>; clayzer gate"
 after = ["grounding-fix", "gate-rule"]
+context = "With scoring settled, improve the caption prompt one change at a time: write a prompt file, run a Batch with `--prompt`, compare it with the Baseline, and keep it only if the regression gate passes. Log each attempt in the PR, kept or rejected. The Proposer automates this later."
+done_when = [
+  "Each prompt change is its own labelled Batch",
+  "Kept changes become the new Baseline",
+  "A log of every attempt and its result",
+]
+refs = [
+  "README.md (The evaluation loop)",
+  "src/clayzer/harness.py (PROMPT)",
+  "src/clayzer/gate.py",
+]
 
 [[task]]
 id = "second-captioner"
+step = "harness"
 title = "Opus 5.5 as a second captioning VLM (self-graded verdicts flagged)"
 area = "Captioning"
 tier = "Must"
 status = "todo"
 closes = ["REQ-10", "REQ-19"]
 start = "uv run clayzer batch --caption-model us.anthropic.claude-opus-5-5"
+context = "REQ-10 asks that changing models is configuration, shown by the same Case on two models. Run the same Cases with Opus 5.5 as the captioner (`--caption-model`). Opus also judges, so those fidelity verdicts are self-graded and every report must say so (REQ-19)."
+done_when = [
+  "A Batch with `--caption-model us.anthropic.claude-opus-5-5`",
+  "Reports flag self-graded fidelity",
+  "Compare shows Nova Pro against Opus per criterion and per Case",
+]
+refs = [
+  "docs/caption-design.md §2.3 (REQ-10, REQ-19)",
+  "src/clayzer/cli.py",
+  "src/clayzer/judge.py",
+]
 
 [[task]]
 id = "gpu-vlm"
+step = "harness"
 title = "An open VLM on a SageMaker GPU endpoint; GPU-seconds per Caption"
 area = "Captioning"
 tier = "Should"
@@ -139,11 +374,131 @@ status = "blocked"
 closes = ["CAP-12", "AWS-04"]
 start = "caption-plan.md §7 AWS service tasks"
 notes = "Needs the GPU quota request first."
+context = "Clay wants cost in GPU time and GPU count and size, not tokens (CAP-12), and Bedrock can't report GPU time. Serve one open VLM on a SageMaker GPU endpoint behind the same model interface, caption the same Cases with the same prompt, and fill the Trace's `cost.gpu_seconds`. Delete the endpoint after each session."
+done_when = [
+  "One open VLM captions through the same interface as Nova Pro",
+  "Its Steps have `cost.gpu_seconds`",
+  "Quality against GPU-seconds compared across models",
+  "The endpoint is deleted after use",
+]
+refs = [
+  "docs/caption-plan.md §7 (AWS service tasks)",
+  "docs/caption-design.md §2.2 (AWS-04)",
+  "src/clayzer/trace.py",
+]
+
+[[task]]
+id = "agentic-harness"
+step = "harness"
+title = "Agentic Harness: a tool-use loop that calls geospatial tools over MCP before captioning"
+area = "Captioning"
+tier = "Must"
+status = "todo"
+closes = ["REQ-01", "REQ-02", "REQ-10"]
+start = "Sandbox ADR-0002 (a plain tool-use loop); RODA and stac-mcp first, then LGND Geo"
+notes = "Saved for later (2026-11-04). The briefs' first success criterion: the Harness calls geospatial tools via MCP. Today it is one VLM call with no tools."
+after = ["eval-loop"]
+context = "Both briefs' first success criterion: the Harness performs the task by calling geospatial tools via MCP. Today it's one VLM call with no tools. Build a plain tool-use loop (model turn, tool calls, results, repeat, until `submit_caption`) with an MCP client. Start with servers that need no sign-in (RODA, stac-mcp), then add LGND Geo. Record each tool call as a Step with `Tracer.tool`. The Sandbox's Reference Harness is the model to follow."
+done_when = [
+  "The Harness can call MCP tools before submitting its Caption",
+  "Every tool call is a `tool` Step with arguments, result, latency, and error",
+  "A step budget stops runaway loops, and the Run records hitting it",
+  "Batches without tools still run unchanged",
+]
+refs = [
+  "docs/adr/0002-reference-harness-is-a-plain-loop.md",
+  "docs/caption-plan.md §6 (5. An agentic Harness)",
+  "src/clayzer/harness.py",
+  "src/clayzer/trace.py (Tracer.tool)",
+  "docs/caption-design.md §2.3 (REQ-01)",
+]
+
+[[task]]
+id = "tool-allowlist"
+step = "harness"
+title = "Enforce the ADR-0006 tool list in code: the Harness can't load a forbidden MCP server"
+area = "Captioning"
+tier = "Must"
+status = "todo"
+closes = ["REQ-13"]
+start = "caption-plan.md §3 (allowed and forbidden MCP servers)"
+after = ["agentic-harness"]
+context = "ADR-0006: no tool the Harness can call may read an Answer Key (USGS, GRW, OSM) for the region being scored, or grounding becomes circular. Plan §3 lists allowed and forbidden MCP servers. Enforce it in code, not by review: the Harness refuses to start with a forbidden server, and each Batch records which servers and versions it used."
+done_when = [
+  "Configuring a forbidden server (e.g. openstreetmap-mcp-server) makes the Batch refuse to start",
+  "`batch.json` lists the MCP servers and versions used",
+  "Tests for both",
+]
+refs = [
+  "docs/caption-plan.md §3 (Answer Keys are hidden from caption inputs)",
+  "docs/adr/0006-answer-keys-are-hidden-from-caption-inputs.md",
+]
+
+[[task]]
+id = "lookalike-prompt"
+step = "harness"
+title = "Prompt: list each class's look-alikes and minimum visible size"
+area = "Captioning"
+tier = "Should"
+status = "todo"
+closes = ["CAP-01"]
+start = "src/clayzer/harness.py (PROMPT); ontology/objects.toml"
+after = ["ontology-in-code"]
+context = "The ontology records each class's look-alikes (confusers) and minimum visible size at 0.6 m. Putting them in the prompt should cut confusions such as greenhouses called solar arrays, and Claims about things NAIP can't show. Test it as a prompt change through the gate."
+done_when = [
+  "The prompt built from the ontology's look-alikes and sizes",
+  "Run as a Batch and gated against the Baseline",
+]
+refs = [
+  "docs/caption-design.md §3.5",
+  "src/clayzer/harness.py",
+  "ontology/objects.toml",
+]
+
+[[task]]
+id = "batch-inference"
+step = "harness"
+title = "Use Bedrock batch inference for large caption runs once the prompt is settled"
+area = "Captioning"
+tier = "Could"
+status = "todo"
+closes = ["AWS-10"]
+start = "docs/caption-design.md §2.2 (AWS-10)"
+after = ["prompt-loop"]
+context = "Batch inference is cheaper and higher-throughput for large, non-interactive caption runs (CAP-12 throughput). Use it only after the prompt is settled, since it gives up per-call Traces in real time."
+done_when = [
+  "A large caption run through Bedrock batch inference",
+  "Results scored like any Batch",
+]
+refs = [
+  "docs/caption-design.md §2.2 (AWS-10)",
+]
+
+[[task]]
+id = "agentcore"
+step = "harness"
+title = "Run the agentic captioner on AgentCore, holding the LGND sign-in and reaching MCP tools"
+area = "Captioning"
+tier = "Could"
+status = "todo"
+closes = ["AWS-11"]
+start = "docs/caption-design.md §2.2 (AWS-11)"
+after = ["agentic-harness", "aws-observability-check"]
+context = "AgentCore could host the agentic Harness as a managed agent that holds the LGND OAuth sign-in and reaches MCP tools through its gateway. Check that AgentCore works in a participant account before any work depends on it."
+done_when = [
+  "AgentCore confirmed available in one account",
+  "The agentic Harness runs there and its Traces land in the store",
+]
+refs = [
+  "docs/caption-design.md §2.2 (AWS-11)",
+  "docs/caption-plan.md §8",
+]
 
 # ── Evaluation ──────────────────────────────────────────────────────────────────────────
 
 [[task]]
 id = "eval-loop"
+step = "batch"
 title = "Evaluation loop: Batches, Repeats, resume, Compare, Baseline, regression gate"
 area = "Evaluation"
 tier = "Must"
@@ -151,9 +506,19 @@ status = "done"
 closes = ["CAP-15", "REQ-14"]
 start = "src/clayzer/batch.py, src/clayzer/gate.py"
 notes = "Built 2026-11-04; an unchanged rerun passed and a vague prompt failed."
+context = "Built 2026-11-04: Batches of every Case times Repeats, resume after expired credentials, rescore, Compare, Baselines, and the regression gate (exit 0 pass, 1 fail, 2 inconclusive)."
+done_when = [
+  "An unchanged rerun passes the gate; a deliberately vague prompt fails it",
+]
+refs = [
+  "src/clayzer/batch.py",
+  "src/clayzer/gate.py",
+  "README.md (The evaluation loop)",
+]
 
 [[task]]
 id = "grounding-fix"
+step = "output"
 title = "Stop grounding from rewarding Captions that say less"
 area = "Evaluation"
 tier = "Must"
@@ -161,9 +526,18 @@ status = "done"
 closes = ["CAP-10"]
 start = "src/clayzer/grounding.py; caption-plan.md §8"
 notes = "Done 2026-11-04: Chips offset so the site can be in any cell; grounding split into correctness and coverage. Follow-up: centre's neighbour credit (next task)."
+context = "Done 2026-11-04: Chips are offset so a positive's site can land in any cell, and grounding is two numbers, correctness and coverage."
+done_when = [
+  "The vague prompt fails the gate on coverage",
+]
+refs = [
+  "src/clayzer/grounding.py",
+  "docs/caption-plan.md §8",
+]
 
 [[task]]
 id = "gate-rule"
+step = "gate"
 title = "Stop a noisy candidate from relaxing its own regression gate"
 area = "Evaluation"
 tier = "Must"
@@ -171,9 +545,18 @@ status = "done"
 closes = ["CAP-15"]
 start = "src/clayzer/gate.py; caption-plan.md §8"
 notes = "Done 2026-11-04: the Baseline's Spread only, plus a warning when a Case turns erratic."
+context = "Done 2026-11-04: the allowed drop uses the Baseline's Spread only, and a Case whose Spread jumps is warned about."
+done_when = [
+  "A noisy candidate can no longer loosen its own threshold (tests in tests/test_loop.py)",
+]
+refs = [
+  "src/clayzer/gate.py",
+  "docs/caption-plan.md §8",
+]
 
 [[task]]
 id = "centre-credit"
+step = "output"
 title = "Stop \"centre\" earning half credit for position on every Case"
 area = "Evaluation"
 tier = "Must"
@@ -181,28 +564,64 @@ status = "decide"
 closes = ["CAP-10"]
 start = "src/clayzer/grounding.py _position_score; caption-plan.md §8"
 notes = "The centre cell neighbours all 8 others, so a Claim at centre always scores at least 0.5. Options: no neighbour credit, or only along a row or column."
+context = "A Claim one cell away from its label gets 0.5 for position. The centre cell neighbours all eight others, so a Claim at centre always earns at least 0.5: a safe guess the Proposer would learn to exploit. Options: no neighbour credit, or credit only along a row or column (not diagonally). This is a team decision first."
+done_when = [
+  "The decision recorded in caption-plan.md §10",
+  "`_position_score` changed, with tests",
+  "Batches rescored (`clayzer rescore`) and the Baseline re-accepted",
+]
+refs = [
+  "src/clayzer/grounding.py (_position_score)",
+  "src/clayzer/grid.py",
+  "docs/caption-plan.md §8",
+]
 
 [[task]]
 id = "rsicd"
+step = "output"
 title = "RSICD benchmark: ~100 test images for fidelity and retrieval against human captions"
 area = "Evaluation"
 tier = "Must"
 status = "todo"
 closes = ["CAP-07", "CAP-09", "CAP-11", "CAP-17"]
 start = "caption-plan.md §3 RSICD rules (download at run time, never commit)"
+context = "RSICD gives human-written captions to measure fidelity and retrieval against. It has no license and commercial-map imagery: download at run time, never commit images or captions, and cite Lu et al. 2017. Two-thirds of its captions repeat; de-duplicate per image before using them as retrieval queries. Start with about 100 test images."
+done_when = [
+  "A loader that fetches about 100 RSICD test images and captions at run time",
+  "Fidelity and retrieval scored on them, reported apart from our Cases",
+  "Nothing from RSICD in git",
+]
+refs = [
+  "docs/caption-plan.md §3 (RSICD rules)",
+  "docs/caption-design.md §2.1 (CAP-17)",
+  "docs/sources.toml",
+]
 
 [[task]]
 id = "workflow-score"
+step = "workflow"
 title = "Workflow Score for caption Runs: verification calls per Claim, failures, steps"
 area = "Evaluation"
 tier = "Must"
 status = "todo"
 closes = ["REQ-06"]
 start = "caption-plan.md §1.3"
-after = ["verify-then-write"]
+after = ["agentic-harness", "trace-capture", "fault-attribution"]
+context = "The brief's first score: how well the Harness worked, from its Trace alone, with no model call. Tool-call correctness and sequencing against the Case's expectations, call success, recovery after Harness Faults, and steps and cost against a budget. Environment Faults don't count. Port the Sandbox's `scoring/workflow.py`; caption Cases need expectations, such as one verification call per Claim. Judge Steps (`role: scoring`) are left out."
+done_when = [
+  "A Workflow Score per Run from its Trace, deterministic",
+  "Each component reports a reason; components that don't apply are left out",
+  "Reported and gated next to the Output Score",
+]
+refs = [
+  "docs/caption-design.md §2.3 (REQ-06)",
+  "docs/adr/0003-errors-are-attributed-to-harness-or-environment.md",
+  "src/clayzer/trace.py",
+]
 
 [[task]]
 id = "label-prep"
+step = "output"
 title = "Label preparation time per label set (definition still asked of Clay)"
 area = "Evaluation"
 tier = "Must"
@@ -210,143 +629,736 @@ status = "doing"
 closes = ["CAP-13"]
 start = "Case prep_seconds; caption-plan.md §9"
 notes = "Recorded per Case and summed per Batch; the definition is a question for Clay."
+context = "Clay's fifth criterion. Each Case records `prep_seconds` (building it) and Batches sum them. Clay hasn't said whether it means preparing Reference Labels or producing Captions (which are Clay v2's training labels); the question is in plan §9."
+done_when = [
+  "The definition confirmed with Clay, or the assumption stated in the plan",
+  "If still unclear, both reported: Case-building time and captioning time per label",
+]
+refs = [
+  "docs/caption-plan.md §9",
+  "src/clayzer/cases.py (prep_seconds)",
+  "docs/caption-design.md §2.1 (CAP-13)",
+]
 
 [[task]]
 id = "vrsbench"
+step = "output"
 title = "VRSBench test split as a grounding benchmark (object boxes → counts, positions)"
 area = "Evaluation"
 tier = "Should"
 status = "todo"
 closes = ["CAP-10", "CAP-17"]
 start = "caption-plan.md §3 What scores what"
+context = "VRSBench's test split (9,350 images) has human-checked object references with boxes over 26 categories, so counts and 3x3 positions can be computed: a grounding benchmark on other people's images. Annotations are CC BY 4.0 but the DOTA images are academic-only: download at run time, never commit."
+done_when = [
+  "A loader that maps boxes to Reference Labels on the grid",
+  "Grounding scored on a sample and reported apart from our Cases",
+  "Licensing noted; nothing committed",
+]
+refs = [
+  "docs/caption-plan.md §3 (VRSBench row)",
+  "docs/sources.toml",
+  "docs/caption-design.md §2.1 (CAP-10, CAP-17)",
+]
 
 [[task]]
 id = "judge-calibration"
+step = "output"
 title = "Calibrate the fidelity Judge with blind Calibration Labels on caption Runs"
 area = "Evaluation"
 tier = "Should"
 status = "todo"
 closes = ["REQ-19"]
 start = "GLOSSARY.md Calibration Label"
+context = "The fidelity Judge is itself a model, so its verdicts need checking. People give blind Calibration Labels to a sample of Runs (same rubric, no Judge verdict shown), and agreement is reported. The Sandbox has this (`bb ui --calibrate`); port it or reuse its approach. The Trace now records the Judge's full prompt, response, and reasoning."
+done_when = [
+  "About 20 Runs labelled blind",
+  "Agreement between the Judge and people reported",
+  "Disagreements reviewed, and the Judge prompt adjusted if needed",
+]
+refs = [
+  "GLOSSARY.md (Calibration Label)",
+  "docs/caption-design.md §2.3 (REQ-19)",
+  "src/clayzer/judge.py",
+]
 
-# ── Sandbox integration ─────────────────────────────────────────────────────────────────
+[[task]]
+id = "example-captions"
+step = "output"
+title = "Score against Clay's example captions and retrieval evaluation set"
+area = "Evaluation"
+tier = "Must"
+status = "blocked"
+closes = ["CAP-07", "CAP-08"]
+start = "caption-plan.md §9"
+notes = "Waiting on Clay for the data; RSICD and Answer Key queries stand in meanwhile."
+context = "The briefs say Clay has example captions and a retrieval evaluation set. When they arrive, add them as references: fidelity and style against the examples, recall@k on Clay's queries. RSICD and Answer Key queries stand in meanwhile."
+done_when = [
+  "The data received and its format documented",
+  "Scoring uses it, reported separately",
+]
+refs = [
+  "docs/caption-plan.md §9",
+  "docs/caption-design.md §2.1 (CAP-07, CAP-08)",
+]
+
+[[task]]
+id = "proposer"
+step = "gate"
+title = "Proposer: an agent that reads a failure digest and proposes one change (prompt, model, or tools) per Batch"
+area = "Evaluation"
+tier = "Should"
+status = "todo"
+closes = []
+start = "clayzer improve --iterations N: propose, Batch, gate, keep or roll back, log to an experiment ledger"
+notes = "Saved for later (2026-11-04). Turns the measured loop into a self-improving one. The Texas test region is never shown to it."
+after = ["agentic-harness", "centre-credit"]
+context = "Turns the measured loop into a self-improving one. A Proposer (an agent) reads a failure digest of the latest Batch (patterns such as \"misses roads in 8 of 12 Runs\", recurring Judge notes), proposes one change to the prompt, model, or tools with a hypothesis, runs a Batch, and keeps the change only if the regression gate passes. Every attempt goes in an experiment ledger, which is also the demo. The Texas test Cases are never shown to it."
+done_when = [
+  "`clayzer improve --iterations N` runs within a spending cap",
+  "Each iteration: digest, one change with a hypothesis, Batch, gate, keep or roll back",
+  "An experiment ledger with every attempt and its result",
+  "Optional human approval before each change runs",
+]
+refs = [
+  "docs/caption-plan.md §6 (6. Self-improvement)",
+  "src/clayzer/gate.py",
+  "src/clayzer/batch.py",
+]
+
+[[task]]
+id = "claims-from-text"
+step = "output"
+title = "Claims from free text: a model extracts Claims from captions that have none, recorded and calibrated like the Judge"
+area = "Evaluation"
+tier = "Must"
+status = "todo"
+closes = ["CAP-20"]
+start = "docs/caption-design.md §3.6"
+context = "Most caption sets have text only, but grounding scores structured Claims. A model reads each caption and extracts Claims in the ADR-0007 format (object, count, grid cell, relations). The extraction is itself a model's judgement, so it's recorded in the Trace and calibrated against people's labels, like the Judge."
+done_when = [
+  "Claims extracted from free-text captions in the ADR-0007 format",
+  "Each extraction recorded as a Step",
+  "Agreement with hand-made Claims checked on a sample",
+]
+refs = [
+  "docs/caption-design.md §3.6",
+  "docs/adr/0007-claims-use-a-grid-and-a-fixed-relation-vocabulary.md",
+  "docs/caption-plan.md §5.2",
+]
+
+[[task]]
+id = "score-imported"
+step = "output"
+title = "Score an imported caption set on the same criteria, with no Harness run"
+area = "Evaluation"
+tier = "Must"
+status = "todo"
+closes = ["CAP-20"]
+start = "docs/caption-design.md §3.6; src/clayzer/batch.py"
+after = ["caption-importer", "claims-from-text"]
+context = "Once imported, a caption set goes through the same scoring as our Captions: grounding against the Answer Keys, fidelity where an image is available, retrieval. No Harness runs; the captions are the input. Rows with no image are scored on grounding and retrieval only, and the verdict says so."
+done_when = [
+  "An imported set scored on all criteria that apply",
+  "Rows without images reported as such",
+  "Included in the midday freeze",
+]
+refs = [
+  "docs/caption-design.md §3.6",
+  "docs/caption-design.md §2.1 (CAP-20)",
+]
+
+[[task]]
+id = "stratified-verdict"
+step = "output"
+title = "A dataset-level verdict: stratified sample, Wilson 95% intervals per rate and per stratum, cheap checks on the whole set"
+area = "Evaluation"
+tier = "Should"
+status = "todo"
+closes = ["CAP-21"]
+start = "docs/caption-design.md §3.6"
+after = ["score-imported"]
+context = "To say how far a whole caption set can be trusted, sample it by class, region, and terrain, run the Judge on the sample, and report every error rate with a 95% Wilson interval, overall and per stratum (about 100 items per stratum for plus or minus 10 points near 50%). Cheap checks with no Judge (grounding, duplication, vocabulary, too-small Claims) run on the whole set."
+done_when = [
+  "Strata from the ontology's classes, region, and terrain",
+  "Every rate with a 95% Wilson interval",
+  "Cheap checks over the whole set",
+]
+refs = [
+  "docs/caption-design.md §3.6",
+  "docs/caption-design.md §2.1 (CAP-21)",
+  "ontology/objects.toml",
+]
+
+[[task]]
+id = "dataset-card"
+step = "report"
+title = "A caption dataset card: duplication, coverage, vocabulary spread, per-class error patterns"
+area = "Evaluation"
+tier = "Should"
+status = "todo"
+closes = ["CAP-22"]
+start = "docs/caption-design.md §3.6"
+after = ["stratified-verdict"]
+context = "One report per caption set: size and duplication rate, class, region, and terrain coverage against what Clay will caption, vocabulary spread, and per-class error patterns from the ontology (miscounts, look-alike confusions such as greenhouses called solar arrays). It also says what it can't show: whether captions improve Clay v2."
+done_when = [
+  "A card per imported set in the report and the web app",
+  "Per-class error patterns using the ontology's look-alikes",
+  "States its limits",
+]
+refs = [
+  "docs/caption-design.md §3.6",
+  "docs/caption-design.md §2.1 (CAP-22)",
+]
+
+[[task]]
+id = "class-partial-credit"
+step = "output"
+title = "Partial credit in grounding when a Claim names a parent or sibling of the label's class"
+area = "Evaluation"
+tier = "Should"
+status = "todo"
+closes = ["CAP-10"]
+start = "src/clayzer/grounding.py"
+after = ["ontology-in-code"]
+context = "A Claim of \"building\" over a greenhouse is closer than one of \"water\". The ontology records each class's parent, so grounding can score a Claim one step away (parent or child) between a hit and a miss."
+done_when = [
+  "A class-distance rule from the ontology",
+  "Grounding gives partial credit at distance 1",
+  "Tests and a rescore of the Baseline",
+]
+refs = [
+  "docs/caption-design.md §3.5",
+  "src/clayzer/grounding.py",
+  "ontology/objects.toml",
+]
+
+[[task]]
+id = "synonym-queries"
+step = "output"
+title = "Retrieval: expand queries with each class's synonyms and measure recall@k with and without"
+area = "Evaluation"
+tier = "Should"
+status = "todo"
+closes = ["CAP-09", "CAP-06"]
+start = "src/clayzer/retrieval.py"
+after = ["ontology-in-code"]
+context = "Retrieval queries today are fixed phrases (\"find solar farms\"). The ontology lists synonyms (\"solar farm\", \"PV plant\"); expanding queries with them shows whether Captions are findable however people phrase things."
+done_when = [
+  "Queries expanded from the ontology's synonyms",
+  "Recall@k reported with and without expansion",
+]
+refs = [
+  "docs/caption-design.md §3.5",
+  "src/clayzer/retrieval.py",
+  "ontology/objects.toml",
+]
+
+# ── Platform ─────────────────────────────────────────────────────────────────
 
 [[task]]
 id = "s3-store"
+step = "capture"
 title = "S3 store per account; NAIP read from AWS in us-west-2"
-area = "Sandbox integration"
+area = "Platform"
 tier = "Must"
 status = "done"
 closes = ["AWS-03", "CAP-19"]
 start = "src/clayzer/store.py; README Storage"
+context = "Done 2026-11-04: one private, encrypted bucket per account; the same keys in any bucket or in local folders; NAIP read from AWS in us-west-2."
+done_when = [
+  "Batches and Traces land in the bucket",
+]
+refs = [
+  "src/clayzer/store.py",
+  "README.md (Storage)",
+]
 
 [[task]]
 id = "web-app"
+step = "report"
 title = "Team web app: workflow, tasks, Cases, Batches, compare, gate, launch"
-area = "Sandbox integration"
+area = "Platform"
 tier = "Should"
 status = "done"
 closes = ["REQ-12"]
 start = "uv run clayzer ui"
+context = "Done 2026-11-04: the team web app (`clayzer ui`): Overview, How it works, Tasks, Cases, Batches with reports, Compare, and the regression gate, Data sources, Concepts."
+done_when = [
+  "Runs locally against the store",
+]
+refs = [
+  "src/clayzer/ui/app.py",
+  "src/clayzer/ui/static/app.js",
+  "README.md (The team web app)",
+]
 
 [[task]]
 id = "trace-summaries"
+step = "summarize"
 title = "Readable Trace summaries for caption Runs"
-area = "Sandbox integration"
+area = "Platform"
 tier = "Must"
 status = "todo"
 closes = ["REQ-05", "REQ-04"]
-start = "batches/<id>/trace.jsonl"
+start = "batches/<id>/traces/<case-id>--r<repeat>.jsonl; uv run clayzer trace"
+context = "Clay's explicit ask: \"summarize traces from agentic activity\". From the Trace alone, write a plain-language summary per Run: what the Harness did, where it struggled and whose fault, and a one-line verdict. The Sandbox's `summarize.py` reads the same Trace shape and can be ported. It must work on a recorded Trace with no network."
+done_when = [
+  "A summary per Run, stored next to its Trace",
+  "Built from a recorded Trace offline",
+  "Shown in the Batch report and the web app",
+]
+refs = [
+  "docs/caption-design.md §2.3 (REQ-05)",
+  "src/clayzer/trace.py",
+  "README.md (The evaluation loop)",
+]
 
 [[task]]
 id = "replay"
+step = "report"
 title = "Recorded-Trace replay: rescore stored Captions without calling the Harness"
-area = "Sandbox integration"
+area = "Platform"
 tier = "Must"
 status = "todo"
 closes = ["REQ-09"]
 start = "batches/<id>/captions.jsonl"
+context = "The brief's fallback: a recorded Trace can be scored and reported with no model, MCP server, credentials, or network, with Judge verdicts replayed from saved results. `clayzer rescore` already re-scores stored Captions; extend it so reports rebuild fully offline, and prove it with the network off."
+done_when = [
+  "A Batch rescored and reported with the network disabled",
+  "Judge verdicts reused, not requested again",
+  "A test that runs with no AWS credentials",
+]
+refs = [
+  "docs/caption-design.md §2.3 (REQ-09)",
+  "src/clayzer/batch.py (rescore)",
+]
 
 [[task]]
 id = "iam"
+step = "ship"
 title = "Least-privilege IAM roles; no credentials in the repo"
-area = "Sandbox integration"
+area = "Platform"
 tier = "Must"
 status = "todo"
 closes = ["AWS-13"]
 start = "caption-plan.md §7 AWS service tasks"
+context = "Least-privilege, short-lived access (AWS-13): no credentials in the repo, a role per service (captioner, Judge, web app), and public access blocked on every bucket. Today everything runs as the Workshop participant role from `.env`."
+done_when = [
+  "Roles defined in the CDK app with only the actions each needs",
+  "No long-lived keys anywhere",
+  "The readiness check confirms every bucket blocks public access",
+]
+refs = [
+  "docs/caption-design.md §2.2 (AWS-13)",
+  "docs/caption-plan.md §7 (AWS service tasks)",
+]
 
 [[task]]
 id = "xray"
-title = "Export Traces through ADOT to X-Ray"
-area = "Sandbox integration"
+step = "capture"
+title = "Export Traces through ADOT to X-Ray: one span per Step, no prompt text or outputs"
+area = "Platform"
 tier = "Should"
 status = "todo"
 closes = ["AWS-05", "REQ-11"]
-start = "caption-plan.md §7 AWS service tasks"
+start = "caption-plan.md §7 AWS service tasks; the OpenTelemetry sink from tracing-swap"
+notes = "The ops view: latency, failures, and tokens across Runs. Spans carry model, latency, tokens, retries, and error codes; the S3 Traces stay the record (ADR-0001)."
+after = ["tracing-swap", "aws-observability-check"]
+context = "The AWS ops view: the OpenTelemetry sink exports through the ADOT collector to X-Ray, one span per Step, so latency, failures, and tokens show across Runs. Faults and Soft Failures appear as errors. The S3 Traces stay the record."
+done_when = [
+  "Spans for a Batch visible in X-Ray",
+  "Faults and Soft Failures marked as errors",
+  "No prompt text or outputs in spans",
+]
+refs = [
+  "docs/caption-plan.md §7 (AWS service tasks)",
+  "docs/caption-design.md §2.2 (AWS-05)",
+  "docs/adr/0001-own-trace-format-otel-is-an-export.md",
+]
 
 [[task]]
 id = "cdk"
+step = "ship"
 title = "CDK app for the stack, deployable into any teammate's account"
-area = "Sandbox integration"
+area = "Platform"
 tier = "Should"
-status = "todo"
+status = "doing"
 closes = ["AWS-07"]
-start = "caption-plan.md §7"
+start = "infra/app.py"
+notes = "Hosting stack (bucket, roles, Fargate, CloudFront) synths; ADOT collector still to add."
+context = "One CDK app creates the whole stack in any teammate's account (AWS-07): the bucket, IAM roles, the ADOT collector, and the web app service. `cdk synth` works without an account, so it can be drafted early."
+done_when = [
+  "`cdk deploy` succeeds in one account and a teammate deploys the same app in theirs",
+  "`cdk destroy` removes it",
+  "No account ids hard-coded",
+]
+refs = [
+  "docs/caption-design.md §2.2 (AWS-07)",
+  "docs/caption-plan.md §7 (AWS service tasks)",
+]
 
 [[task]]
-id = "app-runner"
-title = "Run the web app on App Runner so the demo is a live URL"
-area = "Sandbox integration"
+id = "hosting"
+step = "ship"
+title = "Run the web app on ECS Fargate behind CloudFront so the demo is a live URL"
+area = "Platform"
 tier = "Should"
-status = "todo"
+status = "doing"
 closes = ["AWS-08"]
-start = "caption-plan.md §7"
+start = "infra/app.py; README \"Hosting it on AWS\""
+notes = "App Runner is denied to the participant role (checked 2026-11-03), so Fargate it is."
 after = ["web-app", "cdk"]
+context = "The web app at a URL the judges can open (AWS-08): the container on ECS Fargate behind a load balancer, with CloudFront in front, read-only, reading that account's bucket."
+done_when = [
+  "A public URL serving the app read-only",
+  "Deployed by the CDK app",
+  "No credentials in the image",
+]
+refs = [
+  "docs/caption-design.md §2.2 (AWS-08)",
+  "docs/caption-plan.md §7 (AWS service tasks)",
+  "src/clayzer/ui/app.py",
+]
 
 [[task]]
 id = "gpu-quota"
+step = "ship"
 title = "Request a SageMaker GPU instance quota (can take a day or more)"
-area = "Sandbox integration"
+area = "Platform"
 tier = "Should"
 status = "todo"
 closes = ["AWS-04"]
 start = "Service Quotas console, us-west-2"
+context = "New accounts often have zero SageMaker GPU quota, and increases can take a day or more. Request it early in the account that will host the open-VLM endpoint (a g5 instance or similar, us-west-2)."
+done_when = [
+  "The quota request filed, with the instance type noted",
+  "Approved, or the fallback agreed (cost stays partial on Bedrock)",
+]
+refs = [
+  "docs/caption-plan.md §7 (Before kickoff)",
+  "docs/caption-plan.md §8",
+]
+
+[[task]]
+id = "trace-capture"
+step = "capture"
+title = "Capture every Step in the Trace: tool calls, arguments, sequence, failures and retries, latency, cost"
+area = "Platform"
+tier = "Must"
+status = "done"
+closes = ["REQ-04", "CAP-12"]
+start = "src/clayzer/trace.py; uv run clayzer trace <batch-id> <case-id>"
+notes = "Done 2026-11-04: one Trace per Run, every model call a Step with the full request and response, timing (wall and provider), tokens, retries and failed attempts, and error codes; Judge calls marked as scoring. Tool-call Steps are ready for the agentic Harness; GPU time is recorded once a self-hosted VLM exists (gpu-vlm)."
+context = "Done 2026-11-04: one Trace per Run in `batches/<id>/traces/`, every model call a Step with the full prompt and response, the image by key and hash, wall and provider latency, tokens, retries and failed attempts, and error codes; Judge calls marked as scoring."
+done_when = [
+  "`clayzer trace <batch-id> <case-id>` shows real Steps",
+]
+refs = [
+  "src/clayzer/trace.py",
+  "README.md (The evaluation loop)",
+  "docs/adr/0001-own-trace-format-otel-is-an-export.md",
+]
+
+[[task]]
+id = "fault-attribution"
+step = "capture"
+title = "Attribute each failed Step: Harness Fault, Environment Fault, or Soft Failure"
+area = "Platform"
+tier = "Must"
+status = "todo"
+closes = ["REQ-04", "REQ-06"]
+start = "ADR-0003; GLOSSARY.md (Harness Fault, Environment Fault, Soft Failure)"
+after = ["trace-capture"]
+context = "ADR-0003: each failed call is a Harness Fault (wrong dataset, guessed key, bad arguments; it lowers the Workflow Score) or an Environment Fault (network, TLS, timeouts, missing access; it doesn't). Classify from the response body, not just an error flag, because some servers report failures inside successful responses (Soft Failures). Unrecognized failures default to Harness Fault. Trace Steps already record error codes and HTTP status for this."
+done_when = [
+  "Every failed Step has an attribution (harness or environment), and Soft Failures are flagged",
+  "Rules for Bedrock errors and MCP tool responses, with tests",
+  "Counts per Run in the summary",
+]
+refs = [
+  "docs/adr/0003-errors-are-attributed-to-harness-or-environment.md",
+  "GLOSSARY.md (Harness Fault, Environment Fault, Soft Failure)",
+  "src/clayzer/trace.py",
+  "docs/caption-design.md §2.3 (REQ-04)",
+]
+
+[[task]]
+id = "tracing-swap"
+step = "capture"
+title = "Keep tracing behind an abstraction: our own Trace format, OpenTelemetry as an export, shown with two backends"
+area = "Platform"
+tier = "Must"
+status = "todo"
+closes = ["REQ-11"]
+start = "ADR-0001 (own Trace format; OTel is an export); src/clayzer/trace.py TraceSink"
+notes = "Hybrid, decided 2026-11-04: the S3 JSONL Trace is the record, an OpenTelemetry sink is the export. A local OTLP file or console proves two backends; X-Ray is the AWS one (xray)."
+after = ["trace-capture"]
+context = "Hybrid, decided 2026-11-04 (ADR-0001): the JSONL Trace in S3 is the record that scoring, replay, and the app read; an OpenTelemetry sink is an export for trace viewers. Add the sink behind `TraceSink` in trace.py. Spans follow the GenAI conventions but omit prompt text and outputs. Showing two backends proves the swappable requirement."
+done_when = [
+  "An OpenTelemetry sink next to the store sink",
+  "Spans per Step with model, latency, tokens, retries, error code; no prompt text or outputs",
+  "Shown with two backends (the store and an OTLP file or console)",
+  "Scoring never reads the OpenTelemetry output",
+]
+refs = [
+  "docs/adr/0001-own-trace-format-otel-is-an-export.md",
+  "src/clayzer/trace.py (TraceSink)",
+  "docs/caption-design.md §2.3 (REQ-11)",
+]
+
+[[task]]
+id = "aws-observability-check"
+step = "capture"
+title = "Check what the participant role allows: X-Ray, CloudWatch logs and metrics, Bedrock invocation logging, GenAI observability"
+area = "Platform"
+tier = "Must"
+status = "todo"
+closes = ["AWS-05", "AWS-06"]
+start = "aws sts get-caller-identity; try xray:PutTraceSegments, logs:PutLogEvents, cloudwatch:PutMetricData in one account"
+notes = "Do this before building on any of them: Workshop Studio roles may not allow them. Also check whether CloudWatch's generative-AI observability views (AgentCore) are available."
+context = "Workshop Studio participant roles may not allow every observability service. Before building on any of them, check in one account: X-Ray (`xray:PutTraceSegments`), CloudWatch logs and metrics (`logs:PutLogEvents`, `cloudwatch:PutMetricData`), Bedrock model invocation logging, and CloudWatch's generative-AI observability views (the AgentCore family)."
+done_when = [
+  "A short note in plan §7 of what the role allows",
+  "Anything denied marks the dependent tasks blocked",
+]
+refs = [
+  "docs/caption-plan.md §7 (AWS service tasks)",
+  "docs/caption-design.md §2.2 (AWS-05, AWS-06)",
+]
+
+[[task]]
+id = "cloudwatch-metrics"
+step = "capture"
+title = "CloudWatch metrics per Run: time to output, tokens, Harness and Environment Faults, Sandbox Failures"
+area = "Platform"
+tier = "Should"
+status = "todo"
+closes = ["AWS-06"]
+start = "caption-plan.md §7 AWS service tasks; a metrics sink next to the store sink in trace.py"
+notes = "Dashboards and alarms, e.g. the fault rate jumping after a prompt change."
+after = ["aws-observability-check", "fault-attribution"]
+context = "Per-Run measurements as CloudWatch metrics (AWS-06): time to output, tokens, GPU-seconds when self-hosted, Harness and Environment Faults, Sandbox Failures. Add a metrics sink next to the store sink in trace.py, so dashboards and alarms (e.g. the fault rate jumping after a prompt change) come for free."
+done_when = [
+  "Metrics published per Run with the Batch id as a dimension",
+  "A dashboard for one Batch",
+  "Nothing breaks when metrics are off",
+]
+refs = [
+  "docs/caption-design.md §2.2 (AWS-06)",
+  "src/clayzer/trace.py (TraceSink)",
+  "docs/caption-plan.md §7 (AWS service tasks)",
+]
+
+[[task]]
+id = "trace-link"
+step = "report"
+title = "Link each Run in the Clayzer app to its X-Ray trace (store the OpenTelemetry trace id in the Trace)"
+area = "Platform"
+tier = "Should"
+status = "todo"
+closes = ["AWS-05"]
+start = "RunInfo.metadata in src/clayzer/trace.py; the Run view in the web app"
+after = ["xray", "run-report"]
+context = "Ties the two halves of the hybrid together: store the OpenTelemetry trace id in each Run's Trace (`RunInfo.metadata`), so a Run's page in the web app links straight to its X-Ray trace."
+done_when = [
+  "The trace id saved in each Run's Trace",
+  "The Run view links to X-Ray",
+]
+refs = [
+  "src/clayzer/trace.py (RunInfo)",
+  "src/clayzer/ui/app.py",
+]
+
+[[task]]
+id = "bedrock-invocation-logging"
+step = "capture"
+title = "Turn on Bedrock model invocation logging as an independent cross-check on our Traces"
+area = "Platform"
+tier = "Could"
+status = "todo"
+closes = ["AWS-05"]
+start = "Bedrock console: Settings, Model invocation logging (to S3 or CloudWatch)"
+notes = "Account-wide, not per Run, so a cross-check rather than the record."
+after = ["aws-observability-check"]
+context = "Bedrock can log every model invocation in the account to S3 or CloudWatch. That's account-wide rather than per Run, so it's an independent cross-check on our Traces, not the record."
+done_when = [
+  "Logging on in one account",
+  "One Run's Trace matched to the logged invocations by request id",
+]
+refs = [
+  "docs/caption-design.md §2.2 (AWS-05)",
+  "src/clayzer/trace.py",
+]
+
+[[task]]
+id = "run-report"
+step = "report"
+title = "Per-Run evaluation report: the Trace summary, the Workflow Score, and the Output Score together"
+area = "Platform"
+tier = "Must"
+status = "doing"
+closes = ["REQ-08"]
+start = "src/clayzer/report_html.py"
+notes = "Batch reports exist and show each Repeat; the Trace summary and Workflow Score aren't in them yet."
+after = ["trace-summaries", "workflow-score"]
+context = "REQ-08: each scored Run gets a human-readable report (summary, scores with reasons, Steps, final answer) and a machine-readable one, from a live or a replayed Trace. Batch reports already show each Repeat's Caption, Claims, and Judge notes; missing are the Trace summary, the Steps, and the Workflow Score."
+done_when = [
+  "A per-Run page in the web app, and HTML and JSON in the store",
+  "Shows the summary, both scores with reasons, the Steps, and the Caption",
+  "Works from a replayed Trace",
+]
+refs = [
+  "docs/caption-design.md §2.3 (REQ-08)",
+  "src/clayzer/report_html.py",
+  "src/clayzer/ui/app.py",
+]
+
+[[task]]
+id = "ontology-in-code"
+step = "output"
+title = "Read OBJECTS, KEYED, the OSM mapping, and the retrieval QUERIES from the ontology instead of code lists"
+area = "Platform"
+tier = "Should"
+status = "todo"
+closes = ["CAP-10"]
+start = "src/clayzer/ontology.py"
+after = ["ontology-review"]
+context = "Today the code has its own lists (harness OBJECTS, grounding KEYED, answer_keys osm_object, retrieval QUERIES) and a test keeps them in step with the ontology. Read them from the ontology instead, so adding a class is a one-file change."
+done_when = [
+  "The four lists come from ontology/objects.toml",
+  "Adding a class in the file reaches the prompt, scoring, and retrieval",
+  "Tests updated",
+]
+refs = [
+  "docs/caption-design.md §3.5",
+  "src/clayzer/ontology.py",
+  "src/clayzer/harness.py",
+  "src/clayzer/grounding.py",
+  "src/clayzer/answer_keys.py",
+  "src/clayzer/retrieval.py",
+]
+
+[[task]]
+id = "step-functions"
+step = "ship"
+title = "Run the caption pipeline as a Step Functions workflow, fanning out over Chips"
+area = "Platform"
+tier = "Could"
+status = "todo"
+closes = ["AWS-09"]
+start = "docs/caption-design.md §2.2 (AWS-09)"
+after = ["cdk"]
+context = "For larger Batches, run Chips to Captions to scores to report as a managed workflow with a Distributed Map over Chips, instead of one process on a laptop."
+done_when = [
+  "A Batch runs as a Step Functions execution",
+  "Results land in the same store layout",
+]
+refs = [
+  "docs/caption-design.md §2.2 (AWS-09)",
+  "docs/caption-plan.md §7 (AWS service tasks)",
+]
 
 # ── Demo and delivery ───────────────────────────────────────────────────────────────────
 
 [[task]]
 id = "questions-for-clay"
+step = "ship"
 title = "Send the questions to Clay: example captions, retrieval sets, label prep, LGND limits"
 area = "Demo and delivery"
 tier = "Must"
 status = "todo"
 closes = ["CAP-07", "CAP-08", "CAP-13"]
 start = "caption-plan.md §9"
+context = "Answers take time, so send these early. Plan §9 lists them: what label preparation time means, the example captions and retrieval sets, LGND collections and usage limits, which VLMs and what GPU budget, Vantor vectors, RSICD, VRSBench, and LEVIR licensing, rubric weights, and the assumed caption-set import format."
+done_when = [
+  "Sent to Clay, with the date recorded in plan §9",
+  "Answers recorded in the plan as they arrive, and the blocked tasks updated",
+]
+refs = [
+  "docs/caption-plan.md §9",
+  "docs/caption-design.md §3.6 (Assumed import format)",
+]
 
 [[task]]
 id = "spec-pointers"
+step = "ship"
 title = "Point the Sandbox spec's REQ-C1/C2 at CAP-01 to CAP-19"
 area = "Demo and delivery"
 tier = "Must"
 status = "todo"
 closes = []
 start = "caption-plan.md §7 Before kickoff"
+context = "The Sandbox repo (breaking-barriers) still has old caption requirements REQ-C1 and REQ-C2 in its docs/spec.md. Replace them with pointers to CAP-01 to CAP-22 in this repo, and update its questions-for-clay caption section from plan §9."
+done_when = [
+  "REQ-C1 and REQ-C2 replaced by pointers",
+  "The Sandbox's caption questions match plan §9",
+]
+refs = [
+  "docs/caption-plan.md §7 (Before kickoff)",
+  "docs/caption-design.md §2.1",
+]
 
 [[task]]
 id = "demo-stories"
+step = "ship"
 title = "Caption demo Stories and the midday-freeze demo pack"
 area = "Demo and delivery"
 tier = "Must"
 status = "todo"
 closes = ["REQ-09"]
 start = "caption-plan.md §7 Day 2"
+context = "Stories are recorded Runs, each picked to show one point, that replay with no network. Freeze a scored Batch into the demo pack at midday on Day 2. Candidates: a terse Caption failing coverage, the gate rejecting a change, a Trace with a recovered failure, a look-alike negative, an imported caption set's verdict."
+done_when = [
+  "At least 5 Stories, each with a note of what it shows",
+  "All replay offline",
+  "Nothing in them identifies the machine, network, or organization (REQ-13)",
+]
+refs = [
+  "GLOSSARY.md (Story)",
+  "docs/caption-plan.md §7 (Day 2)",
+  "docs/caption-design.md §2.3 (REQ-09, REQ-13)",
+]
 
 [[task]]
 id = "readiness"
+step = "ship"
 title = "Readiness check: no disallowed services, licenses, nothing secret committed"
 area = "Demo and delivery"
 tier = "Must"
 status = "todo"
 closes = ["AWS-12", "REQ-13", "REQ-17"]
 start = "caption-plan.md §7"
+
+context = "A check before the demo and before handing over: no disallowed services (no HyperPod, Trainium clusters, cross-account deployment, or warehouse), licenses respected (RSICD and other benchmarks never committed, ODbL notice on OSM-derived files), Apache-2.0 LICENSE present, nothing secret committed (.env ignored; no hostnames or account ids)."
+done_when = [
+  "A readiness command or checklist that passes",
+  "LICENSE (Apache-2.0) in the repo",
+  "The leak scan is clean",
+]
+refs = [
+  "docs/caption-design.md §2.2 (AWS-12)",
+  "docs/caption-design.md §2.3 (REQ-13, REQ-15, REQ-17)",
+  "docs/caption-plan.md §3",
+]
+
+[[task]]
+id = "imported-story"
+step = "ship"
+title = "A demo Story: an imported caption set (RSICD standing in for Clay's) with its verdict and card"
+area = "Demo and delivery"
+tier = "Must"
+status = "todo"
+closes = ["CAP-20", "CAP-21", "CAP-22"]
+start = "docs/caption-plan.md §7 (Caption data evaluation tasks)"
+after = ["score-imported"]
+context = "The pitch in one sentence: give us your caption set, and we tell you how much of it you can trust, where it fails, and what it costs to make better. Show it with RSICD converted to the import format standing in for Clay's data."
+done_when = [
+  "A Story that replays offline",
+  "Shows the verdict and, if built, the card",
+]
+refs = [
+  "docs/caption-design.md §3.6",
+  "GLOSSARY.md (Story)",
+]
+
