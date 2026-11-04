@@ -1392,10 +1392,10 @@ step = "ship"
 title = "CDK app for the stack, deployable into any teammate's account"
 area = "Platform"
 tier = "Should"
-status = "doing"
+status = "done"
 closes = ["AWS-07"]
 start = "infra/app.py"
-notes = "The hosting stack (roles, Fargate, load balancer, CloudFront; the bucket imported or created) is deployed in one participant account. Waiting on a teammate deploying it in theirs, and on a checked `cdk destroy`. The ADOT collector moved to xray (2026-11-04)."
+notes = "Deployed in two participant accounts. In the second (2026-11-04), `cdk destroy` removed everything but the retained bucket, a fresh deploy came back, and CI now deploys main into it. A redeploy after destroy creates a new bucket, so pass `-c store=` once a store holds data. The ADOT collector moved to xray (2026-11-04)."
 context = "One CDK app creates the whole stack in any teammate's account (AWS-07): the bucket, IAM roles, and the web app service; xray adds the ADOT collector to it. `cdk synth` works without an account, so it can be drafted early."
 done_when = [
   "`cdk deploy` succeeds in one account and a teammate deploys the same app in theirs",
@@ -1405,6 +1405,12 @@ done_when = [
 refs = [
   "docs/caption-design.md §2.2 (AWS-07)",
   "docs/caption-plan.md §7 (AWS service tasks)",
+]
+see_it = "docs/deploy.md: the manual deploy step by step; the stack's Url output is the hosted site."
+changes = [
+  "infra/app.py: credential-free synth (`-c cloudfront_prefix_list=`), ClusterName and ServiceName outputs, and a project=clayzer tag on every resource",
+  "infra/github_oidc.py: the role CI deploys with, trusting only this repo's `aws` environment",
+  "docs/deploy.md: the manual deploy, what each step becomes in CI, and what to watch",
 ]
 
 [[task]]
@@ -1708,7 +1714,7 @@ step = "ship"
 title = "GitHub Actions CI: lint, format, tests, and the deck smoke test on every push and PR"
 area = "Platform"
 tier = "Should"
-status = "doing"
+status = "done"
 start = ".github/workflows/ci.yml (new)"
 context = "Six people push to one public repo, and today nothing checks a PR before it merges. A GitHub Actions workflow runs on every push and pull request: `uv run ruff check src tests`, `uv run ruff format --check src tests`, `uv run pytest` with the `ui` and `tools` extras, and `node tests/deck_smoke.mjs`. The tests already run offline (fake Bedrock, local MCP servers), so CI needs no AWS credentials and gets none. uv.lock is gitignored because a local one records a private package index, so CI resolves from public PyPI; decide whether to commit a lock generated against public PyPI so CI and laptops install the same versions. Once the readiness check exists, run its leak scan here too."
 done_when = [
@@ -1722,6 +1728,13 @@ refs = [
   "tests/deck_smoke.mjs",
   "README.md",
   ".gitignore",
+]
+notes = "Pushes run CI only on main; branches get their checks from their PR. The deploy job runs on pushes to main and by hand, in the `aws` environment, which still needs a branch rule limiting it to main (repo admin). uv.lock stays uncommitted."
+see_it = "The CI badge at the top of the README, and Actions → CI: the five jobs on every push to main."
+changes = [
+  ".github/workflows/ci.yml: lint (ruff, bugbear, complexity, vulture), tests with 75% coverage, the deck smoke test and duplication, credential-free cdk synth and OIDC trust tests, and a deploy job over GitHub's OIDC with a check of the live URL",
+  ".nvmrc: Node 24 for CI and laptops",
+  "README.md: the CI badge and the checks to run before a PR",
 ]
 
 # ── Demo and delivery ───────────────────────────────────────────────────────────────────
