@@ -103,7 +103,7 @@ function Demo() {
 function Downstream() {
   return html`<div class="arch-slide">
     <${Kicker}>Downstream value<//>
-    <h2>How our captions make Clay v2 better</h2>
+    <h2>Checked captions, searchable imagery</h2>
     <${ValueFlow} />
   </div>`;
 }
@@ -143,8 +143,8 @@ export const SLIDES = [
     spoken: "Now the site. The overview shows the current baseline. A caption, with each claim marked supported or not, right on the image. The report, five criteria side by side, which can read itself aloud. And compare to baseline: the gate says better, worse, or inconclusive.",
     notes: ["Overview → a Caption on its grid → report and Listen → Compare.", "Keep the recorded Batch open as the offline fallback."] },
   { title: "Downstream value", seconds: 30, component: Downstream,
-    spoken: "Why this matters for Clay. Clay v2 learns from satellite images paired with captions. Imagery and public records go into Clayzer. We write each caption from the image alone, then check every fact against the records. Only pairs that pass go on to Clay v2, so it learns from captions that are true. That is what lets it search the Earth in words, like find solar farms, at the scale of fifteen billion embeddings.",
-    notes: ["Left to right: public data, Clayzer (our part, the dashed box), Clay v2.", "The line to land: a caption that miscounts never becomes a lesson Clay v2 learns.", "The dashed loop back is planned, not built: say 'next'."] },
+    spoken: "Why this matters for Clay. Imagery and public records go into Clayzer. We write each caption from the image alone, then check every fact against the records. Only pairs that pass go on to Clay, which makes the imagery searchable in words. Search for floods in Thailand, and you get the images whose captions say so. That search is only as good as the captions, and that is what we check.",
+    notes: ["Left to right: public data, Clayzer (our part, the dashed box), Clay.", "The line to land: search results are only as good as the captions behind them.", "The Thailand flood search is an illustration: our Cases today are US solar, wind and land cover. Don't imply we have run it.", "The dashed loop back is planned, not built: say 'next'."] },
   { title: "What it means for Clay", seconds: 20, theme: "dark", component: Next,
     spoken: "Hand Clayzer a caption set and get a verdict: how much to trust, where it fails, what it costs to fix. Our ask is Clay's real caption set and its rubric weights. And any slide here reads itself aloud.",
     notes: ["Close on the ask: Clay's real caption set and its rubric weights.", "Mention Listen (A) as the accessibility point."] },
