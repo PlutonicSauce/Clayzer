@@ -141,7 +141,7 @@ function Deck() {
         ${canSpeak && html`<button class="speak" title="Read this slide aloud (A)"
           aria-label="Read this slide aloud"
           onClick=${(e) => { e.stopPropagation(); speechSynthesis.speaking ? stopSpeaking() : readAloud(); }}>
-          &#9658; Listen</button>`}
+          ${"\u25BA"} Listen</button>`}
       </div>
     </div>
     ${notes && html`<${Notes} i=${i} elapsed=${elapsed} running=${running} />`}`;

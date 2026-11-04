@@ -1,14 +1,14 @@
-// The 8-minute pitch. One entry per slide: a title, a time budget in seconds (they add up to
-// 8:00; the notes panel warns when a slide runs long), presenter notes, a plain-language `spoken`
+// The 4-minute pitch. One entry per slide: a title, a time budget in seconds (they add up to
+// 4:00; the notes panel warns when a slide runs long), presenter notes, a plain-language `spoken`
 // script read aloud by the A key (accessibility), and the component.
 //
-// Numbers come from the committed Baseline (baselines/default/summary.json): base-v2, Nova Pro
-// captions judged by Opus 5.5, 4 dev Cases × 3 Repeats, all 12 Runs ok. Scale figures (15.2B
-// embeddings, ~99 MCP servers) are from the hackathon brief. Re-quote from a committed Baseline
-// if the scores change, never from a one-off Run.
+// Scores aren't quoted on a slide: the demo opens the live Overview, which reads the committed
+// Baseline. The caption example is a real Run (see caption-example.js). Scale figures (15.2B
+// embeddings) are from the hackathon brief.
 
 import { html } from "./html.js";
 import { StoryArchitecture } from "./diagram.js";
+import { CaptionExample } from "./caption-example.js";
 
 const Kicker = ({ children }) => html`<p class="kicker">${children}</p>`;
 
@@ -85,13 +85,12 @@ function Approach() {
 function Demo() {
   return html`<div>
     <${Kicker}>Live demo · the proof<//>
-    <h2>One Batch, from image to verdict</h2>
+    <h2>The site, in four stops</h2>
     <ol class="demo-script">
-      <li><b>A Case.</b> The image and what open data says is really there.</li>
-      <li><b>Its Caption.</b> Each Claim marked supported or not, on the 3 × 3 grid — see it, don't
+      <li><b>Overview.</b> The current Baseline: every Case, every Repeat, scored.</li>
+      <li><b>A Caption.</b> Each Claim marked supported or not, on the 3 × 3 grid — see it, don't
         read it.</li>
-      <li><b>The report.</b> Five criteria side by side, averaged over repeats.</li>
-      <li><b>The dataset card.</b> Where captions go wrong — a greenhouse called a solar array.</li>
+      <li><b>The report.</b> Five criteria side by side, and a Listen button that reads it aloud.</li>
       <li><b>Compare to Baseline.</b> The gate says better, worse, or inconclusive.</li>
     </ol>
     <p class="source">Live here: <a href="./">Overview</a> · <a href="./#/batches">Batches</a> ·
@@ -99,83 +98,42 @@ function Demo() {
   </div>`;
 }
 
-function Results() {
-  return html`<div>
-    <${Kicker}>Results · committed Baseline base-v2<//>
-    <h2>What we measured</h2>
-    <div class="criteria">
-      <div class="criterion"><b>0.58</b><p>Grounding correctness</p></div>
-      <div class="criterion"><b>0.67</b><p>Grounding coverage</p></div>
-      <div class="criterion"><b>0.54</b><p>Fidelity (Opus judge)</p></div>
-      <div class="criterion"><b>0.89</b><p>Retrieval MRR, ±0.02</p></div>
-      <div class="criterion"><b>3.9 s</b><p>per Caption on Bedrock</p></div>
-    </div>
-    <p class="big">The gate caught a vague one-Claim prompt that looked good on correctness but
-      collapsed on coverage (0.67 → 0.27) — the "say less to score higher" trap, stopped before it
-      became the Baseline. That is the eval doing its job.</p>
-    <p class="source">4 dev Cases × 3 Repeats, 12 of 12 Runs clean. Each rate is on its own;
-      weights are Clay's to set. From a committed Baseline, not a one-off Run.</p>
-  </div>`;
-}
-
-function Scale() {
-  return html`<div>
-    <${Kicker}>Scale &amp; impact<//>
-    <h2>Built to grow from 12 Runs to 15 billion</h2>
-    <div class="criteria">
-      <div class="criterion"><b>15.2B</b><p>embeddings Clay has already published — the scale its
-        captions must reach</p></div>
-      <div class="criterion"><b>Serverless</b><p>Bedrock, S3, and Step Functions fan out over
-        Chips; no server to outgrow</p></div>
-      <div class="criterion"><b>Cheap checks first</b><p>grounding and duplication run on the whole
-        set; the costly LLM judge only on a sample</p></div>
-      <div class="criterion"><b>Any caption set</b><p>point it at anyone's captions — ours, or
-        Clay's own pipeline — for a verdict, failure modes, and cost, no retraining</p></div>
-    </div>
-    <p class="big">The impact: Clay can trust a caption set before training on it, instead of
-      finding out after a continental-scale run. And the ontology learned on the way makes the
-      next batch of captions better — a loop that compounds, not a one-off score.</p>
-  </div>`;
-}
-
 function Next() {
   return html`<div class="title-slide closing">
     <${Kicker}>What it means for Clay<//>
     <h2>Trust your captions before you train on them</h2>
-    <p class="lede">On Monday: hand Clayzer a caption set, get a verdict — how much to trust,
-      where it fails, what it costs to fix. Point it at Clay's own pipeline next.</p>
+    <p class="lede">Hand Clayzer a caption set, get a verdict: how much to trust, where it fails,
+      what it costs to fix. It's serverless, with cheap checks on every caption and the costly
+      judge on a sample, so it grows toward the 15.2 billion embeddings Clay has published.</p>
     <p class="team">The ask: Clay's real caption set and its rubric weights, so the verdict is
       Clay's, not our stand-in's.</p>
     <p class="access-note">Any slide reads itself aloud — press <b>A</b> or the Listen button.</p>
   </div>`;
 }
 
-// Eight slides, exactly 8:00. The story architecture, the three novel ideas, scale, and the
-// demo each get their own slide; writing + scoring + originality are merged into Approach, and
-// the accessibility note rides on the closing slide (the Listen feature is on every slide).
+// Seven slides, exactly 4:00: problem, one real caption and its answer key, the architecture as
+// a story, the novel ideas, the site, and the close. Results and scale ride on the demo's live
+// Overview and the closing slide.
 export const SLIDES = [
-  { title: "Clayzer", seconds: 25, theme: "dark", component: Title,
-    spoken: "Clayzer. Give us your caption set, and we tell you how much of it you can trust, where it fails, and what it costs to make better.",
-    notes: ["Say the one-line pitch, then move on.", "8:00 total. T starts the timer, A reads a slide aloud."] },
-  { title: "The problem", seconds: 55, component: Problem,
-    spoken: "Clay's new model learns from written descriptions of satellite images that nobody has checked. In a real run, a caption described a wind farm with turbines to the north. The official database says sixteen turbines, to the south. Wrong count, wrong place. That kind of plausible, wrong caption quietly poisons training.",
-    notes: ["Read the wrong caption, then the answer key: 16 turbines, south.", "Make it concrete — this is the hook."] },
-  { title: "How it works", seconds: 75, component: Architecture,
-    spoken: "Here is the whole journey. One aerial image comes in on the left. Step one, a model on AWS writes a caption. Step two, before each statement is kept, we check it against the imagery. Step three, we score it against open map data the model never saw. Step four, a gate decides whether it is good enough. What comes out on the right is a verdict you can trust. The same path works for one image or a million.",
-    notes: ["Walk it as a story: one image in on the left, a verdict out on the right.", "Point at each numbered stop. End on: same path scales to millions."] },
-  { title: "Our approach · what's new", seconds: 70, component: Approach,
-    spoken: "Three things set this apart from a plain prompt. First, verify-then-write: each claim is checked against imagery as the caption is written, so wrong claims are dropped, not graded after. Second, the captioner never sees the answer keys, so a good score is earned. Third, and this is the differentiator: our object vocabulary is learned from a caption corpus and fed back into the model, so it confuses a greenhouse for a solar array less often. The ontology both scores captions and teaches the next ones — a loop, proven by the gate.",
-    notes: ["Originality: verify-then-write, hidden keys, and the ontology that feeds the model.", "The loop is the story: the ontology scores AND teaches. Proven by the gate, not asserted.", "Honest: the A/B/C comparison number is pending real Clay embeddings."] },
-  { title: "Live demo", seconds: 100, component: Demo,
-    spoken: "Now the proof. A case: the image and what is really there. Its caption, with each claim marked supported or not, right on the image. The report, five criteria side by side. The dataset card, showing where captions go wrong. And compare to baseline: the gate says better, worse, or inconclusive.",
-    notes: ["The core of the pitch. Case → Caption → report → dataset card → gate.", "Keep the recorded Batch open as the offline fallback."] },
-  { title: "Results", seconds: 50, component: Results,
-    spoken: "On our committed baseline: correctness zero point five eight, coverage zero point six seven, fidelity zero point five four, retrieval zero point eight nine. The headline: the gate caught a vague prompt whose coverage collapsed from zero point six seven to zero point two seven, and stopped it. That is the evaluation doing its job.",
-    notes: ["Numbers from the committed Baseline base-v2.", "Lead with the gate catching the vague prompt: coverage 0.67 → 0.27."] },
-  { title: "Scale & impact", seconds: 60, component: Scale,
-    spoken: "Will it scale? Clay has already published fifteen point two billion embeddings — that is the scale its captions must reach. Everything here is serverless: Bedrock, S3, and Step Functions fan out over images with no server to outgrow. Cheap checks run on the whole set; the costly judge only on a sample. Point it at any caption set, including Clay's own pipeline. The impact: Clay can trust a set before training on it, and the ontology it learns makes the next batch better — a loop that compounds.",
-    notes: ["Answer scale head on: 15.2B embeddings is the target; serverless fan-out.", "Impact + loop: a bad caption caught here is a lesson never learned; the ontology compounds."] },
-  { title: "What it means for Clay", seconds: 45, theme: "dark", component: Next,
-    spoken: "What it means for Clay: hand Clayzer a caption set, get a verdict — how much to trust, where it fails, what it costs to fix. Then point it at Clay's own pipeline. Our ask is Clay's real caption set and its rubric weights. And any slide here reads itself aloud — press A.",
-    notes: ["Close on the ask: Clay's real caption set and its rubric weights.", "Mention the Listen feature (A) as the accessibility point."] },
+  { title: "Clayzer", seconds: 10, theme: "dark", component: Title,
+    spoken: "Clayzer. Give us your caption set, and we tell you how much of it you can trust.",
+    notes: ["One line, then move on.", "4:00 total. T starts the timer, A reads a slide aloud."] },
+  { title: "The problem", seconds: 25, component: Problem,
+    spoken: "Clay's new model learns from written descriptions of satellite images that nobody has checked. In a real run, a caption put a wind farm's turbines to the north. The official database says sixteen turbines, to the south. Plausible, and wrong.",
+    notes: ["Read the wrong caption, then the answer key: 16 turbines, south.", "Keep it short: the next slide shows a full example."] },
+  { title: "What a caption looks like", seconds: 40, component: CaptionExample,
+    spoken: "Here is one real caption. The model saw only this photo and wrote that there are eighteen wind turbines, then listed its facts. We grade those facts against public records. But the records disagree: the government turbine database lists seventeen, and OpenStreetMap has an eighteenth in the corner. The photo shows it. So no single source is the truth. We checked every image by eye and keep the fixes in one file. This caption got the count right and the position wrong.",
+    notes: ["Left to right: the photo, what Nova Pro wrote from it alone, the records it is graded against.", "USGS missed a turbine OpenStreetMap had: no single source is the truth.", "Say both: count right, position wrong."] },
+  { title: "How it works", seconds: 45, component: Architecture,
+    spoken: "Here is the whole journey. One aerial image comes in on the left. A model on AWS writes a caption. Before each statement is kept, we check it against the imagery. We score it against open map data the model never saw. A gate decides whether it is good enough. What comes out is a verdict you can trust, and the same path works for one image or a million.",
+    notes: ["One image in on the left, a verdict out on the right.", "Point at each numbered stop. End on: same path scales to millions."] },
+  { title: "Our approach · what's new", seconds: 40, component: Approach,
+    spoken: "Three things set this apart. Verify-then-write: each claim is checked against imagery as the caption is written. Hidden answer keys: the captioner never sees the ground truth, so a good score is earned. And an ontology learned from captions and fed back into the model, so it confuses a greenhouse for a solar array less often. It scores captions and teaches the next ones.",
+    notes: ["Verify-then-write, hidden keys, the ontology that feeds the model.", "The loop: the ontology scores AND teaches, proven by the gate."] },
+  { title: "Live demo", seconds: 50, component: Demo,
+    spoken: "Now the site. The overview shows the current baseline. A caption, with each claim marked supported or not, right on the image. The report, five criteria side by side, which can read itself aloud. And compare to baseline: the gate says better, worse, or inconclusive.",
+    notes: ["Overview → a Caption on its grid → report and Listen → Compare.", "Keep the recorded Batch open as the offline fallback."] },
+  { title: "What it means for Clay", seconds: 30, theme: "dark", component: Next,
+    spoken: "Hand Clayzer a caption set and get a verdict: how much to trust, where it fails, what it costs to fix. It is serverless, so it grows to Clay's scale. Our ask is Clay's real caption set and its rubric weights. And any slide here reads itself aloud.",
+    notes: ["Close on the ask: Clay's real caption set and its rubric weights.", "Mention Listen (A) as the accessibility point."] },
 ];
