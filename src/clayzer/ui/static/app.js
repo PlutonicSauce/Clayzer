@@ -35,66 +35,90 @@ const STATUS = {
 const statusBadge = (s) => `<span class="badge ${STATUS[s]?.[0] || "b-na"}">${esc(STATUS[s]?.[1] || s)}</span>`;
 const AREA_CLASS = {
   "Data and Cases": "area-data", Captioning: "area-captions", Evaluation: "area-evaluation",
-  "Sandbox integration": "area-platform", "Demo and delivery": "area-delivery",
+  Platform: "area-platform", "Demo and delivery": "area-delivery",
 };
 const AREAS = Object.keys(AREA_CLASS);
 
 // ── The workflow, one step at a time ─────────────────────────────────────────────────────
 
+// The phases, in order. `core` marks the brief's "heart of the build": observe, summarize,
+// score, report.
+const PHASES = [
+  { key: "prepare", label: "Prepare" },
+  { key: "run", label: "Run" },
+  { key: "observe", label: "Observe", core: true },
+  { key: "score", label: "Score", core: true },
+  { key: "report", label: "Report", core: true },
+  { key: "improve", label: "Improve" },
+  { key: "ship", label: "Ship" },
+];
+
+// Each task in docs/tasks.toml names its step with `step = "<key>"`.
 const FLOW = [
   {
-    key: "case", title: "Case", sub: "a Chip and its Reference Labels", area: "Data and Cases",
-    what: `A ${term("Case")} is one unit of work: a 512 × 512 px ${term("Chip")} of NAIP imagery (0.6 m, about 300 m across) plus the ${term("Reference Label", "Reference Labels")} a good ${term("Caption")} would agree with. Positives are cut around a USGS solar site or wind turbine; negatives are places USGS has nothing near. OSM adds roads, buildings, water, and land use.`,
-    why: `Grounding needs something true to compare Claims against. The labels come from ${term("Answer Key", "Answer Keys")} (USGS, OSM) and are hidden from the Harness (ADR-0006): a Harness that could read them would score well by copying.`,
+    key: "case", phase: "prepare", title: "Case", sub: "a Chip and its Reference Labels", area: "Data and Cases",
+    what: `A ${term("Case")} is one unit of work: a 512 × 512 px ${term("Chip")} of NAIP imagery (0.6 m, about 300 m across) plus the ${term("Reference Label", "Reference Labels")} a good ${term("Caption")} would agree with. Positives are cut around a USGS solar site or wind turbine, offset so the site can land in any grid cell; negatives are places USGS has nothing near. OSM adds roads, buildings, water, and land use.`,
+    why: `Scoring needs something true to compare against. The labels come from ${term("Answer Key", "Answer Keys")} (USGS, OSM) and are hidden from the Harness (ADR-0006): a Harness that could read them would score well by copying.`,
     code: ["uv run clayzer case uspvdb <site-id>", "src/clayzer/cases.py", "src/clayzer/answer_keys.py"],
-    tasks: ["dev-cases", "lookalike-negatives", "fixtures", "texas-cases"],
   },
   {
-    key: "harness", title: "Harness", sub: "Chip in, Caption out", area: "Captioning",
-    what: `The ${term("Harness")} is the system under test. Today it's one Nova Pro call that sees only the Chip and returns a Caption: free text plus structured ${term("Claim", "Claims")}, each an object, a count, a cell of the 3×3 grid, and relations from a fixed vocabulary (ADR-0007).`,
-    why: "Claims in a fixed format are what make grounding checkable by code; the text is the training data for Clay v2.",
-    code: ["src/clayzer/harness.py", "caption-plan.md §5.2 (Caption format)"],
-    tasks: ["skeleton", "prompt-loop", "second-captioner"],
+    key: "harness", phase: "run", title: "Harness", sub: "an agent with geospatial tools", area: "Captioning",
+    what: `The ${term("Harness")} is the system under test: the model, its prompt, and its tools. Today it is one Nova Pro call that sees only the Chip and returns a Caption with ${term("Claim", "Claims")} on the 3×3 grid. The goal is an agent that calls geospatial tools over MCP before it writes: LGND Geo's imagery check and classifiers, STAC catalogs, RODA. Only tools on the ADR-0006 list are allowed.`,
+    why: "The briefs' first success criterion is a Harness that performs the task by calling geospatial tools via MCP, and tool calls are what give the Workflow Score something to judge. The model sits behind an abstraction so it can be swapped (Nova Pro, Opus 5.5, an open VLM on a GPU).",
+    code: ["src/clayzer/harness.py", "caption-plan.md §1.3 (verify, then write)", "caption-plan.md §3 (allowed and forbidden MCP servers)"],
   },
   {
-    key: "verify", title: "Verify, then write", sub: "check Claims before committing", area: "Captioning",
-    what: "Planned: the Harness drafts Claims, checks each with LGND Geo's imagery check at its grid cell over MCP, and writes the Caption only from Claims that passed; the rest go in “uncertain”.",
-    why: "Fewer false Claims means better grounding, and verification calls show up in the Trace, so the Run gets a Workflow Score. The verifier is never an Answer Key and never used to score.",
-    code: ["caption-plan.md §1.3", "LGND Geo: reasoning_imagery_check"],
-    tasks: ["lgnd-client", "verify-then-write"],
+    key: "capture", phase: "observe", title: "Capture", sub: "record every Step in a Trace", area: "Platform",
+    what: `Every ${term("Run")} is recorded as a ${term("Trace")}: one ${term("Step")} per model turn or tool call, in order, with its arguments, result, failures and retries, latency, and cost. For captions, cost means GPU time and GPU count and size, not tokens; Bedrock only reports time and tokens, so cost stays partial there. Traces are kept in the store, so a Run can be judged later without running it again.`,
+    why: "Clay's ask is to evaluate agentic workflows, and what isn't recorded can't be evaluated. Every model call is now a Step with its full prompt and response, timing, tokens, retries, and error codes, and Judge calls are marked as scoring. Tool-call Steps arrive with the agentic Harness. The Trace format is ours and OpenTelemetry is an export (ADR-0001), so the tracing tool stays swappable.",
+    code: ["batches/<batch-id>/traces/<case-id>--r<repeat>.jsonl", "src/clayzer/trace.py", "uv run clayzer trace <batch-id> <case-id>", "ADR-0001 (Trace format), ADR-0003 (fault attribution)"],
   },
   {
-    key: "score", title: "Score", sub: "five criteria, each on its own", area: "Evaluation",
-    what: "Grounding compares Claims with Reference Labels in code, as two numbers: correctness (of what the Caption claimed, how much is right: precision, count, position, attributes, relations) and coverage (how much of the Answer Key it mentions). Fidelity: Opus 5.5 looks at the image and the Caption. Retrieval: can a text query (“find solar farms”) find the right Caption, using Titan embeddings. Plus label preparation time and cost (partial on Bedrock).",
-    why: "These are Clay's five rubric criteria. Weights aren't set, so each is reported separately. Grounding is split so a terse-but-right Caption and a detailed-but-sloppy one look different instead of averaging to the same number.",
+    key: "summarize", phase: "observe", title: "Summarize", sub: "what the agent did, where it struggled", area: "Platform",
+    what: "Each raw Trace becomes a short, readable account of the Run: which tools the Harness called and why, which Claims it verified or dropped, what failed, and whether it recovered.",
+    why: "Clay's explicit ask is to “summarize traces from agentic activity”. A summary is what a person reads before trusting a score, and what a Proposer would read to suggest the next change.",
+    code: ["batches/<batch-id>/traces/", "the Sandbox's summarize.py (to port)"],
+  },
+  {
+    key: "workflow", phase: "score", title: "Workflow Score", sub: "how it worked, from the Trace", area: "Evaluation",
+    what: `The first of the brief's two scores: how well the Harness worked, judged from its Trace alone and without a model call. Were the right tools called in a sensible order, were failed calls recovered, and how many Steps and how much cost did it take against the Case's budget? ${term("Environment Fault", "Environment Faults")} (network, access) don't count against it; ${term("Harness Fault", "Harness Faults")} do.`,
+    why: "A Caption can come out right by luck or by a wasteful path. The Workflow Score tells them apart, and it only exists once the Harness calls tools.",
+    code: ["the Sandbox's scoring/workflow.py (to port)", "ADR-0003"],
+  },
+  {
+    key: "output", phase: "score", title: "Output Score", sub: "what it produced, on five criteria", area: "Evaluation",
+    what: "The second score: the final Caption against references, on Clay's five criteria, each reported on its own. Grounding is two numbers against the Answer Keys: correctness (of what was claimed, how much is right) and coverage (how much of the Answer Key was mentioned). Fidelity: Opus 5.5 looks at the image and the Caption. Retrieval: can a text query find the right Caption, with Titan embeddings. Plus label preparation time and cost. Clay's example captions and retrieval set slot in when they arrive; RSICD and VRSBench add outside benchmarks.",
+    why: "Grounding is the criterion Clay ranked most important. It's split in two so a terse-but-right Caption and a detailed-but-sloppy one look different instead of averaging to the same number.",
     code: ["src/clayzer/grounding.py", "src/clayzer/judge.py", "src/clayzer/retrieval.py"],
-    tasks: ["grounding-fix", "rsicd", "label-prep", "workflow-score"],
   },
   {
-    key: "batch", title: "Batch", sub: "every Case × Repeats", area: "Evaluation",
-    what: `A ${term("Run")} is one Harness execution on one Case. A ${term("Batch")} runs every Case several times (${term("Repeat", "Repeats")}) under one fixed configuration, and reports each Case's mean and ${term("Spread")}.`,
+    key: "report", phase: "report", title: "Report", sub: "summary and both scores, per Run", area: "Platform",
+    what: "One evaluation report per Run that puts its Trace summary, Workflow Score, and Output Score together; Batch reports roll the Runs up. If the live Harness misbehaves, recorded Traces and Captions are replayed through scoring, so a report, and the demo, never depend on a live run.",
+    why: "The report is what a practitioner or partner reads. The replay fallback is a brief Must: it keeps the demo safe.",
+    code: ["src/clayzer/report_html.py", "uv run clayzer rescore <batch-id> (replays stored Captions through scoring)", "uv run clayzer ui"],
+  },
+  {
+    key: "batch", phase: "improve", title: "Batch & Compare", sub: "every Case × Repeats, side by side", area: "Evaluation",
+    what: `A ${term("Batch")} runs every Case several times (${term("Repeat", "Repeats")}) under one fixed configuration and reports each Case's mean and ${term("Spread")}. Compare puts two Batches side by side: which settings differ (prompt, model, tools), and how every criterion moved, overall and per Case.`,
     why: "Captions differ from Run to Run: Pine Tree Solar scored 0.70, 0.43, and 0.88 in three identical Runs. One Run can't tell a better prompt from luck.",
-    code: ["uv run clayzer batch --repeats 3 --label <change>", "src/clayzer/batch.py"],
-    tasks: ["eval-loop"],
+    code: ["uv run clayzer batch --repeats 3 --label <change>", "uv run clayzer compare <a> <b>", "src/clayzer/batch.py"],
   },
   {
-    key: "compare", title: "Compare", sub: "what changed, by how much", area: "Evaluation",
-    what: "Two Batches side by side: which settings differ (prompt, model…), and the change in every criterion, overall and per Case, next to the Spread.",
-    why: "A change only counts if it moves scores by more than run-to-run variation. A different Judge or Case set is flagged: those change the measuring stick, not the captioner.",
-    code: ["uv run clayzer compare <a> <b>", "src/clayzer/gate.py"],
-    tasks: ["eval-loop"],
-  },
-  {
-    key: "gate", title: "Regression gate", sub: "keep or reject the change", area: "Evaluation",
-    what: `The candidate Batch against the accepted ${term("Baseline")}. A Case regresses when its correctness, coverage, or fidelity drops more than max(0.05, the Baseline's Spread). Exit 0 pass, 1 fail, 2 inconclusive (Sandbox Failures).`,
+    key: "gate", phase: "improve", title: "Regression gate", sub: "keep or reject the change", area: "Evaluation",
+    what: `The candidate Batch against the accepted ${term("Baseline")}. A Case regresses when its correctness, coverage, or fidelity drops more than max(0.05, the Baseline's Spread). Exit 0 pass, 1 fail, 2 inconclusive. Next, saved for later: a Proposer that reads a failure digest, proposes one change to the prompt, model, or tools, and lets the gate decide.`,
     why: "This is the improvement loop the pitch rests on: every change to the captioner is measured and kept only if nothing got worse.",
-    code: ["uv run clayzer baseline accept <id>", "uv run clayzer gate <id>"],
-    tasks: ["eval-loop", "gate-rule"],
+    code: ["uv run clayzer baseline accept <id>", "uv run clayzer gate <id>", "src/clayzer/gate.py"],
+  },
+  {
+    key: "ship", phase: "ship", title: "Ship", sub: "AWS, demo, readiness", area: "Demo and delivery",
+    what: "Put it where Clay can use it: least-privilege IAM, a CDK stack any teammate can deploy, the app at a live URL, a GPU quota for open VLMs, the demo Stories, the questions for Clay, and a readiness check (no disallowed services, licenses respected, nothing secret committed).",
+    why: "The judges score technical execution and AWS integration, and Clay needs to run this after the event.",
+    code: ["caption-plan.md §7 (AWS service tasks)", "README.md"],
   },
 ];
 
 function stepState(step, tasks) {
-  const mine = tasks.filter((t) => step.tasks.includes(t.id));
+  const mine = tasks.filter((t) => t.step === step.key);
   if (mine.length && mine.every((t) => t.status === "done")) return ["built", "#2f6b3a"];
   if (mine.some((t) => ["done", "doing"].includes(t.status))) return ["partly built", "#8a5b0e"];
   return ["not built", "#b9b0ab"];
@@ -109,28 +133,24 @@ async function overview() {
   const tasks = o.tasks;
   const must = tasks.filter((t) => t.tier === "Must");
   const mustDone = must.filter((t) => t.status === "done").length;
-  const decide = tasks.filter((t) => t.status === "decide");
   const L = o.latest, B = o.baseline;
   const card = (title, big, note, cls = "") =>
     `<div class="card ${cls}"><small>${esc(title)}</small><div class="big">${big}</div><small>${note}</small></div>`;
 
   $view.innerHTML = `
-    <h1>What we're building</h1>
-    <p>A caption generator for the text-native Clay v2 model, and the evaluation loop that proves it
-    gets measurably better: every change is a new ${term("Batch")}, scored on Clay's five criteria and
-    kept only if the regression gate passes. Click a step to see what it is, why it's there, where it
-    lives in the code, and what's left to do.</p>
-    <div class="flow" id="flow">${FLOW.map((s, i) => {
-      const [label, color] = stepState(s, tasks);
-      return `<button class="${AREA_CLASS[s.area]}" data-i="${i}" aria-pressed="${i === 0}">
-        <span class="dot" style="background:${color}" title="${label}"></span>
-        <b>${i + 1}. ${esc(s.title)}</b><small>${esc(s.sub)}</small><small>${esc(s.area)}</small></button>`;
-    }).join("")}</div>
-    <div class="legend"><span><i style="background:#2f6b3a"></i>built</span>
-      <span><i style="background:#8a5b0e"></i>partly built</span>
-      <span><i style="background:#b9b0ab"></i>not built</span>
-      <span>Colours are the functional areas (caption-plan.md §4).</span></div>
-    <div id="step"></div>
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-body">
+        <p class="hero-kicker">Clay Earth Dataset Foundry · caption track</p>
+        <h1 id="hero-title">Captions that teach Clay to read the Earth</h1>
+        <p class="hero-lede">Clay v2 learns from text as well as imagery. We write those captions for
+        aerial imagery, and prove each change makes them better: every change is a ${term("Batch")},
+        scored on Clay's five criteria, and kept only if the regression gate passes.</p>
+        <div class="hero-cta">
+          <a class="hero-btn primary" href="#/how">How it works</a>
+          <a class="hero-btn" href="#/tasks">Pick a task</a>
+        </div>
+      </div>
+    </section>
 
     <h2>Where we are</h2>
     <div class="cards">
@@ -140,36 +160,135 @@ async function overview() {
       ${L ? card("Latest grounding: correctness · coverage", `${f2(L.correctness)} · ${f2(L.coverage)}`, `<a href="#/batches/${esc(L.batch_id)}">${esc(L.batch_id)}</a>`) : card("Latest Batch", "—", "none yet")}
       ${L ? card("Latest fidelity · retrieval", `${f2(L.fidelity)} · ${f2(L.retrieval?.mean)}`, `${L.cases} Cases × ${L.repeats} Repeats`) : ""}
       ${B ? card("Baseline: correctness · coverage", `${f2(B.correctness)} · ${f2(B.coverage)}`, `${esc(B.batch_id)} · ${B.cases} Cases × ${B.repeats}`, "platform") : card("Baseline", "—", "none accepted yet", "platform")}
-    </div>
-    ${decide.length ? `<h2>Waiting on a team decision</h2>
-      <table><tr><th>Task</th><th>Area</th><th>What's open</th></tr>
-      ${decide.map((t) => `<tr><td><b>${esc(t.title)}</b></td><td>${esc(t.area)}</td><td>${esc(t.notes || "")}</td></tr>`).join("")}
-      </table>` : ""}
-    <p class="sub">Next: see <a href="#/tasks">Tasks</a> for everything left, by functional area.</p>`;
-
-  const show = (i) => {
-    const s = FLOW[i];
-    const mine = tasks.filter((t) => s.tasks.includes(t.id));
-    document.querySelectorAll("#flow button").forEach((b) => b.setAttribute("aria-pressed", String(+b.dataset.i === i)));
-    document.getElementById("step").innerHTML = `<div class="panel">
-      <div><h2 style="margin-top:0">${i + 1}. ${esc(s.title)}</h2>
-        <h3>What it is</h3><p>${s.what}</p>
-        <h3>Why it's there</h3><p>${s.why}</p>
-        <h3>Where it lives</h3><p>${s.code.map((c) => `<code>${esc(c)}</code>`).join("<br>")}</p></div>
-      <div><h3>Tasks for this step</h3>
-        ${mine.map((t) => `<p>${statusBadge(t.status)} <span class="badge b-na">${esc(t.tier)}</span><br>${esc(t.title)}</p>`).join("") || '<p class="sub">None listed.</p>'}
-      </div></div>`;
-  };
-  document.querySelectorAll("#flow button").forEach((b) => b.addEventListener("click", () => show(+b.dataset.i)));
-  show(0);
+    </div>`;
 }
 
-async function tasksPage() {
+const STEP_STATE = {
+  built: { label: "Built", cls: "st-built" },
+  partly: { label: "Partly built", cls: "st-partly" },
+  not: { label: "Not built yet", cls: "st-not" },
+};
+const stateOf = (step, tasks) => {
+  const [label] = stepState(step, tasks);
+  return label === "built" ? STEP_STATE.built : label === "partly built" ? STEP_STATE.partly : STEP_STATE.not;
+};
+
+async function howPage(stepKey) {
   const me = SEQ;
   const tasks = await api("/api/tasks");
   if (stale(me)) return;
+  const first = Math.max(0, FLOW.findIndex((s) => s.key === stepKey));
+
+  $view.innerHTML = `
+    <header class="how-head">
+      <h1>How it works</h1>
+      <p class="how-lede">Ten steps take a place on the map to a kept or rejected change to the
+      captioner. The middle of it, <b>observe, summarize, score, report</b>, is the loop the brief
+      calls the heart of the build. Pick a step to see what it is, why it's there, where it lives
+      in the code, and every task that's left for it.</p>
+      <ul class="how-key" aria-label="Status key">
+        <li><span class="how-num st-built" aria-hidden="true"></span>Built</li>
+        <li><span class="how-num st-partly" aria-hidden="true"></span>Partly built</li>
+        <li><span class="how-num st-not" aria-hidden="true"></span>Not built yet</li>
+      </ul>
+    </header>
+    <div class="how-track" style="--steps:${FLOW.length}">
+    <ol class="how-phases" aria-label="Phases">${PHASES.map((p) => {
+      const n = FLOW.filter((s) => s.phase === p.key).length;
+      return `<li class="${p.core ? "core" : ""}" style="grid-column: span ${n}">${esc(p.label)}</li>`;
+    }).join("")}</ol>
+    <ol class="how-steps" id="flow">${FLOW.map((s, i) => {
+      const st = stateOf(s, tasks);
+      return `<li><button type="button" data-i="${i}" aria-pressed="${i === first}"
+          aria-label="Step ${i + 1}: ${esc(s.title)} (${st.label})">
+        <span class="how-num ${st.cls}">${i + 1}</span>
+        <span class="how-text"><span class="how-title">${esc(s.title)}</span>
+          <span class="how-sub">${esc(s.sub)}</span></span>
+      </button></li>`;
+    }).join("")}</ol>
+    </div>
+    <p class="how-core-note"><span></span>The core loop: the brief's “observe, summarize, score” plus the report.</p>
+    <section class="how-panel" id="step" aria-live="polite"></section>`;
+
+  const show = (i) => {
+    const s = FLOW[i];
+    const st = stateOf(s, tasks);
+    const order = { doing: 0, decide: 1, blocked: 2, todo: 3, done: 4 };
+    const tier = { Must: 0, Should: 1, Could: 2 };
+    const mine = tasks.filter((t) => t.step === s.key)
+      .sort((x, y) => (order[x.status] - order[y.status]) || (tier[x.tier] - tier[y.tier]));
+    const prev = FLOW[i - 1], next = FLOW[i + 1];
+    document.querySelectorAll("#flow button").forEach((b) => b.setAttribute("aria-pressed", String(+b.dataset.i === i)));
+    document.getElementById("step").innerHTML = `
+      <div class="how-panel-head">
+        <p class="how-kicker">Step ${i + 1} of ${FLOW.length} · ${esc(PHASES.find((p) => p.key === s.phase).label)}</p>
+        <h2>${esc(s.title)}</h2>
+        <p class="how-tags"><span class="how-area ${AREA_CLASS[s.area]}">${esc(s.area)}</span>
+          <span class="how-state ${st.cls}">${esc(st.label)}</span></p>
+      </div>
+      <div class="how-panel-body">
+        <div class="how-prose">
+          <h3>What it is</h3><p>${s.what}</p>
+          <h3>Why it's there</h3><p>${s.why}</p>
+          <h3>Where it lives</h3>
+          <ul class="how-code">${s.code.map((c) => `<li><code>${esc(c)}</code></li>`).join("")}</ul>
+        </div>
+        <aside class="how-tasks" aria-label="Tasks for this step">
+          <h3>Tasks for this step <small>(${mine.filter((t) => t.status === "done").length} of ${mine.length} done)</small></h3>
+          ${mine.map((t) => `<div class="how-task">
+              <div>${statusBadge(t.status)} <span class="badge b-na">${esc(t.tier)}</span></div>
+              <p><a href="#/tasks/${esc(t.id)}">${esc(t.title)}</a></p></div>`).join("") || '<p class="sub">None listed.</p>'}
+          <a class="how-all" href="#/tasks">All tasks →</a>
+        </aside>
+      </div>
+      <nav class="how-pager" aria-label="Steps">
+        ${prev ? `<button type="button" class="btn secondary" data-go="${i - 1}">← ${i}. ${esc(prev.title)}</button>` : "<span></span>"}
+        ${next ? `<button type="button" class="btn" data-go="${i + 1}">${i + 2}. ${esc(next.title)} →</button>` : ""}
+      </nav>`;
+    document.querySelectorAll("#step [data-go]").forEach((b) => b.addEventListener("click", () => go(+b.dataset.go)));
+  };
+  const go = (i) => {
+    show(i);
+    // Give each step a linkable address without re-rendering the page.
+    history.replaceState(null, "", `#/how/${FLOW[i].key}`);
+  };
+  document.querySelectorAll("#flow button").forEach((b) => b.addEventListener("click", () => go(+b.dataset.i)));
+  show(first);
+}
+
+// A task as a self-contained brief a teammate can paste into their coding agent.
+function taskBrief(t, byId, reqs) {
+  const lines = [`# ${t.title}`, "",
+    `Task \`${t.id}\` · ${t.tier} · ${STATUS[t.status]?.[1] || t.status} · area: ${t.area} · How it works step: ${t.step}`, ""];
+  if (t.context) lines.push("## Context", "", t.context, "");
+  if ((t.closes || []).length) {
+    lines.push("## Requirements it closes", "");
+    for (const id of t.closes) lines.push(`- **${id}**: ${reqs[id] || "(see docs/caption-design.md §2)"}`);
+    lines.push("");
+  }
+  if ((t.done_when || []).length) lines.push("## Done when", "", ...t.done_when.map((d) => `- ${d}`), "");
+  if ((t.refs || []).length) lines.push("## Read first", "", ...t.refs.map((r) => `- ${r}`), "");
+  if (t.start) lines.push("## Where to start", "", t.start, "");
+  const after = (t.after || []).filter((id) => byId[id]);
+  if (after.length) {
+    lines.push("## Waits on", "", ...after.map((id) => `- ${byId[id].title} (\`${id}\`, ${STATUS[byId[id].status]?.[1] || byId[id].status})`), "");
+  }
+  if (t.notes) lines.push("## Notes", "", t.notes, "");
+  lines.push("## Repo rules", "",
+    "- Capitalized terms (Case, Chip, Claim, Run, Trace, Batch, ...) mean exactly what GLOSSARY.md says.",
+    "- The plan is docs/caption-plan.md; requirements are docs/caption-design.md §2; decisions are docs/adr/.",
+    "- ADR-0006: the caption Harness never reads an Answer Key (USGS, GRW, OSM) or a Case's Reference Labels.",
+    "- Before a PR: `uv run ruff check src tests` and `uv run pytest`. Never commit .env, data/, batches/, or benchmark images.",
+    "- In the same PR, update this task in docs/tasks.toml (status, owner, notes).");
+  return lines.join("\n");
+}
+
+async function tasksPage(focusId) {
+  const me = SEQ;
+  const [tasks, reqs] = await Promise.all([api("/api/tasks"), api("/api/requirements")]);
+  if (stale(me)) return;
   const byId = Object.fromEntries(tasks.map((t) => [t.id, t]));
-  const state = { tier: "", status: "open" };
+  const state = { tier: "", status: focusId ? "all" : "open" };
   const render = () => {
     const keep = (t) =>
       (!state.tier || t.tier === state.tier) &&
@@ -183,30 +302,57 @@ async function tasksPage() {
         <small>${done}/${all.length} done</small></header>
         ${shown.map((t) => {
           const wait = blockedBy(t);
-          return `<div class="task ${t.status === "done" ? "done" : ""}">
+          return `<div class="task ${t.status === "done" ? "done" : ""}" id="task-${esc(t.id)}">
             <div class="t">${esc(t.title)}</div>
             <div class="meta">${statusBadge(t.status)} <span class="badge b-na">${esc(t.tier)}</span>
-              <span class="ids">${(t.closes || []).map((c) => `<code>${esc(c)}</code>`).join("")}</span></div>
+              <span class="ids">${(t.closes || []).map((c) => `<code title="${esc(reqs[c] || "")}">${esc(c)}</code>`).join("")}</span></div>
             ${t.notes ? `<div class="sub">${esc(t.notes)}</div>` : ""}
             ${wait.length ? `<div class="sub">After: ${wait.map((id) => esc(byId[id].title)).join("; ")}</div>` : ""}
+            <details class="brief" ${t.id === focusId ? "open" : ""}><summary>Brief</summary>
+              ${t.context ? `<p>${esc(t.context)}</p>` : ""}
+              ${(t.done_when || []).length ? `<h4>Done when</h4><ul>${t.done_when.map((d) => `<li>${esc(d)}</li>`).join("")}</ul>` : ""}
+              ${(t.refs || []).length ? `<h4>Read first</h4><ul class="refs">${t.refs.map((r) => `<li><code>${esc(r)}</code></li>`).join("")}</ul>` : ""}
+              <button type="button" class="btn copy" data-id="${esc(t.id)}">Copy brief for your agent</button>
+              <span class="copied sub" aria-live="polite"></span>
+            </details>
             <div class="start">Start: <span class="mono">${esc(t.start || "")}</span>
               · Owner: ${esc(t.owner || "open")}</div></div>`;
         }).join("") || '<div class="task sub">Nothing matches the filter.</div>'}</section>`;
     }).join("");
+    document.querySelectorAll("button.copy").forEach((b) => b.addEventListener("click", async () => {
+      const text = taskBrief(byId[b.dataset.id], byId, reqs);
+      const note = b.nextElementSibling;
+      try {
+        await navigator.clipboard.writeText(text);
+        note.textContent = "Copied. Paste it into your agent.";
+      } catch {
+        // No clipboard access: show the brief so it can be copied by hand.
+        const area = document.createElement("textarea");
+        area.className = "brief-text"; area.value = text; area.rows = 14;
+        b.replaceWith(area); area.select();
+        note.textContent = "Select all and copy.";
+      }
+    }));
   };
   $view.innerHTML = `<h1>Tasks</h1>
     <p>Everything left to finish the hackathon project, by functional area. Pick one that isn't
-    waiting on another, put your name in <code>docs/tasks.toml</code>, and open a PR. The ids are the
-    requirements a task closes (<a href="#/concepts">Concepts</a> explains them).</p>
+    waiting on another, open its <b>Brief</b>, and copy it into your coding agent: it has the context,
+    the requirements it closes, what done means, and what to read first. Put your name in
+    <code>docs/tasks.toml</code> and open a PR.</p>
     <div class="filters">
       <label>Tier <select id="tier"><option value="">all</option><option>Must</option><option>Should</option><option>Could</option></select></label>
       <label>Status <select id="status"><option value="open">not done</option><option value="all">all</option>
         <option value="decide">needs a decision</option><option value="doing">in progress</option>
         <option value="todo">to do</option><option value="blocked">blocked</option><option value="done">done</option></select></label>
     </div><div class="areas" id="areas"></div>`;
+  document.getElementById("status").value = state.status;
   document.getElementById("tier").addEventListener("change", (e) => { state.tier = e.target.value; render(); });
   document.getElementById("status").addEventListener("change", (e) => { state.status = e.target.value; render(); });
   render();
+  if (focusId) {
+    const el = document.getElementById(`task-${focusId}`);
+    if (el) { el.classList.add("focus"); el.scrollIntoView({ block: "center" }); }
+  }
 }
 
 async function casesPage() {
@@ -460,7 +606,8 @@ async function route() {
   $view.innerHTML = '<p class="sub">Loading…</p>';
   try {
     if (page === "") await overview();
-    else if (page === "tasks") await tasksPage();
+    else if (page === "how") await howPage(parts[1]);
+    else if (page === "tasks") await tasksPage(parts[1]);
     else if (page === "cases") await casesPage();
     else if (page === "batches" && parts[1]) await batchPage(parts[1]);
     else if (page === "batches") await batchesPage();

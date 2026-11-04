@@ -133,3 +133,44 @@ def test_the_data_sources_parse_and_point_at_real_code(client):
             path = REPO / u["path"]
             assert path.exists(), (s["id"], u["path"])
             assert u["symbol"] in path.read_text(), (s["id"], u["path"], u["symbol"])
+
+
+def test_every_task_belongs_to_a_how_it_works_step():
+    import re
+    from pathlib import Path
+
+    js = (Path(__file__).parents[1] / "src/clayzer/ui/static/app.js").read_text()
+    flow = js[js.index("const FLOW = [") : js.index("function stepState(")]
+    steps = re.findall(r'key: "([a-z]+)", phase:', flow)
+    tasks = load_tasks()
+    assert len(steps) == 10
+    for t in tasks:
+        assert t.get("step") in steps, f"{t['id']} has step {t.get('step')!r}"
+    assert {t["step"] for t in tasks} == set(steps), "every step needs at least one task"
+
+
+def test_every_task_has_a_brief_with_real_references_and_requirements():
+    from pathlib import Path
+
+    from clayzer.ui.app import load_requirements
+
+    root = Path(__file__).parents[1]
+    reqs = load_requirements()
+    areas = {"Data and Cases", "Captioning", "Evaluation", "Platform", "Demo and delivery"}
+    for t in load_tasks():
+        assert t["area"] in areas, f"{t['id']}: unknown area {t['area']!r}"
+        assert t.get("context"), f"{t['id']} has no context"
+        assert t.get("done_when"), f"{t['id']} has no done_when"
+        assert t.get("refs"), f"{t['id']} has no refs"
+        for ref in t["refs"]:
+            path = ref.split(" ")[0]
+            assert (root / path).exists(), f"{t['id']}: {path} doesn't exist"
+        for rid in t.get("closes", []):
+            assert rid in reqs, f"{t['id']}: {rid} isn't in caption-design.md §2"
+
+
+def test_requirements_endpoint(client):
+    c, _ = client
+    reqs = c.get("/api/requirements").json()
+    assert reqs["CAP-10"].startswith("Grounding")
+    assert {"REQ-06", "AWS-05"} <= set(reqs)

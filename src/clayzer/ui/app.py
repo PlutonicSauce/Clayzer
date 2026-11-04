@@ -46,6 +46,18 @@ def load_sources(path: Path = REPO / "docs" / "sources.toml") -> list[dict]:
     return tomllib.loads(path.read_text())["source"]
 
 
+def load_requirements(path: Path = REPO / "docs" / "caption-design.md") -> dict[str, str]:
+    """Requirement id -> its text, from the CAP, REQ, and AWS tables in caption-design.md §2."""
+    if not path.exists():
+        return {}
+    reqs = {}
+    for line in path.read_text().splitlines():
+        m = re.match(r"^\|\s*((?:CAP|REQ|AWS)-\d+)\s*\|\s*(.+?)\s*\|", line)
+        if m:
+            reqs.setdefault(m.group(1), m.group(2))
+    return reqs
+
+
 def load_glossary(path: Path = REPO / "GLOSSARY.md") -> list[dict]:
     """Terms from GLOSSARY.md: '**Term**:' then a definition, then an optional '_Avoid_:'."""
     if not path.exists():
@@ -158,6 +170,10 @@ def create_app(settings: Settings, region: str = "dev", allow_launch: bool = Fal
     def sources():
         return load_sources()
 
+    @app.get("/api/requirements")
+    def requirements():
+        return load_requirements()
+
     @app.get("/api/glossary")
     def glossary():
         return load_glossary()
@@ -259,6 +275,10 @@ def create_app(settings: Settings, region: str = "dev", allow_launch: bool = Fal
     @app.get("/")
     def index():
         return FileResponse(STATIC / "index.html")
+
+    @app.get("/deck")
+    def deck():
+        return FileResponse(STATIC / "deck" / "index.html")
 
     return app
 

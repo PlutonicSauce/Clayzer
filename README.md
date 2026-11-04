@@ -106,8 +106,16 @@ uv run clayzer batch --resume <batch-id>
 
 A Batch writes `batches/<batch-id>/` in the store: `batch.json` (models, prompt hash, Cases
 hash, Repeats, scorer version), `prompt.txt`, `cases.jsonl` (frozen at the start),
-`results.jsonl`, `captions.jsonl`, `trace.jsonl`, `retrieval.jsonl`, `summary.json` (per-Case
-mean and Spread), `report.md`, and `report.html`.
+`results.jsonl`, `captions.jsonl`, `retrieval.jsonl`, `summary.json` (per-Case mean and
+Spread), `report.md`, `report.html`, and `traces/`: one Trace per Run
+(`<case-id>--r<repeat>.jsonl`). A Trace records every model call as a Step, with the full
+prompt and response, the image by key and hash, wall time and Bedrock's own latency, tokens,
+retries, and the error code of anything that failed; Judge calls are marked as scoring.
+
+```sh
+uv run clayzer trace <batch-id> <case-id> --repeat 1          # one Run, Step by Step
+uv run clayzer trace <batch-id> <case-id> --repeat 1 --json   # the raw Trace
+```
 
 `report.html` is the one to open: a single self-contained file (no server, no network) with
 each Chip, its Claims and Reference Labels drawn on the 3×3 grid, mean ± Spread per Case, and
@@ -136,8 +144,11 @@ uv run clayzer ui --allow-launch   # also lets the browser run Batches
 
 - **Overview:** the workflow, step by step (what each step is, why it's there, where it lives,
   and whether it's built), plus the latest Batch next to the Baseline.
-- **Tasks:** the work board from [`docs/tasks.toml`](docs/tasks.toml), by functional area. To
-  take a task, put your name in its `owner` field and open a PR.
+- **Tasks:** the work board from [`docs/tasks.toml`](docs/tasks.toml), by functional area. Each
+  task has a **Brief** (context, the requirements it closes, what done means, what to read first)
+  and a **Copy brief for your agent** button that puts all of it, plus the repo rules, on the
+  clipboard as Markdown. `#/tasks/<task-id>` links straight to one. To take a task, put your
+  name in its `owner` field and open a PR.
 - **Cases:** every Chip in the store with its Reference Labels.
 - **Batches:** every Batch, its report, its regression gate against the Baseline, and
   Compare between any two.
@@ -162,6 +173,26 @@ localhost only.
 
 Behind a TLS-intercepting proxy, set `SSL_CERT_FILE` to the proxy's CA bundle; it's passed to
 GDAL for NAIP reads too.
+
+### Hosting it on AWS
+
+One CDK app ([`infra/app.py`](infra/app.py)) puts the read-only web app in your own account
+behind an HTTPS CloudFront URL: CloudFront → Application Load Balancer → one ECS Fargate task
+(ARM64) that reads your store bucket. It needs Node (for the CDK CLI) and Docker or Podman.
+
+```sh
+uv sync --group infra
+cd infra
+npx aws-cdk@2 bootstrap                                   # once per account and region
+npx aws-cdk@2 deploy -c store=s3://<your bucket>/<prefix>  # prints the Url output
+```
+
+Leave out `-c store=...` to have the stack create a new bucket. With Podman, set
+`CDK_DOCKER=podman`. The hosted app never starts Batches, and its role can only read the store
+prefix. `npx aws-cdk@2 destroy` removes everything except the bucket.
+
+To build the image on its own: `docker build -t clayzer .` (see the
+[Dockerfile](Dockerfile) for mirror and proxy options).
 
 ### Tests
 
