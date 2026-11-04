@@ -389,3 +389,155 @@ abbr { text-decoration: underline dotted; cursor: help; }
 .prov-run > summary { cursor: pointer; font-weight: 600; }
 .prov-run table { margin-top: 10px; }
 @media (max-width: 1000px) { .prov { grid-template-columns: 1fr; } }
+
+/* ── Ontology explainer ─────────────────────────────────────────────────────── */
+.onto-hero { background: #252323; min-height: 220px; }
+.onto-hero::before { background: linear-gradient(118deg, #4a3b36 0%, #252323 60%); opacity: 1; }
+.onto-h { margin: 34px 0 6px; font-size: 20px; }
+.onto-intro { margin: 0 0 14px; max-width: 760px; }
+.onto-join { margin: 14px 0 0; padding: 12px 16px; background: var(--data);
+  border: 1px solid var(--data-line); border-radius: 10px; max-width: 900px; }
+
+.onto-halves { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+@media (max-width: 760px) { .onto-halves { grid-template-columns: 1fr; } }
+.onto-half { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; }
+.onto-half h3 { margin: 0 0 2px; font-size: 16px; }
+.onto-pill { font-size: 11px; font-weight: 600; color: var(--muted); border: 1px solid var(--line);
+  border-radius: 999px; padding: 1px 8px; margin-left: 6px; vertical-align: middle; }
+.onto-layers { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.onto-layer { display: grid; grid-template-columns: auto 1fr; grid-template-areas: "badge name" "badge one" "more more";
+  gap: 2px 12px; text-align: left; width: 100%; cursor: pointer; font: inherit; color: var(--ink);
+  background: var(--paper); border: 1px solid var(--line); border-left: 5px solid var(--line);
+  border-radius: 10px; padding: 12px 14px; }
+.onto-layer:hover { border-color: var(--ink); }
+.onto-layer.onto-a { border-left-color: var(--captions-line); }
+.onto-layer.onto-c { border-left-color: var(--delivery-line); }
+.onto-layer.onto-b { border-left-color: var(--platform-line); }
+.onto-badge { grid-area: badge; align-self: center; width: 30px; height: 30px; border-radius: 50%;
+  display: grid; place-items: center; font-weight: 700; background: var(--ink); color: #fff; }
+.onto-a .onto-badge { background: #b06a4f; } .onto-c .onto-badge { background: #8a5b0e; }
+.onto-b .onto-badge { background: #4a7a86; }
+.onto-layer-name { grid-area: name; font-weight: 650; }
+.onto-layer-one { grid-area: one; color: var(--muted); font-size: 13.5px; }
+.onto-layer-more { grid-area: more; font-size: 13.5px; line-height: 1.5; margin-top: 8px;
+  padding-top: 8px; border-top: 1px dashed var(--line); display: none; }
+.onto-layer.open .onto-layer-more { display: block; }
+.onto-layer-more em { color: var(--muted); }
+
+.onto-chipbtns { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.onto-chipbtn.active { background: var(--captions); border-color: var(--captions-line); color: var(--ink); }
+.onto-compare { background: var(--paper); border: 1px solid var(--line); border-radius: 12px;
+  padding: 16px 18px; max-width: 680px; }
+.onto-truth { margin: 0 0 12px; font-size: 14px; }
+.onto-bars { display: flex; flex-direction: column; gap: 8px; }
+.onto-bar-row { display: grid; grid-template-columns: 110px 1fr 44px; align-items: center; gap: 10px; }
+.onto-bar-name { font-size: 13px; }
+.onto-bar-track { background: var(--data); border-radius: 999px; height: 16px; overflow: hidden; }
+.onto-bar-fill { display: block; height: 100%; background: #c9d6d8; border-radius: 999px;
+  transition: width .5s ease; }
+.onto-bar-fill.top { background: #4a7a86; }
+.onto-bar-score { font-variant-numeric: tabular-nums; font-size: 13px; text-align: right; }
+.onto-verdict { margin: 12px 0 0; }
+
+.onto-toggle { display: inline-flex; gap: 4px; background: var(--data); border-radius: 999px;
+  padding: 4px; margin-bottom: 14px; }
+.seg2 { font: inherit; font-size: 13px; border: 0; background: transparent; color: var(--muted);
+  padding: 6px 16px; border-radius: 999px; cursor: pointer; }
+.seg2.active { background: var(--paper); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.12); font-weight: 600; }
+
+.onto-flow { display: grid; grid-template-columns: 300px 1fr; gap: 18px; align-items: start; }
+@media (max-width: 760px) { .onto-flow { grid-template-columns: 1fr; } }
+.onto-steplist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.onto-step { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; font: inherit;
+  cursor: pointer; background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; color: var(--ink); }
+.onto-step:hover { border-color: var(--ink); }
+.onto-step.current { background: var(--captions); border-color: var(--captions-line); font-weight: 600; }
+.onto-step.skipped { opacity: .5; }
+.onto-step.skipped .onto-step-title { text-decoration: line-through; }
+.onto-step-icon { font-size: 18px; width: 24px; text-align: center; }
+.onto-detail-card { background: var(--paper); border: 1px solid var(--line); border-radius: 12px;
+  padding: 18px 20px; border-top: 4px solid var(--captions-line); }
+.onto-detail-card.layer-B { border-top-color: var(--platform-line); }
+.onto-detail-card.layer-AC { border-top-color: var(--delivery-line); }
+.onto-detail-card h3 { margin: 0 0 8px; }
+.onto-receives-label { margin: 14px 0 6px; font-weight: 600; font-size: 13.5px; }
+.onto-receives { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 5px; font-size: 13.5px; }
+.onto-receives li.onto-extra { color: var(--ink); background: var(--delivery); border-radius: 6px;
+  padding: 3px 8px; list-style: none; margin-left: -18px; }
+.onto-skip { margin: 12px 0 0; padding: 10px 12px; background: var(--data); border-radius: 8px;
+  color: var(--muted); font-size: 13.5px; }
+.onto-pager { display: flex; gap: 8px; margin-top: 14px; }
+.onto-foot { margin: 28px 0 10px; }
+
+/* ── Ontology wizard, build columns, and class graph ────────────────────────── */
+.onto-lead { font-size: 15px; line-height: 1.6; max-width: 820px; margin: 0 0 18px; }
+.onto-wz-steps { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; margin: 18px 0; padding: 0; }
+.onto-wz-dot { display: flex; align-items: center; gap: 8px; font: inherit; font-size: 13px; cursor: pointer;
+  background: var(--paper); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px 6px 6px; color: var(--muted); }
+.onto-wz-dot:hover { border-color: var(--ink); color: var(--ink); }
+.onto-wz-num { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--data); color: var(--muted); font-weight: 700; font-size: 12px; }
+.onto-wz-dot.done .onto-wz-num { background: var(--evaluation); color: var(--ok); }
+.onto-wz-dot.active { background: var(--captions); border-color: var(--captions-line); color: var(--ink); font-weight: 600; }
+.onto-wz-dot.active .onto-wz-num { background: var(--ink); color: #fff; }
+.onto-panel { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 22px 24px; min-height: 260px; }
+.onto-wz-pager { display: flex; align-items: center; gap: 14px; margin-top: 14px; }
+.onto-wz-pager #onto-wz-at { margin-left: auto; }
+.onto-wz-pager #onto-next { margin-left: 0; }
+
+/* build columns */
+.onto-build { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+@media (max-width: 760px) { .onto-build { grid-template-columns: 1fr; } }
+.onto-build-col { border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; }
+.onto-build-col.build-words { background: var(--captions); border-color: var(--captions-line); }
+.onto-build-col.build-pics { background: var(--platform); border-color: var(--platform-line); }
+.onto-build-col h3 { margin: 0 0 12px; font-size: 15.5px; }
+.onto-build-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0; }
+.onto-build-steps li { position: relative; padding: 0 0 16px 22px; border-left: 2px solid rgba(37,35,35,.18); }
+.onto-build-steps li:last-child { border-left: 2px solid transparent; padding-bottom: 0; }
+.onto-build-steps li::before { content: ""; position: absolute; left: -7px; top: 3px; width: 12px; height: 12px;
+  border-radius: 50%; background: var(--paper); border: 2px solid var(--ink); }
+.onto-build-steps li:last-child::before { background: var(--ink); }
+.onto-build-steps b { display: block; font-size: 13.5px; }
+.onto-build-steps span { display: block; font-size: 13px; color: var(--ink); opacity: .78; margin-top: 2px; }
+.onto-rules { margin-top: 18px; background: var(--data); border: 1px solid var(--data-line); border-radius: 10px; padding: 4px 16px; }
+.onto-rules summary { cursor: pointer; font-weight: 600; padding: 10px 0; }
+.onto-rules ul { margin: 4px 0 12px; padding-left: 20px; display: flex; flex-direction: column; gap: 7px; font-size: 13.5px; line-height: 1.5; }
+
+/* class graph */
+.onto-graph-wrap { display: grid; grid-template-columns: 1fr 280px; gap: 16px; align-items: start; }
+@media (max-width: 760px) { .onto-graph-wrap { grid-template-columns: 1fr; } }
+.onto-graph-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background:
+  repeating-linear-gradient(0deg, var(--paper), var(--paper) 41px, #faf6f3 41px, #faf6f3 42px); }
+.onto-graph-svg { display: block; }
+.onto-edge { fill: none; stroke: #b9a99d; stroke-width: 1.75; }
+.onto-node rect { fill: var(--paper); stroke-width: 2; transition: fill .15s; }
+.onto-node text { font-size: 12.5px; fill: var(--ink); pointer-events: none; }
+.onto-node { cursor: pointer; }
+.onto-node:hover rect { fill: #f6efe9; }
+.onto-node:focus { outline: none; }
+.onto-node:focus rect { fill: #f6efe9; }
+.onto-node.selected rect { fill: var(--captions); stroke-width: 3; }
+.onto-node-detail { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; position: sticky; top: 12px; }
+.onto-node-detail h3 { margin: 0 0 4px; font-size: 16px; }
+.onto-chain { margin: 0 0 10px; font-size: 12.5px; }
+.onto-dl-label { margin: 12px 0 5px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.onto-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.onto-chip { font-size: 12.5px; border-radius: 999px; padding: 2px 10px; border: 1px solid var(--line); }
+.onto-chip.syn { background: var(--captions); border-color: var(--captions-line); }
+.onto-chip.conf { background: var(--delivery); border-color: var(--delivery-line); }
+.onto-star { font-size: 11px; font-weight: 600; color: var(--ok); border: 1px solid var(--evaluation-line);
+  background: var(--evaluation); border-radius: 999px; padding: 1px 8px; vertical-align: middle; }
+.onto-star.muted { color: var(--muted); background: var(--data); border-color: var(--data-line); }
+.onto-legend { margin-top: 10px; }
+
+/* pipeline as a vertical list */
+.onto-uselist { display: flex; flex-direction: column; gap: 10px; }
+.onto-use-step { border: 1px solid var(--line); border-left: 4px solid var(--captions-line); border-radius: 10px; padding: 12px 16px; background: var(--paper); }
+.onto-use-step.layer-B { border-left-color: var(--platform-line); }
+.onto-use-step.layer-AC { border-left-color: var(--delivery-line); }
+.onto-use-step.skipped { opacity: .5; border-left-color: var(--line); }
+.onto-use-step.skipped h3 { text-decoration: line-through; }
+.onto-use-head { display: flex; align-items: center; gap: 10px; }
+.onto-use-head h3 { margin: 0; font-size: 15px; }
+.onto-use-step p { margin: 6px 0 0; font-size: 13.5px; line-height: 1.5; }

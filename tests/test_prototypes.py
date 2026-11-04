@@ -17,7 +17,7 @@ def _build(**kw):
         ("solar_array", [0.9, 0.1, 0.0]),
         ("greenhouse", [0.8, 0.6, 0.0]),
         ("water", [0.0, 0.0, 1.0]),
-        ("wind_turbine", [0.0, 1.0, 0.0]),  # not a Layer B class: must be dropped
+        ("substation", [0.0, 1.0, 0.0]),  # not a Layer B class (a non-claimable candidate): dropped
     ]
     return proto.build(
         pairs, ontology_version="test", build_region="dev", source="unit",
@@ -31,9 +31,9 @@ def test_build_averages_and_normalises_centroids():
     assert pytest.approx(sum(x * x for x in p.centroids["solar_array"]), abs=1e-9) == 1.0
 
 
-def test_cost_guard_drops_classes_not_discriminable_at_10m():
+def test_build_keeps_only_layer_b_classes():
     p = _build()
-    assert "wind_turbine" not in p.centroids  # thin at Sentinel-2 10 m
+    assert "substation" not in p.centroids  # outside LAYER_B_CLASSES
     assert set(p.centroids) <= set(proto.LAYER_B_CLASSES)
 
 
@@ -126,6 +126,24 @@ def test_layer_b_fires_end_to_end_through_the_batch_path(tmp_path, monkeypatch):
     circular = batches.BatchConfig(**{**cfg.__dict__, "region": "dev"})
     with pytest.raises(proto.CircularityError):
         batches._ontology_context(circular, {"id": "t1", "embedding": [1.0, 0.0, 0.0]})
+
+
+def test_layer_a_confusers_are_data_driven_when_prototypes_exist():
+    """With a prototype file, the look-alike line uses MEASURED pairs, not the hand-curated ones."""
+    p = _build()  # centroids for solar_array, greenhouse, water; wind_turbine dropped
+    # Embedding nearest solar; its measured nearest other class drives the confuser line.
+    ctx = proto.caption_context(ONT, p, [1.0, 0.0, 0.0], scoring_region="held-out")
+    assert "Easily-confused look-alikes" in ctx
+    assert "Solar array vs" in ctx
+    # The hand-curated ontology pairs solar with parking_lot; the measured set here does not.
+    assert "Parking lot" not in ctx.split("Example phrasings")[0]
+
+
+def test_learned_confuser_pairs_are_distinct():
+    p = _build()
+    pairs = proto.learned_confuser_pairs(p)
+    assert all(a != b for a, b in pairs)
+    assert len({frozenset(pr) for pr in pairs}) == len(pairs)  # no duplicates
 
 
 def test_local_backend_roundtrips(tmp_path):

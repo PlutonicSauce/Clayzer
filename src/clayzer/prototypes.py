@@ -33,11 +33,14 @@ from pathlib import Path
 
 from clayzer.ontology import Ontology
 
-# Classes discriminable at Sentinel-2's 10 m GSD, the resolution of Clay/LGND's published
-# embeddings. Small or thin objects (wind_turbine, road, railroad, individual buildings) are left
-# out: a 10 m centroid can't separate them, so a hint about them would be noise (ADR-0010 §risks).
+# Classes Layer B builds prototypes for — set by the resolution of the embeddings you feed it.
+# Clay embeddings of NAIP chips are 0.6 m, so every claimable class is resolvable, including thin
+# objects (wind_turbine, road, railroad) and individual buildings. If you ever build from 10 m
+# Sentinel-2 embeddings instead, narrow this back to the large classes (solar_array, water, field,
+# parking_lot, bare_ground, greenhouse) — a 10 m centroid can't separate the thin ones (ADR-0010).
 LAYER_B_CLASSES = (
-    "solar_array", "greenhouse", "parking_lot", "water", "field", "vegetation", "bare_ground",
+    "solar_array", "wind_turbine", "road", "railroad", "building", "water", "field",
+    "parking_lot", "greenhouse", "vegetation", "bare_ground",
 )  # fmt: skip
 
 TOP_K = 3  # classes a query returns; a prompt hint names at most this many
@@ -204,6 +207,24 @@ def hint(prototypes: Prototypes, embedding: list[float], ont: Ontology, k: int =
     return line
 
 
+def learned_confuser_pairs(
+    prototypes: Prototypes, class_ids: list[str] | None = None
+) -> list[tuple[str, str]]:
+    """Distinct look-alike pairs MEASURED from embeddings (each class with the nearest other
+    class centroids), for a data-driven Layer A. Defaults to every class in the prototype file.
+    Restrict with `class_ids` (e.g. the Layer B focus)."""
+    focus = set(class_ids) if class_ids is not None else set(prototypes.learned_confusers)
+    seen, pairs = set(), []
+    for cid, others in prototypes.learned_confusers.items():
+        if cid not in focus:
+            continue
+        for other in others:
+            if cid != other and (key := frozenset((cid, other))) not in seen:
+                seen.add(key)
+                pairs.append((cid, other))
+    return pairs
+
+
 def caption_context(
     ont: Ontology,
     prototypes: Prototypes | None,
@@ -211,22 +232,31 @@ def caption_context(
     *,
     scoring_region: str | None = None,
 ) -> str:
-    """The full ontology guidance block for one Chip: Layer A + C (ontology.prompt_context) plus,
-    when prototypes and an embedding are both present, the Layer B hint.
+    """The full ontology guidance block for one Chip:
+    - Layer A look-alikes: MEASURED from embeddings when a prototype file is present (data-driven,
+      ADR-0010), otherwise the hand-curated ontology pairs.
+    - Layer C caption exemplars (ontology file), narrowed to the focus classes when there is one.
+    - Layer B nearest-class hint, only when prototypes AND a Chip embedding are both present.
 
-    When there is no embedding or no prototypes, Layer B is silently skipped and only A + C are
-    returned — so the feature degrades to zero extra cost rather than failing (ADR-0010)."""
+    When there are no prototypes at all, only the hand-curated A + C are returned. When prototypes
+    exist, the circularity guard applies (they must not be used to caption their build region),
+    whether or not this Chip has an embedding (the learned look-alikes are built from that region
+    too)."""
     from clayzer.ontology import prompt_context
 
     focus = None
     layer_b = ""
-    if prototypes is not None and embedding:
+    confusers = None
+    if prototypes is not None:
         if scoring_region:
             guard_scoring_region(prototypes, scoring_region)
-        ranked = [cid for cid, s in prototypes.nearest(embedding) if s >= SIM_FLOOR]
-        focus = ranked or None
-        layer_b = hint(prototypes, embedding, ont)
-    block = prompt_context(ont, focus=focus)
+        if embedding:
+            ranked = [cid for cid, s in prototypes.nearest(embedding) if s >= SIM_FLOOR]
+            focus = ranked or None
+            layer_b = hint(prototypes, embedding, ont)
+        pairs = learned_confuser_pairs(prototypes, focus)
+        confusers = pairs or None  # fall back to hand-curated if the focus has no measured pair
+    block = prompt_context(ont, focus=focus, confusers=confusers)
     return f"{block}\n{layer_b}".strip() if layer_b else block
 
 

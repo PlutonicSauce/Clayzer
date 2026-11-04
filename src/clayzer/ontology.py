@@ -100,16 +100,21 @@ def prompt_context(
     focus: list[str] | None = None,
     *,
     include_confusers: bool = True,
+    confusers: list[tuple[str, str]] | None = None,
     per_class: int = 1,
     max_total: int = 4,
 ) -> str:
     """Class-level guidance for the captioner: look-alikes (Layer A) and example phrasings
     (Layer C). General knowledge only — never a Case's Answer Key (ADR-0006). Returns "" when
-    there is nothing to add."""
+    there is nothing to add.
+
+    `confusers`, when given, overrides the hand-curated look-alikes from the ontology file with
+    pairs measured from embeddings (prototypes.learned_confuser_pairs) — that is what makes
+    Layer A data-driven (ADR-0010). Falls back to the ontology file when None."""
     order = focus if focus else ont.claimable()
     lines: list[str] = []
     if include_confusers:
-        pairs = ont.confuser_pairs(focus)
+        pairs = confusers if confusers is not None else ont.confuser_pairs(focus)
         if pairs:
             joined = "; ".join(f"{ont.name_of(a)} vs {ont.name_of(b)}" for a, b in pairs)
             lines.append(f"Easily-confused look-alikes to tell apart: {joined}.")

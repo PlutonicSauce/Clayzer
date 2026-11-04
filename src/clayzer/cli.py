@@ -138,9 +138,9 @@ def _ontology_command(a, settings) -> int:
     kept = ", ".join(f"{c}×{protos.counts[c]}" for c in sorted(protos.centroids))
     dropped = sorted({c for c, _ in pairs} - set(protos.centroids))
     print(f"built {len(protos.centroids)} class prototypes (dim {protos.dim}) → {out}")
-    print(f"  kept (10 m-discriminable): {kept}")
+    print(f"  kept (Layer B classes seen in the data): {kept}")
     if dropped:
-        print(f"  dropped (too small at 10 m or not a Layer B class): {', '.join(dropped)}")
+        print(f"  dropped (outside LAYER_B_CLASSES for this embedding resolution): {', '.join(dropped)}")
     print(f"  CIRCULARITY: built on region {build_region!r}; do NOT score this region with it")
     return 0
 

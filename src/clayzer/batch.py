@@ -163,22 +163,22 @@ def _classify(e: Exception) -> str:
 def _ontology_context(cfg: BatchConfig, chip: dict) -> str | None:
     """Class-level ontology guidance for one Chip (ADR-0010), or None when there's nothing to add.
 
-    Layers A + C always apply (look-alikes, exemplars). Layer B applies only when a prototype
-    file exists for this ontology version AND the Chip carries a Clay/LGND `embedding`: then the
-    nearest-class hint is added, with the circularity guard against the Batch's region. The
-    prototype file is read once per Batch (prototypes.load_local is cached); there is no model
-    call."""
+    Layer C exemplars always apply. Layer A look-alikes are MEASURED from the prototype file when
+    one exists for this ontology version (data-driven), else hand-curated. Layer B's nearest-class
+    hint applies only when the prototype file exists AND the Chip carries a Clay/LGND `embedding`.
+    The prototype file is read once per Batch (prototypes.load_local is cached); no model call."""
     from clayzer import prototypes as proto
     from clayzer.ontology import load
 
     ont = load()
     protos = None
-    embedding = chip.get("embedding")
-    if embedding and cfg.ontology_version:
+    # Load prototypes whenever the file exists, not only when this Chip has an embedding: the
+    # learned look-alikes (Layer A) don't need a per-Chip embedding, only the Chip's does (Layer B).
+    if cfg.ontology_version:
         path = proto.default_path(cfg.ontology_version)
         if path.exists():
             protos = proto.load_local(str(path))
-    context = proto.caption_context(ont, protos, embedding, scoring_region=cfg.region)
+    context = proto.caption_context(ont, protos, chip.get("embedding"), scoring_region=cfg.region)
     return context or None
 
 

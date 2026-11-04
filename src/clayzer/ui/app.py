@@ -98,6 +98,15 @@ class Launch(BaseModel):
 def create_app(settings: Settings, region: str = "dev", allow_launch: bool = False) -> FastAPI:
     store = settings.store()
     app = FastAPI(title="Clayzer", docs_url=None, redoc_url=None)
+
+    @app.middleware("http")
+    async def _revalidate_static(request, call_next):
+        # The front end is served from /static with no build step; tell browsers to revalidate
+        # each load so UI edits show up on a plain reload instead of from a stale cache.
+        resp = await call_next(request)
+        if request.url.path.startswith("/static/"):
+            resp.headers["Cache-Control"] = "no-cache"
+        return resp
     jobs: dict[str, dict] = {}
     lock = threading.Lock()
     # A finished Batch never changes, so its summary and showcase are read from the store once.
@@ -295,6 +304,27 @@ def create_app(settings: Settings, region: str = "dev", allow_launch: bool = Fal
     @app.get("/api/glossary")
     def glossary():
         return load_glossary()
+
+    @app.get("/api/ontology")
+    def ontology_api():
+        """The Object Ontology (ADR-0008) as classes for the Ontology explainer's graph: the
+        is-a hierarchy with each class's synonyms, look-alikes, and whether an Answer Key scores
+        it."""
+        from clayzer.ontology import load
+
+        ont = load()
+        keyed = ont.keyed()
+        return {
+            "version": ont.version,
+            "classes": [
+                {
+                    "id": c.id, "name": c.name, "parent": c.parent, "claimable": c.claimable,
+                    "synonyms": list(c.synonyms), "confusers": list(c.confusers),
+                    "keyed": c.id in keyed,
+                }
+                for c in ont.classes.values()
+            ],
+        }  # fmt: skip
 
     @app.get("/api/cases")
     def cases():

@@ -25,9 +25,18 @@ with the loop we already have (Batches, Compare, the gate) rather than asserting
 | **C — caption exemplars** | 1–2 class-level caption phrases in house style | `objects.toml` `caption_exemplars` (new) | few-shot "example phrasings" lines | retrieval, fidelity/style |
 | **B — embedding prototypes** | per-class centroid of example Chips' Clay/LGND embeddings, measured look-alikes, counts | `ontology/prototypes/<version>.json` (generated) | "this tile is closest to solar_array (0.82), greenhouse (0.74)…" | grounding (disambiguation) |
 
-**A and C are hand-curated and diff-able; B is generated and never hand-edited.** A and C are
-always available and cost only tokens. B is used only when a prototype file *and* a Chip
-embedding both exist, and is skipped silently otherwise.
+**A and C start hand-curated and diff-able; B is generated — and B feeds back into A.** A and C
+are always available and cost only tokens. B's nearest-class hint is used only when a prototype
+file *and* a Chip embedding both exist. But the prototype build also produces `learned_confusers`
+(the classes closest in embedding space), and when a prototype file is present the Layer A
+look-alike line is drawn from those **measured** pairs instead of the hand-typed `confusers` — so
+Layer A becomes data-driven too, falling back to the ontology file when no prototypes exist.
+(`min_visible_m` stays a physical sensor fact, not learned.)
+
+Layer C exemplars remain hand-written for now: LGND and Clay give embeddings, not a caption
+corpus, and the 60 fixtures carry structured labels but no caption text — so data-driving C needs
+a *caption* source (a human-captioned set like RSICD, or VLM-generated captions from a disjoint
+region), which is a separate, cost-bearing step (§7).
 
 ### What Layer B does and doesn't hold
 
@@ -130,7 +139,7 @@ rebuilding prototypes) bumps the version, is recorded in each Batch's provenance
 | Layer B per caption | **one dot product**, no model call | reuse Clay/LGND embeddings; `SIM_FLOOR` emits a hint only when confident |
 | Vector storage/query | cents | a handful of centroids; S3 Vectors has no idle cost |
 | **Circularity** (ADR-0006) | would invalidate grounding | class-level only; disjoint build region; built from Clay/LGND (not a scored Answer Key); `guard_scoring_region` |
-| **Resolution mismatch** (10 m vs 0.6 m) | bad hints for small objects | `LAYER_B_CLASSES` excludes turbines, roads, individual buildings |
+| **Resolution mismatch** (embedding GSD vs object size) | bad hints for objects too small for the embedding resolution | `LAYER_B_CLASSES` is set to the embedding resolution: all claimable classes for 0.6 m NAIP/Clay (incl. wind_turbine, road, building); narrowed to the large classes only if built from 10 m Sentinel-2 |
 | **Bad exemplars** | poison a class | verify each exemplar through LGND's imagery check before it enters the index |
 | **Anchoring** | over-claim the top class | always name top-2+ with a "tell them apart" clause; the gate measures whether it helped |
 

@@ -593,6 +593,18 @@ embedding prototypes). Implemented on branch `feat/ontology-data-driven`; opt-in
 | Embedding seam + three sources: Clay model (`scripts/clay_embed.py`), precomputed file, Titan multimodal (`embeddings.py`) | Data and Cases | Could | Done on branch |
 | Attach embeddings to Cases and build prototypes from them (`clayzer ontology embed-cases`, `build-prototypes`) | Data and Cases | Could | Done on branch |
 | Run Clay on a GPU box for real embeddings; build + commit a prototype file under `ontology/prototypes/` | Data and Cases | Could | To do (needs GPU + Clay weights) |
+
+**Ontology induction (ADR-0011, [docs/ontology-induction.md](ontology-induction.md)).** Build
+Layers A and C *from a caption corpus* via an LLM agent, independent of embeddings; reconcile with
+the keyed Answer-Key classes; Layer B becomes enrichment. Design approved; build pending confirmation.
+
+| Task | Area | Tier | Status |
+|---|---|---|---|
+| Caption-corpus loader + RSICD adapter to the §3.6 format | Data and Cases | Should | Designed, to build |
+| `clayzer ontology induce`: map/reduce extraction agent → candidate ontology JSON | Data and Cases | Should | Designed, to build (one-time Bedrock) |
+| Deterministic reconciliation of induced terms with the keyed/Answer-Key anchor | Data and Cases | Should | Designed, to build |
+| Validation + review diff; adopt a new ontology version, updating code lists in lockstep | Evaluation | Should | Designed, to build |
+| Optional: Layer B embedding cross-check of induced look-alikes | Data and Cases | Could | Designed, to build |
 | S3 Vectors bucket and index in the CDK app; load prototypes into it (AWS-03) | Platform | Could | To do |
 | Measure A, A+C, A+C+B as Batches on a held-out region; record grounding/retrieval and cost deltas | Evaluation | Should | To do (the headline pitch number) |
 | Co-occurrence priors (typical counts, class co-occurrence) in the build step | Data and Cases | Could | Documented, not built |

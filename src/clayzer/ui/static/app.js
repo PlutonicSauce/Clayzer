@@ -873,6 +873,360 @@ async function sourcesPage() {
 
 // ── Router ───────────────────────────────────────────────────────────────────────────────
 
+// ── Ontology explainer (interactive) ───────────────────────────────────────────────────────
+// A plain-English, no-API walk-through of the data-driven ontology and how the captioning agent
+// uses it. Docs: docs/ontology-data-driven.md, docs/ontology-induction.md (ADR-0008/0010/0011).
+
+const ONTO_CHIPS = {
+  solar: { label: "Solar-farm tile", truth: "a real solar array site",
+    scores: [["Solar farm", 0.80], ["Water", 0.47], ["Parking lot", 0.44]] },
+  wind: { label: "Wind-farm tile", truth: "a real wind-turbine site", close: true,
+    scores: [["Wind turbine", 0.96], ["Water", 0.91], ["Farm field", 0.89]] },
+  empty: { label: "Empty-land tile", truth: "a tile with no solar or wind",
+    scores: [["Parking lot", 0.92], ["Water", 0.86], ["Farm field", 0.80]] },
+};
+
+const ONTO_LAYERS = [
+  { id: "A", cls: "onto-a", name: "Layer A — look-alikes", tag: "words",
+    one: "Which things are easily mixed up, so the writer is warned.",
+    more: "For each category the guide lists what it is easily confused with in an aerial view — e.g. a solar farm vs. a greenhouse vs. a parking lot. These warnings go into the writer's instructions so it doesn't call a greenhouse a solar farm.",
+    from: "Built by an AI reading lots of example captions (and double-checked by the fingerprints)." },
+  { id: "C", cls: "onto-c", name: "Layer C — example phrasings", tag: "words",
+    one: "A couple of house-style sentences showing how to describe each thing.",
+    more: "Short example sentences per category (\"Rows of dark blue-grey panels fill the centre…\"). They teach the writer the house style and help the search feature find captions later. They are generic examples — never a description of the actual image being captioned.",
+    from: "Built by an AI reading example captions." },
+  { id: "B", cls: "onto-b", name: "Layer B — visual fingerprints", tag: "pictures",
+    one: "A numeric 'fingerprint' of what each category looks like.",
+    more: "The Clay model turns example images into a fingerprint (a long list of numbers) for each category. A new image gets its own fingerprint, and we measure which category it most resembles — a fast, cheap hint with no AI 'thinking' at that step.",
+    from: "Built by the Clay model looking at example images. Optional: the words still work without it." },
+];
+
+const ONTO_STEPS = [
+  { key: "image", icon: "🛰️", title: "A new image arrives",
+    body: "The captioning agent is handed one aerial tile and asked to describe what is on the ground — the objects, how many, where, and how they sit relative to each other." },
+  { key: "fingerprint", icon: "🔎", title: "Fingerprint check (Layer B)", layer: "B",
+    body: "The tile's fingerprint is compared with each category's fingerprint. The closest matches become a hint: “this looks most like a solar farm (0.80).” Pure arithmetic — instant and almost free.",
+    skipNote: "Skipped: without the fingerprints there is no 'looks most like' hint." },
+  { key: "notes", icon: "📋", title: "The guide prepares notes (Layers A + C)", layer: "AC",
+    body: "The ontology gathers the relevant notes: the look-alikes to tell apart, a couple of house-style example sentences, and (if available) the fingerprint hint. All general knowledge — never the answer for this tile.",
+    skipNote: "Skipped: without the ontology the writer gets no look-alike warnings or examples." },
+  { key: "write", icon: "✍️", title: "The captioning AI writes", layer: "captions",
+    body: "The vision model (e.g. Nova Pro) receives the image plus the notes, and writes a caption together with structured claims (object, count, position, relations)." },
+  { key: "verify", icon: "✅", title: "Double-check (verify, then write)",
+    body: "Each claim is checked against imagery with LGND Geo. Claims that can't be confirmed are marked uncertain, and the caption is rewritten from only the confirmed ones." },
+  { key: "final", icon: "📝", title: "Final caption",
+    body: "The finished caption and its confirmed claims are saved — then scored on grounding, retrieval and fidelity like any other caption, so we can measure whether the ontology helped." },
+];
+
+function ontologyReceives(withOnto) {
+  const base = ["The aerial image", "Base instructions: describe objects, counts, positions, relations"];
+  const extra = [
+    "⚠️ Look-alikes to tell apart (Layer A): Solar farm vs Greenhouse; Solar farm vs Parking lot",
+    "💬 Example phrasing (Layer C): “Rows of dark blue-grey panels fill the centre of the tile.”",
+    "🔎 Fingerprint hint (Layer B): closest to Solar farm (0.80)",
+  ];
+  const items = withOnto ? base.concat(extra) : base;
+  return `<ul class="onto-receives">${items.map((t, k) =>
+    `<li class="${withOnto && k >= 2 ? "onto-extra" : ""}">${esc(t)}</li>`).join("")}</ul>`;
+}
+
+const ONTO_ROOTCOLOR = {
+  energy_infrastructure: "#b06a4f", transportation: "#4a7a86",
+  built_structure: "#8a7a63", hydrography: "#4a6a86", land_cover: "#5a7a4a",
+};
+
+async function ontologyPage(focus) {
+  const me = SEQ;
+  const ont = await api("/api/ontology").catch(() => null);
+  if (stale(me)) return;
+  const state = { chip: "solar", withOnto: true, node: null };
+
+  // ── Step: what it is ───────────────────────────────────────────────────────
+  const renderWhat = (host) => {
+    host.innerHTML = `
+      <p class="onto-lead">Before the AI describes an aerial image, we hand it a <b>field guide</b>
+        to what shows up in these images — like a bird-watching guide: written entries plus
+        reference photos, matched up by name. It has two halves. Click a layer to learn more.</p>
+      <div class="onto-halves">
+        <div class="onto-half">
+          <h3>📖 The written guide <span class="onto-pill">words</span></h3>
+          <p class="sub">Built by an AI reading example captions.</p>
+          <div class="onto-layers" data-tags="words"></div>
+        </div>
+        <div class="onto-half">
+          <h3>🖼️ The reference fingerprints <span class="onto-pill">pictures</span></h3>
+          <p class="sub">Built by the Clay model looking at example images.</p>
+          <div class="onto-layers" data-tags="pictures"></div>
+        </div>
+      </div>
+      <p class="onto-join">The two halves are linked by <b>category name</b> — the words and the
+        fingerprint for “solar farm” sit side by side. The written guide works on its own; the
+        fingerprints are an optional add-on that sharpens the hints.</p>`;
+    for (const h of host.querySelectorAll(".onto-layers")) {
+      h.innerHTML = ONTO_LAYERS.filter((l) => l.tag === h.dataset.tags).map((l) => `
+        <button type="button" class="onto-layer ${l.cls}">
+          <span class="onto-badge">${l.id}</span>
+          <span class="onto-layer-name">${esc(l.name)}</span>
+          <span class="onto-layer-one">${esc(l.one)}</span>
+          <span class="onto-layer-more">${esc(l.more)}<br><em>${esc(l.from)}</em></span>
+        </button>`).join("");
+    }
+    host.querySelectorAll(".onto-layer").forEach((b) =>
+      b.addEventListener("click", () => b.classList.toggle("open")));
+  };
+
+  // ── Step: how it's built ───────────────────────────────────────────────────
+  const BUILD = {
+    words: { cls: "build-words", icon: "📖", head: "The written guide (Layers A + C)",
+      steps: [
+        ["A pile of example captions", "e.g. a human-captioned image set (RSICD), or Clay's own example captions."],
+        ["An AI reads them", "and pulls out the categories people mention, other names for the same thing (synonyms), which things get confused, and example sentences."],
+        ["It organises them into a hierarchy", "grouping specific things under general ones, following a classic ontology recipe (Noy & McGuinness)."],
+        ["A person reviews it", "and the scored categories stay matched to the answer keys, so grounding keeps working."],
+        ["→ Layers A + C of the guide", "classes, synonyms, look-alikes, and house-style examples."],
+      ] },
+    pics: { cls: "build-pics", icon: "🖼️", head: "The fingerprints (Layer B)",
+      steps: [
+        ["Example images per category", "confirmed solar sites, wind sites, water, and so on."],
+        ["The Clay model reads each image", "turning it into a fingerprint — a long list of numbers summarising what it looks like."],
+        ["Average them per category", "all the solar examples become one “typical solar” fingerprint."],
+        ["→ Layer B of the guide", "one fingerprint per category, stored beside the words."],
+      ] },
+  };
+  const buildCol = (b) => `
+    <div class="onto-build-col ${b.cls}">
+      <h3>${b.icon} ${esc(b.head)}</h3>
+      <ol class="onto-build-steps">
+        ${b.steps.map(([t, d]) => `<li><b>${esc(t)}</b><span>${esc(d)}</span></li>`).join("")}
+      </ol>
+    </div>`;
+  const renderBuild = (host) => {
+    host.innerHTML = `
+      <p class="onto-lead">The two halves are built separately — and <b>neither needs the other</b>.
+        The words come from reading captions; the fingerprints come from looking at images.</p>
+      <div class="onto-build">${buildCol(BUILD.words)}${buildCol(BUILD.pics)}</div>
+      <details class="onto-rules">
+        <summary>The rules the AI follows when building the guide (Noy &amp; McGuinness)</summary>
+        <ul>
+          <li><b>Group specific under general.</b> A greenhouse is a <i>kind of</i> building, which is a kind of built structure.</li>
+          <li><b>Synonyms are alternate names, not new categories.</b> “PV plant”, “photovoltaic array”, “solar farm” all point to one <i>solar farm</i> entry.</li>
+          <li><b>Only make a new category when it truly behaves differently.</b> “Large” is a <i>size</i> of solar farm, not its own category.</li>
+          <li><b>Keep it tidy.</b> 2–12 things under each group; consistent, simple names; no loops.</li>
+        </ul>
+      </details>`;
+  };
+
+  // ── Step: example ontology graph ───────────────────────────────────────────
+  const rootOf = (id, byId) => { let c = byId[id]; while (c && c.parent) c = byId[c.parent]; return c ? c.id : id; };
+  const layoutOnt = (classes) => {
+    const byId = {}; classes.forEach((c) => (byId[c.id] = c));
+    const kids = {}; classes.forEach((c) => { const p = c.parent || ""; (kids[p] = kids[p] || []).push(c.id); });
+    const depth = (id) => { let d = 0, p = byId[id].parent; while (p) { d++; p = byId[p].parent; } return d; };
+    const rowH = 42, colW = 215, padX = 14, padY = 14, nodeH = 30, nodeW = 160;
+    let leaf = 0; const y = {};
+    const assign = (id) => {
+      const ks = kids[id] || [];
+      if (!ks.length) { y[id] = padY + leaf * rowH + nodeH / 2; leaf++; }
+      else { ks.forEach(assign); y[id] = (y[ks[0]] + y[ks[ks.length - 1]]) / 2; }
+    };
+    (kids[""] || []).sort().forEach(assign);
+    const maxDepth = Math.max(0, ...classes.map((c) => depth(c.id)));
+    const nodes = classes.map((c) => ({ ...c, x: padX + depth(c.id) * colW, y: y[c.id] }));
+    const edges = classes.filter((c) => c.parent).map((c) => ({ from: c.parent, to: c.id }));
+    return { nodes, edges, byId, nodeW, nodeH, width: padX * 2 + maxDepth * colW + nodeW, height: padY * 2 + leaf * rowH };
+  };
+  const renderGraph = (host) => {
+    if (!ont) { host.innerHTML = `<p class="empty">Couldn't load the ontology.</p>`; return; }
+    const lay = layoutOnt(ont.classes);
+    const byId = lay.byId;
+    const edgeEls = lay.edges.map((e) => {
+      const a = byId[e.from], b = byId[e.to];
+      // Stop a few px short of the child so the arrowhead sits just before the box, not under it.
+      const x1 = a.x + lay.nodeW, y1 = a.y, x2 = b.x - 4, y2 = b.y, mx = (x1 + x2) / 2;
+      return `<path class="onto-edge" marker-end="url(#onto-arrow)" d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}"/>`;
+    }).join("");
+    const nodeEls = lay.nodes.map((n) => {
+      const col = ONTO_ROOTCOLOR[rootOf(n.id, byId)] || "#999";
+      return `<g class="onto-node" data-id="${esc(n.id)}" tabindex="0" role="button"
+        aria-label="${esc(n.name)}" transform="translate(${n.x},${n.y - lay.nodeH / 2})">
+        <rect width="${lay.nodeW}" height="${lay.nodeH}" rx="8" style="stroke:${col}"/>
+        <text x="11" y="${lay.nodeH / 2 + 4}">${esc(n.name)}${n.keyed ? " ★" : ""}</text>
+      </g>`;
+    }).join("");
+    host.innerHTML = `
+      <p class="onto-lead">A real slice of the guide (Layer A), straight from the project's
+        ontology file — classes and their sub-classes. <b>Click any box</b> to see its other names
+        (synonyms) and what it's confused with.</p>
+      <div class="onto-graph-wrap">
+        <div class="onto-graph-scroll">
+          <svg viewBox="0 0 ${lay.width} ${lay.height}" width="${lay.width}" height="${lay.height}"
+            class="onto-graph-svg" role="group" aria-label="Ontology class hierarchy">
+            <defs>
+              <marker id="onto-arrow" viewBox="0 0 10 10" refX="9" refY="5"
+                markerWidth="12" markerHeight="12" markerUnits="userSpaceOnUse" orient="auto">
+                <path d="M0,0 L10,5 L0,10 z" fill="#6b6461"/>
+              </marker>
+            </defs>
+            ${edgeEls}${nodeEls}
+          </svg>
+        </div>
+        <aside id="onto-node-detail" class="onto-node-detail"><p class="sub">Pick a box to see its details.</p></aside>
+      </div>
+      <p class="sub onto-legend">★ = scored against an answer key · colour = top-level group ·
+        ontology v${esc(ont.version)}.</p>`;
+    const showNode = (id) => {
+      const c = byId[id]; if (!c) return;
+      const chain = []; let p = c.parent; while (p) { chain.unshift(byId[p].name); p = byId[p].parent; }
+      const chips = (arr, kind) => arr.length
+        ? `<div class="onto-chips">${arr.map((x) => `<span class="onto-chip ${kind}">${esc(byId[x] ? byId[x].name : x)}</span>`).join("")}</div>`
+        : `<p class="sub">—</p>`;
+      document.getElementById("onto-node-detail").innerHTML = `
+        <h3>${esc(c.name)} ${c.keyed ? '<span class="onto-star">★ scored</span>' : '<span class="onto-star muted">not scored</span>'}</h3>
+        <p class="sub onto-chain">${chain.length ? esc(chain.join(" › ")) + " › " : ""}<b>${esc(c.name)}</b></p>
+        <p class="onto-dl-label">Other names (synonyms)</p>
+        ${c.synonyms.length ? `<div class="onto-chips">${c.synonyms.map((s) => `<span class="onto-chip syn">${esc(s)}</span>`).join("")}</div>` : '<p class="sub">none listed</p>'}
+        <p class="onto-dl-label">Easily confused with</p>
+        ${chips(c.confusers, "conf")}`;
+    };
+    host.querySelectorAll(".onto-node").forEach((g) => {
+      const sel = () => {
+        host.querySelectorAll(".onto-node").forEach((x) => x.classList.toggle("selected", x === g));
+        state.node = g.dataset.id; showNode(g.dataset.id);
+      };
+      g.addEventListener("click", sel);
+      g.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); sel(); } });
+    });
+    if (state.node && byId[state.node]) {
+      host.querySelector(`.onto-node[data-id="${state.node}"]`)?.classList.add("selected");
+      showNode(state.node);
+    }
+  };
+
+  // ── Step: measuring similarity ─────────────────────────────────────────────
+  const renderMeasure = (host) => {
+    host.innerHTML = `
+      <p class="onto-lead">Each image becomes a fingerprint. We measure how closely a new tile's
+        fingerprint lines up with each category's — a score from 0 (unrelated) to 1 (near-identical).
+        Pick a tile:</p>
+      <div class="onto-chipbtns">
+        ${Object.entries(ONTO_CHIPS).map(([k, c]) =>
+          `<button type="button" class="btn secondary onto-chipbtn" data-chip="${k}">${esc(c.label)}</button>`).join("")}
+      </div>
+      <div id="onto-compare" class="onto-compare"></div>`;
+    const draw = () => {
+      const c = ONTO_CHIPS[state.chip];
+      document.getElementById("onto-compare").innerHTML = `
+        <p class="onto-truth">This tile is ${esc(c.truth)}. Its fingerprint scores against each category:</p>
+        <div class="onto-bars">
+          ${c.scores.map(([name, s], k) => `
+            <div class="onto-bar-row">
+              <span class="onto-bar-name">${esc(name)}</span>
+              <span class="onto-bar-track"><span class="onto-bar-fill ${k === 0 ? "top" : ""}" style="width:${Math.round(s * 100)}%"></span></span>
+              <span class="onto-bar-score">${s.toFixed(2)}</span>
+            </div>`).join("")}
+        </div>
+        <p class="sub onto-verdict">${c.close
+          ? `Closest is <b>${esc(c.scores[0][0])}</b> — but the runner-up is close, so the hint tells the writer “these look alike here, check the image.”`
+          : `Closest is <b>${esc(c.scores[0][0])}</b>, clearly ahead — a confident hint.`}</p>`;
+    };
+    host.querySelectorAll(".onto-chipbtn").forEach((b) => b.addEventListener("click", () => {
+      state.chip = b.dataset.chip;
+      host.querySelectorAll(".onto-chipbtn").forEach((x) => x.classList.toggle("active", x === b));
+      draw();
+    }));
+    host.querySelector(`.onto-chipbtn[data-chip="${state.chip}"]`)?.classList.add("active");
+    draw();
+  };
+
+  // ── Step: how the agent uses it ────────────────────────────────────────────
+  const renderUse = (host) => {
+    const skipped = (st) => !state.withOnto && (st.key === "fingerprint" || st.key === "notes");
+    host.innerHTML = `
+      <p class="onto-lead">A tile flows through the pipeline below. Toggle the ontology off to see
+        what the writer would get without it.</p>
+      <div class="onto-toggle" role="group" aria-label="Ontology on or off">
+        <button type="button" class="seg2" data-mode="on">With ontology</button>
+        <button type="button" class="seg2" data-mode="off">Without ontology</button>
+      </div>
+      <div id="onto-uselist" class="onto-uselist"></div>`;
+    const draw = () => {
+      document.getElementById("onto-uselist").innerHTML = ONTO_STEPS.map((st) => {
+        const sk = skipped(st);
+        let extra = "";
+        if (sk) extra = `<p class="onto-skip">${esc(st.skipNote)}</p>`;
+        else if (st.key === "write") extra = `<p class="onto-receives-label">What the writer receives:</p>${ontologyReceives(state.withOnto)}`;
+        return `<div class="onto-use-step ${sk ? "skipped" : ""} ${st.layer ? "layer-" + st.layer : ""}">
+          <div class="onto-use-head"><span class="onto-step-icon">${sk ? "⤼" : st.icon}</span>
+            <h3>${esc(st.title)}</h3></div>
+          <p>${esc(st.body)}</p>${extra}</div>`;
+      }).join("");
+    };
+    host.querySelector(`.seg2[data-mode="${state.withOnto ? "on" : "off"}"]`).classList.add("active");
+    host.querySelectorAll(".seg2").forEach((b) => b.addEventListener("click", () => {
+      state.withOnto = b.dataset.mode === "on";
+      host.querySelectorAll(".seg2").forEach((x) => x.classList.toggle("active", x === b));
+      draw();
+    }));
+    draw();
+  };
+
+  // ── Wizard shell + navigation ──────────────────────────────────────────────
+  const STEPS = [
+    { key: "what", title: "What it is", render: renderWhat },
+    { key: "build", title: "How it's built", render: renderBuild },
+    { key: "graph", title: "Example ontology", render: renderGraph },
+    { key: "measure", title: "Measuring “looks like”", render: renderMeasure },
+    { key: "use", title: "How the agent uses it", render: renderUse },
+  ];
+  let cur = STEPS.findIndex((s) => s.key === focus);
+  if (cur < 0) cur = 0;
+
+  $view.innerHTML = `
+    <section class="hero onto-hero">
+      <div class="hero-body">
+        <p class="hero-kicker">The data-driven ontology</p>
+        <h1>How the ontology works</h1>
+        <p class="hero-lede">A guided tour: what the ontology is, how its three layers are built,
+          a real example you can explore, and how the caption-writer uses it.</p>
+      </div>
+    </section>
+    <ol class="onto-wz-steps" role="tablist">
+      ${STEPS.map((s, i) => `<li><button type="button" class="onto-wz-dot" data-i="${i}">
+        <span class="onto-wz-num">${i + 1}</span><span class="onto-wz-label">${esc(s.title)}</span>
+      </button></li>`).join("")}
+    </ol>
+    <div id="onto-panel" class="onto-panel" aria-live="polite"></div>
+    <nav class="onto-wz-pager">
+      <button type="button" class="btn secondary" id="onto-prev">←</button>
+      <span id="onto-wz-at" class="sub"></span>
+      <button type="button" class="btn" id="onto-next">Next →</button>
+    </nav>
+    <p class="onto-foot sub">Deeper reading for the team:
+      <a href="/docs/docs/ontology-data-driven.md">ontology-data-driven.md</a> ·
+      <a href="/docs/docs/ontology-induction.md">ontology-induction.md</a> ·
+      ADR-<a href="/docs/docs/adr/0008-object-classes-live-in-one-ontology-file.md">0008</a>/<a href="/docs/docs/adr/0010-the-ontology-is-data-driven-and-feeds-the-captioner.md">0010</a>/<a href="/docs/docs/adr/0011-the-ontology-is-induced-from-a-caption-corpus.md">0011</a>.</p>`;
+
+  const dots = [...$view.querySelectorAll(".onto-wz-dot")];
+  const prev = document.getElementById("onto-prev");
+  const next = document.getElementById("onto-next");
+  const show = (i) => {
+    cur = Math.max(0, Math.min(STEPS.length - 1, i));
+    dots.forEach((d, k) => { d.classList.toggle("active", k === cur); d.classList.toggle("done", k < cur); });
+    prev.disabled = cur === 0;
+    next.textContent = cur === STEPS.length - 1 ? "Done ✓" : `Next: ${STEPS[cur + 1].title} →`;
+    document.getElementById("onto-wz-at").textContent = `Step ${cur + 1} of ${STEPS.length}`;
+    history.replaceState(null, "", `#/ontology/${STEPS[cur].key}`);
+    const panel = document.getElementById("onto-panel");
+    panel.innerHTML = "";
+    STEPS[cur].render(panel);
+    panel.scrollIntoView({ block: "nearest" });
+  };
+  dots.forEach((d) => d.addEventListener("click", () => show(+d.dataset.i)));
+  prev.addEventListener("click", () => show(cur - 1));
+  next.addEventListener("click", () => { if (cur < STEPS.length - 1) show(cur + 1); });
+  show(cur);
+}
+
 async function route() {
   const me = ++SEQ;
   const parts = (location.hash.replace(/^#\/?/, "") || "").split("/").map(decodeURIComponent);
@@ -891,6 +1245,7 @@ async function route() {
   try {
     if (page === "") await overview();
     else if (page === "how") await howPage(parts[1]);
+    else if (page === "ontology") await ontologyPage(parts[1]);
     else if (page === "tasks") await tasksPage(parts[1]);
     else if (page === "cases") await casesPage();
     else if (page === "batches" && parts[1]) await batchPage(parts[1], parts[2]);

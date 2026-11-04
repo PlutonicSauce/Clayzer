@@ -6,6 +6,11 @@ This ADR extends it into the caption step as retrieval-augmented, class-level gu
 layers, so the captioner knows the vocabulary, the look-alikes, and the house style before it
 writes — the team's data-driven differentiator.
 
+> **Refined by [ADR-0011](0011-the-ontology-is-induced-from-a-caption-corpus.md):** Layers A and C
+> are induced from a caption corpus by an LLM agent, independent of embeddings. The
+> embedding-measured `learned_confusers` described below for Layer A are kept only as *enrichment*
+> (a cross-check), not the source of A's data-drivenness.
+
 - **Layer A — symbolic (already in the file).** Classes, is-a hierarchy, allowed attributes,
   look-alikes (`confusers`), and `min_visible_m`. Injected into the prompt as a compact
   look-alike caution.
