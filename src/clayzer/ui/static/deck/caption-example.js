@@ -25,13 +25,12 @@ const CLAIMS = [
 const SOURCES = [
   ["USGS wind turbine database", "17 turbines in the photo", "one just outside", "bad"],
   ["OpenStreetMap", "18: it puts the top-edge turbine 2 m further in", "", "ok"],
-  ["Checked by eye", "18: the top-edge turbine is in the photo", "answer key", "ok"],
+  ["Automatic cross-check", "flags the disagreement; a person confirms 18", "answer key", "ok"],
 ];
 
 const WRONG = [
-  ["USGS and OpenStreetMap", "place this turbine 2 m apart"],
-  ["OpenStreetMap", "no houses on a street of about 30"],
-  ["OpenStreetMap", "a dry wash mapped as water"],
+  ["Two sources", "cross-checked by code on every image"],
+  ["A person", "only looks where they disagree"],
 ];
 
 // The 17 turbines both records place inside the Chip (USGS positions), and the one they disagree on.
@@ -94,9 +93,8 @@ export function CaptionExample() {
           centre; the records put them all around it.</p>
       </div>
     </div>
-    <p class="ex-wrong"><b>Public records disagree, and are wrong too.</b>
+    <p class="ex-wrong"><b>Labels are automatic: about a minute per image, no hand-labelling.</b>
       ${WRONG.map(([src, what]) => html`<span><i>${src}</i> ${what}</span>`)}
-      <span>Every image checked by eye; the fixes live in one file.</span>
     </p>
   </div>`;
 }
