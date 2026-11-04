@@ -255,3 +255,10 @@ object = "road"
 action = "add"
 cells = ["centre", "north_east", "east", "south_east", "south", "south_west"]
 reason = "Tracks to a well pad; OSM has none."
+
+[[correction]]
+case = "fixed-test-neg-10"
+object = "water"
+action = "add"
+cells = ["north_east", "north"]
+reason = "A wet, muddy pond across the top: OSM maps it as intermittent water, which the water rule now drops, but it's wet in this image (2022-08-25). The centre and sides are dry field."
