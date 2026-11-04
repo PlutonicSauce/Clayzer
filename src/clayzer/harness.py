@@ -14,12 +14,11 @@ the Claims that are left: verify, then write.
 
 import time
 
+from clayzer import ontology
 from clayzer.grid import GRID, RELATIONS
 
-OBJECTS = (
-    "solar_array", "wind_turbine", "road", "railroad", "building", "water", "field",
-    "parking_lot", "greenhouse", "vegetation", "bare_ground",
-)  # fmt: skip
+# The object types a Claim may name: the ontology's claimable classes, in file order (ADR-0008).
+OBJECTS = tuple(ontology.load().claimable())
 
 PROMPT = """\
 This is an aerial image (NAIP, 0.6 m per pixel, about 300 m across, north is up).

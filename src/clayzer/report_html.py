@@ -185,7 +185,7 @@ def _claim_table(g: dict, labels: list[dict]) -> str:
         claim = f"{cl['count']} × {_short(cl['object'])} at {cl['position']} {attrs}".strip()
         if cl.get("change"):  # a Change Case's Claim
             claim += f" ({cl['change']})"
-        ref = refs.get(cl["object"])
+        ref = refs.get(row.get("ref_object", cl["object"]))
         if ref:
             ref_attrs = " ".join(f"{k}={v}" for k, v in ref["attributes"].items())
             count = f"{ref['count']} × " if ref["count"] is not None else ""
@@ -195,7 +195,11 @@ def _claim_table(g: dict, labels: list[dict]) -> str:
                 + (f" ({ref['change']})" if ref.get("change") else "")
                 + f" · {ref['source']}"
             )
-            verdict = '<span class="badge b-ok">matched</span>'
+            verdict = (
+                '<span class="badge b-warn">near miss, half credit</span>'
+                if row["verdict"] == "near miss"
+                else '<span class="badge b-ok">matched</span>'
+            )
         else:
             reference = "none"
             verdict = '<span class="badge b-bad">false positive</span>'
@@ -481,10 +485,13 @@ def render_html(b: dict, store) -> str:
     if b["retrieval"]:
         html.append(
             "<h2>Retrieval</h2><table><tr><th>Repeat</th><th>Query</th><th>Relevant Cases</th>"
-            '<th>Ranking</th><th class="num">Reciprocal rank</th></tr>'
+            '<th>Ranking</th><th class="num">Reciprocal rank</th>'
+            '<th class="num">With synonyms</th></tr>'
         )
         for row in b["retrieval"]:
+            expanded = {q["query"]: q for q in (row.get("expanded") or {}).get("queries", [])}
             for q in row["queries"]:
+                rr_x = (expanded.get(q["query"]) or {}).get("reciprocal_rank")
                 ranking = " › ".join(
                     f"<b>{escape(c)}</b>" if c in q["relevant"] else escape(c) for c in q["ranked"]
                 )
@@ -492,7 +499,8 @@ def render_html(b: dict, store) -> str:
                     f"<tr><td>{row['repeat']}</td><td>{escape(q['query'])}</td>"
                     f"<td>{escape(', '.join(q['relevant']))}</td>"
                     f"<td class='mono'>{ranking}</td>"
-                    f'<td class="num">{_badge(q["reciprocal_rank"])}</td></tr>'
+                    f'<td class="num">{_badge(q["reciprocal_rank"])}</td>'
+                    f'<td class="num">{_badge(rr_x)}</td></tr>'
                 )
         html.append("</table>")
     html.append(f"</main><script>{SCRIPT}</script></body></html>")

@@ -1,8 +1,11 @@
 """The object ontology (ontology/objects.toml): every class a Claim can name (ADR-0008).
 
 Small and read-only: the classes, their is-a hierarchy, and the crosswalks to Answer Keys,
-retrieval queries, and benchmarks. Grounding can use `distance` for partial credit when a Claim
-names a parent or sibling of the Reference Label's class.
+retrieval queries, and benchmarks. The code's vocabularies come from here, not from lists of
+their own (decided 2026-11-04): the Harness's allowed objects (`claimable`), grounding's scored
+classes (`keyed`), the OSM mapping (`osm_object`), and the retrieval queries (`queries`), so
+adding a class is a one-file change. Grounding uses `distance` for partial credit when a Claim
+names a parent or child of the Reference Label's class.
 """
 
 from __future__ import annotations
@@ -66,6 +69,25 @@ class Ontology:
 
     def queries(self) -> dict[str, str]:
         return {q: c.id for c in self.classes.values() for q in c.queries}
+
+    def osm_rules(self) -> list[tuple[str, dict]]:
+        """(class id, tag rule) for every OSM rule the code maps, the most specific class
+        first (a greenhouse before a building), then in file order."""
+        rules = [(c.id, dict(r)) for c in self.classes.values() for r in c.osm]
+        return sorted(rules, key=lambda cr: -len(self.ancestors(cr[0])))
+
+    def osm_object(self, tags: dict) -> str | None:
+        """The class an OSM way maps to, or None. Power features are left to USGS, and a way
+        tagged intermittent=yes is never water (OSM maps dry desert washes as streams)."""
+        if "power" in tags:
+            return None
+        dry = tags.get("intermittent") == "yes"
+        for class_id, rule in self.osm_rules():
+            if dry and self.is_a(class_id, "hydrography"):
+                continue
+            if all(k in tags and v in ("*", tags[k]) for k, v in rule.items()):
+                return class_id
+        return None
 
 
 def _tuple(raw: dict, key: str) -> tuple:

@@ -306,7 +306,7 @@ dashed classes are candidates, not yet claimable.
 
 | What each class records | Used for | Criterion |
 |---|---|---|
-| Parent class (is-a) | Partial credit when a Claim names a parent or sibling of the Reference Label's class (`distance`) | Grounding (CAP-10) |
+| Parent class (is-a) | Half credit when a Claim names the parent or a child of the Reference Label's class (`distance` 1); siblings get none | Grounding (CAP-10) |
 | Answer Keys and OSM tag rules | Building Reference Labels; reporting which Claims no Answer Key covers | Grounding, label prep time (CAP-10, CAP-13) |
 | Synonyms | Expanding retrieval queries and Captions onto shared terms ("solar farm", "PV plant") | Retrieval (CAP-09, CAP-06) |
 | Look-alikes (`confusers`) | Warnings in the prompt; choosing negative Cases (greenhouses and parking lots vs solar arrays) | Fidelity, grounding |
@@ -314,10 +314,11 @@ dashed classes are candidates, not yet claimable.
 | Attributes | The values a Claim may carry (`size`, `surface`) | Grounding |
 | RSICD scenes, NLCD and WorldCover classes | Comparing scores across our Cases and outside benchmarks; scene-level only, never grounding | Fidelity, retrieval |
 
-**Today vs planned.** The file matches the code's existing lists exactly, and
-`tests/test_ontology.py` keeps them matched. Still to do: have the code read its lists from the
-file, add partial credit to grounding, expand retrieval with synonyms, and put look-alikes in the
-prompt (plan §7). The land-cover crosswalks were checked on 2026-11-04 against the MRLC NLCD
+**Today vs planned.** Since 2026-11-04 the code reads its lists from the file (the Harness's
+allowed objects, grounding's scored classes, the OSM mapping, and the retrieval queries), so
+adding a class is a one-file change; grounding gives half credit at class distance 1; and
+retrieval is reported with and without synonym-expanded queries. Still to do: put look-alikes
+in the prompt (plan §7). The land-cover crosswalks were checked on 2026-11-04 against the MRLC NLCD
 legend and the WorldCover v2.0 user manual, and `tests/test_ontology.py` keeps their names to
 those legends. They only partly match: WorldCover counts pasture as grassland and orchards as
 tree cover, and NLCD calls most Mojave desert Shrub/Scrub, so a land-cover score would disagree

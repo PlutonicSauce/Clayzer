@@ -51,7 +51,7 @@ from clayzer.workflow import score as workflow_score
 
 # Bump when grounding or summary logic changes, so the regression gate warns that scores from
 # before and after aren't comparable.
-SCORER_VERSION = "grounding-4+workflow-1"  # exact-cell position; the Workflow Score
+SCORER_VERSION = "grounding-5+workflow-1"  # near-miss class credit; the Workflow Score
 
 OK, HARNESS_FAULT, SANDBOX_FAILURE = "ok", "harness_fault", "sandbox_failure"
 EXPIRED = {
@@ -489,6 +489,9 @@ def summarize(cfg: BatchConfig, cases: list[dict], results: list[dict], retr: li
     mrr = [row["mrr"] for row in retr if row["mrr"] is not None]
     # The rubric's measure: how often the right Caption is the top result for a query.
     top1 = [row["recall@1"] for row in retr if row.get("recall@1") is not None]
+    # The same, with each query expanded by its class's synonyms (Batches before have none).
+    top1_x = [row["expanded"]["recall@1"] for row in retr
+              if (row.get("expanded") or {}).get("recall@1") is not None]  # fmt: skip
     prep = [c.get("prep_seconds") for c in cases if c.get("prep_seconds") is not None]
     return {
         "batch_id": cfg.batch_id,
@@ -500,6 +503,7 @@ def summarize(cfg: BatchConfig, cases: list[dict], results: list[dict], retr: li
             "fidelity": _mean(c["fidelity"]["mean"] for c in per_case.values()),
             "retrieval_mrr": {"mean": _mean(mrr), "spread": _spread(mrr)},
             "retrieval_recall_at_1": {"mean": _mean(top1), "spread": _spread(top1)},
+            "retrieval_recall_at_1_expanded": {"mean": _mean(top1_x), "spread": _spread(top1_x)},
             "unscored_share": _mean(c["unscored_share"] for c in per_case.values()),
             "label_prep_seconds": sum(c.get("prep_seconds") or 0 for c in cases),
             "label_prep_seconds_per_case": _mean(prep),
