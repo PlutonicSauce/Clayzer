@@ -243,7 +243,10 @@ an ODbL notice; the rest of the repo stays Apache-2.0 (REQ-15).
 
 **Provenance** (REQ-14). Benchmark Reference Captions are downloaded at run time, so each Run
 records the dataset version or commit hash and the image ids it used, enough to fetch the same
-references again.
+references again. Every Batch also records what it was judged with (`src/clayzer/provenance.py`):
+the caption prompt, the Judge's rubric, the frozen Cases, a SHA-256 of every Chip (checked
+before each Run), the ontology's version, and the git commit. The Batch page shows them beside
+the Baseline's, with a link to every stored file.
 
 **Outside benchmark rules** (RSICD, VRSBench, LEVIR-CC / LEVIR-MCI). Their imagery is commercial
 or academic-only, so the RSICD rules below apply to all of them. LEVIR covers Texas, our test

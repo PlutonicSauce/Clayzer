@@ -374,3 +374,18 @@ pre.sample { background: #faf6f3; border: 1px solid var(--line); border-radius: 
 .term b { font-size: 15px; }
 abbr { text-decoration: underline dotted; cursor: help; }
 .empty { color: var(--muted); padding: 14px; border: 1px dashed var(--line); border-radius: 8px; }
+
+/* Provenance: a Batch's settings beside the Baseline's, and its stored files. */
+.prov { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 28px; align-items: start; }
+.prov h3 { margin-top: 0; }
+.prov-settings td:first-child { color: var(--muted); white-space: nowrap; }
+.prov-group th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--muted); background: #f7f3f1; }
+.prov-settings tr.differs td { background: #fbf4e6; }
+.prov-files tr.missing td { color: var(--muted); }
+.btn-link { background: none; border: 0; padding: 0; color: inherit; text-decoration: underline;
+  cursor: pointer; font: inherit; }
+.prov-run { margin: 10px 0 16px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 8px; }
+.prov-run > summary { cursor: pointer; font-weight: 600; }
+.prov-run table { margin-top: 10px; }
+@media (max-width: 1000px) { .prov { grid-template-columns: 1fr; } }

@@ -20,7 +20,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from clayzer import batch as batches
-from clayzer.cases import cases_key, load_cases
+from clayzer import provenance
+from clayzer.cases import cases_key, load_cases, parse_jsonl
 from clayzer.config import REPO, Settings
 from clayzer.gate import DEFAULT_TOLERANCE, compare, gate, load_baseline
 
@@ -332,6 +333,76 @@ def create_app(settings: Settings, region: str = "dev", allow_launch: bool = Fal
     def one(batch_id: str):
         cfg, summary = batches.load_summary(store, _safe(batch_id))
         return {"config": asdict(cfg), "summary": summary}
+
+    @app.get("/api/batches/{batch_id}/provenance")
+    def batch_provenance(batch_id: str):
+        """Every setting the Batch ran and was judged with, beside the Baseline's, and where
+        each of its stored files is."""
+        bid = _safe(batch_id)
+        cfg = asdict(batches.load_config(store, bid))
+        base = baseline_or_none()
+        bcfg = asdict(base["config"]) if base else None
+        rows = []
+        for key, label, group in provenance.SETTINGS:
+            value = cfg.get(key)
+            row = {"key": key, "label": label, "group": group, "value": value,
+                   "recorded": not (key in provenance.RECORDED_SINCE and value is None)}  # fmt: skip
+            if bcfg is not None and key not in ("created", "region"):
+                old = bcfg.get(key)
+                row["baseline"] = old
+                row["baseline_recorded"] = not (key in provenance.RECORDED_SINCE and old is None)
+                row["differs"] = row["recorded"] and row["baseline_recorded"] and old != value
+            rows.append(row)
+        for key, value in cfg["extra"].items():
+            rows.append({"key": key, "label": key, "group": "Recorded by another branch's code",
+                         "value": value, "recorded": True})  # fmt: skip
+        return {
+            "batch_id": bid,
+            "baseline_id": bcfg["batch_id"] if bcfg else None,
+            "settings": rows,
+            "files": provenance.files(store, bid, provenance.BATCH_FILES),
+        }
+
+    @app.get("/api/batches/{batch_id}/runs/{name}/provenance")
+    def run_provenance(batch_id: str, name: str):
+        """A Run's stored files, and exactly which Case and Chip it was scored on."""
+        bid = _safe(batch_id)
+        m = re.match(r"^(.+)--r(\d+)$", _safe(name))
+        if not m:
+            raise HTTPException(404, "not a Run")
+        case_id, repeat = m.group(1), int(m.group(2))
+        cases = {c["id"]: c for c in parse_jsonl(store.get(f"batches/{bid}/cases.jsonl"))}
+        if case_id not in cases:
+            raise HTTPException(404, f"{case_id} isn't in {bid}")
+        case = cases[case_id]
+        chip = case["chips"][0]
+        chips_key = f"batches/{bid}/chips.json"
+        chip_shas = json.loads(store.get(chips_key)) if store.exists(chips_key) else {}
+        return {
+            "batch_id": bid,
+            "case": {
+                "id": case_id,
+                "sha": provenance.sha(json.dumps(case, sort_keys=True).encode()),
+                "reference_labels": len(case.get("reference_labels", [])),
+                "chip_uri": chip["uri"],
+                "chip_store_url": store.url(chip["uri"]),
+                "chip_sha256": chip_shas.get(chip["uri"]),
+            },
+            "files": provenance.run_files(store, bid, case_id, repeat),
+        }
+
+    @app.get("/api/batches/{batch_id}/files/{name:path}")
+    def batch_file(batch_id: str, name: str):
+        """One of a Batch's stored files, as stored. Only the files provenance.py lists."""
+        if not provenance.allowed_file(name):
+            raise HTTPException(404, "not a Batch file")
+        key = f"batches/{_safe(batch_id)}/{name}"
+        if not store.exists(key):
+            raise HTTPException(404, "not stored for this Batch")
+        kind = ("application/json" if name.endswith(".json")
+                else "text/html; charset=utf-8" if name.endswith(".html")
+                else "text/plain; charset=utf-8")  # fmt: skip
+        return Response(store.get(key), media_type=kind)
 
     @app.get("/api/batches/{batch_id}/report.html", response_class=HTMLResponse)
     def report(batch_id: str):

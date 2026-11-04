@@ -627,9 +627,64 @@ async function pollJobs() {
   else setTimeout(route, 1500);
 }
 
-async function batchPage(id) {
+// ── Provenance: what a Batch ran and was judged with, and where its files are ──────────
+
+function provValue(key, v) {
+  if (v === null || v === undefined) return key === "judge_model" || key === "judge_prompt_sha" ? "off" : "—";
+  if (typeof v === "boolean") return v ? "yes" : "no";
+  if (Array.isArray(v)) return v.length ? v.join(", ") : key === "tools" ? "none (single-call Harness)" : "—";
+  const text = String(v);
+  if (/^[0-9a-f]{40}$/.test(text)) return `<code title="${esc(text)}">${esc(text.slice(0, 12))}</code>`;
+  if (/^[0-9a-f]{12}$/.test(text)) return `<code>${esc(text)}</code>`;
+  return esc(text);
+}
+
+function provFiles(files) {
+  return `<table class="prov-files"><tr><th>File</th><th>What it is</th><th>In the store</th></tr>
+    ${files.map((f) => `<tr class="${f.exists ? "" : "missing"}">
+      <td class="mono">${f.exists ? `<a href="${esc(f.href)}" target="_blank" rel="noopener">${esc(f.name)}</a>` : esc(f.name)}</td>
+      <td>${esc(f.what)}${f.exists ? "" : ' <span class="badge b-na">not stored</span>'}</td>
+      <td>${f.exists ? `<button type="button" class="btn-link copy-uri" data-uri="${esc(f.store_url)}" title="${esc(f.store_url)}">copy address</button>
+        ${f.console_url ? ` · <a href="${esc(f.console_url)}" target="_blank" rel="noopener">AWS console</a>` : ""}` : ""}</td></tr>`).join("")}</table>`;
+}
+
+function wireCopy() {
+  document.querySelectorAll("button.copy-uri").forEach((b) => b.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(b.dataset.uri);
+      b.textContent = "copied";
+    } catch {
+      // No clipboard access: show the address so it can be copied by hand.
+      b.replaceWith(Object.assign(document.createElement("code"), { textContent: b.dataset.uri }));
+    }
+  }));
+}
+
+function provenancePanel(p) {
+  const groups = [...new Set(p.settings.map((s) => s.group))];
+  const base = p.baseline_id;
+  const unrecorded = p.settings.filter((s) => !s.recorded).length;
+  return `<h2 id="provenance">Provenance</h2>
+    <p class="sub">Everything this Batch was run and judged with, so any score can be traced back to its
+      inputs.${base ? ` Compared with the Baseline, <code>${esc(base)}</code>.` : ""}
+      ${unrecorded ? ` ${unrecorded} items weren't recorded: this Batch predates provenance recording.` : ""}</p>
+    <div class="prov">
+      <table class="prov-settings"><tr><th>Setting</th><th>This Batch</th>${base ? "<th>Baseline</th>" : ""}</tr>
+      ${groups.map((g) => `<tr class="prov-group"><th colspan="${base ? 3 : 2}">${esc(g)}</th></tr>
+        ${p.settings.filter((s) => s.group === g).map((s) => `<tr${s.differs ? ' class="differs"' : ""}>
+          <td>${esc(s.label)}</td>
+          <td>${s.recorded ? provValue(s.key, s.value) : '<span class="badge b-na">not recorded</span>'}</td>
+          ${base ? `<td>${!("baseline" in s) ? "" : s.baseline_recorded ? provValue(s.key, s.baseline) : '<span class="badge b-na">not recorded</span>'}${s.differs ? ' <span class="badge b-warn">differs</span>' : ""}</td>` : ""}
+        </tr>`).join("")}`).join("")}
+      </table>
+      <div><h3>Stored files</h3>${provFiles(p.files)}</div>
+    </div>`;
+}
+
+async function batchPage(id, section) {
   const me = SEQ;
-  const b = await api(`/api/batches/${encodeURIComponent(id)}`);
+  const [b, prov] = await Promise.all([api(`/api/batches/${encodeURIComponent(id)}`),
+    api(`/api/batches/${encodeURIComponent(id)}/provenance`)]);
   let gateHtml = "";
   try {
     const g = await api(`/api/gate/${encodeURIComponent(id)}`);
@@ -654,25 +709,41 @@ async function batchPage(id) {
   $view.innerHTML = `<p><a href="#/batches">← Batches</a></p><h1>${esc(c.batch_id)}</h1>
     <p class="sub">${c.case_ids.length} Cases × ${c.repeats} Repeats · ${esc(c.caption_model)} · prompt
     <code>${esc(c.prompt_sha)}</code> (${esc(c.prompt_source)}) · Judge ${esc(c.judge_model || "off")} · Cases
-    <code>${esc(c.cases_sha)}</code></p>
+    <code>${esc(c.cases_sha)}</code> · <a href="#/batches/${esc(id)}/provenance">full provenance</a></p>
     ${gateHtml}
+    ${provenancePanel(prov)}
     <h2>Report</h2>
     <p class="sub">The same self-contained report the CLI writes; <a href="/api/batches/${encodeURIComponent(id)}/report.html" target="_blank">open it on its own</a>.</p>
     <iframe class="report" sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox" src="/api/batches/${encodeURIComponent(id)}/report.html" title="Batch report"></iframe>`;
+  wireCopy();
+  if (section) document.getElementById(section)?.scrollIntoView();
 }
 
 async function runPage(batchId, caseId, repeat) {
   const me = SEQ;
   const name = `${caseId}--r${repeat}`;
   const src = `/api/batches/${encodeURIComponent(batchId)}/runs/${encodeURIComponent(name)}`;
-  const r = await api(`${src}.json`);
+  const [r, p] = await Promise.all([api(`${src}.json`), api(`${src}/provenance`)]);
   if (stale(me)) return;
+  const k = p.case;
   $view.innerHTML = `<p><a href="#/batches/${esc(batchId)}">← Batch ${esc(batchId)}</a></p>
     <h1>Run ${esc(r.run_id)}</h1>
     <p class="sub">${esc((r.summary || {}).verdict || r.status)} ·
       <a href="${src}.html" target="_blank" rel="noopener">open on its own</a> ·
       <a href="${src}.json" target="_blank" rel="noopener">as JSON</a></p>
+    <details class="prov-run"><summary>Provenance: what this Run was scored on, and its stored files</summary>
+      <table class="prov-settings">
+        <tr><td>Case</td><td><code>${esc(k.id)}</code>, frozen in the Batch as <code>${esc(k.sha)}</code>
+          with ${k.reference_labels} Reference Labels</td></tr>
+        <tr><td>Chip</td><td><code>${esc(k.chip_uri)}</code>
+          ${k.chip_sha256 ? `· SHA-256 <code title="${esc(k.chip_sha256)}">${esc(k.chip_sha256.slice(0, 12))}</code>, checked before the Run`
+            : '<span class="badge b-na">hash not recorded</span>'}</td></tr>
+        <tr><td>Settings</td><td>the Batch's: <a href="#/batches/${esc(batchId)}/provenance">models, prompts, Judge rubric, ontology, commit</a></td></tr>
+      </table>
+      ${provFiles(p.files)}
+    </details>
     <iframe class="report" sandbox="allow-scripts" src="${src}.html" title="Run report"></iframe>`;
+  wireCopy();
 }
 
 async function comparePage(a, b) {
@@ -690,7 +761,10 @@ async function comparePage(a, b) {
     <h2>What changed</h2>
     ${c.settings.length ? `<table><tr><th>Setting</th><th>A</th><th>B</th><th>Kind</th></tr>
       ${c.settings.map((s) => `<tr><td>${esc(s.setting)}</td><td class="mono">${esc(s.a)}</td><td class="mono">${esc(s.b)}</td>
-        <td>${s.kind === "measurement" ? '<span class="badge b-warn">measurement: scores may not be comparable</span>' : '<span class="badge b-na">captioner</span>'}</td></tr>`).join("")}</table>`
+        <td>${{ measurement: '<span class="badge b-warn">measurement: scores may not be comparable</span>',
+          code: '<span class="badge b-na">code</span>',
+          "not recorded": '<span class="badge b-na">not recorded on one side</span>' }[s.kind]
+          || '<span class="badge b-na">captioner</span>'}</td></tr>`).join("")}</table>`
       : '<p>No settings changed, so any difference is run-to-run variation.</p>'}
     <h2>Batch</h2><table><tr><th>Metric</th><th class="num">A</th><th class="num">B</th><th class="num">Change</th></tr>
       ${c.batch.map((r) => `<tr><td>${esc(r.metric)}</td><td class="num">${f2(r.a)}</td><td class="num">${f2(r.b)}</td>
@@ -819,7 +893,7 @@ async function route() {
     else if (page === "how") await howPage(parts[1]);
     else if (page === "tasks") await tasksPage(parts[1]);
     else if (page === "cases") await casesPage();
-    else if (page === "batches" && parts[1]) await batchPage(parts[1]);
+    else if (page === "batches" && parts[1]) await batchPage(parts[1], parts[2]);
     else if (page === "batches") await batchesPage();
     else if (page === "compare") await comparePage(parts[1], parts[2]);
     else if (page === "runs") await runPage(parts[1], parts[2], parts[3] || "1");

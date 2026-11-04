@@ -1744,3 +1744,36 @@ refs = [
   "docs/caption-design.md §3.4",
   "infra/app.py",
 ]
+
+[[task]]
+id = "batch-provenance"
+step = "report"
+title = "Provenance on every Batch and Run: what it was judged with, and where its files are"
+area = "Evaluation"
+tier = "Must"
+status = "done"
+closes = ["REQ-14"]
+notes = "Done 2026-11-04: src/clayzer/provenance.py. A Batch now also saves the Judge's rubric (judge-prompt.txt, hashed), a SHA-256 of every Chip (chips.json, checked before each Run), the ontology's version and file hash, the git commit and whether it had uncommitted changes, and the narrative model. A replaced Chip is a Sandbox Failure, and resume refuses a changed rubric. Compare and the gate treat rubric, Chip and ontology changes as measurement changes; Batches from before show them as not recorded, and the gate says to re-run the Baseline. Benchmark Reference Captions (RSICD) aren't used yet, so their dataset version isn't recorded yet."
+see_it = "A Batch's page (#/batches/<id>/provenance): every setting beside the Baseline's, with differences marked, and every stored file with an in-app link, its store address to copy, and an AWS console link on S3. A Run's page: Provenance, with the Case and Chip it was scored on and its Trace, summary and narrative."
+changes = [
+  "src/clayzer/provenance.py: the Judge rubric, ontology, code version and Chip hashes; the lists of a Batch's settings and stored files",
+  "src/clayzer/batch.py: new Batches record them, each Run checks its Chip's hash, and resume refuses a changed Judge rubric",
+  "src/clayzer/gate.py: rubric, Chip and ontology changes are measurement changes; tools and turn budget are captioner changes; unrecorded items get a warning",
+  "src/clayzer/ui/app.py: /api/batches/<id>/provenance, /api/batches/<id>/runs/<run>/provenance, and /api/batches/<id>/files/<name> for the allow-listed files",
+  "src/clayzer/ui/static/app.js: Provenance panels on the Batch and Run pages; Compare labels code and not-recorded changes",
+  "tests/test_provenance.py: what's recorded, a replaced Chip, a changed rubric, Compare and gate kinds, the API, and the file allow-list",
+]
+start = "caption-design.md §2.3 (REQ-14)"
+after = ["eval-loop", "run-report"]
+context = "The vision brief: \"every scored run keeps its traces, inputs, and the rubric/reference it was judged against\". A Batch already froze its caption prompt and Cases; the Judge's rubric, the Chip images, the ontology and the code could change without any record."
+done_when = [
+  "Every new Batch records the Judge rubric, Chip hashes, ontology version and git commit",
+  "A Run never scores a Chip that changed since its Batch started",
+  "Compare and the gate flag a changed rubric, Chip set or ontology",
+  "The Batch and Run pages show the settings and link every stored file",
+]
+refs = [
+  "docs/vision-hackathon.md §Business Constraints",
+  "docs/caption-design.md §2.3 (REQ-14)",
+  "src/clayzer/batch.py",
+]
