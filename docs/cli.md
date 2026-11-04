@@ -29,7 +29,8 @@ CLAYZER_STORE=s3://clayzer-<account-id>-us-west-2/caption
 CLAYZER_NAIP_SOURCE=aws
 ```
 
-`uv run clayzer push --from <dir>` copies a local `chips/` + `cases/` folder into your bucket.
+`uv run clayzer push --from <dir>` copies a local `chips/` + `cases/` folder into your store;
+`--from fixtures/caption` loads the team's committed development Cases.
 
 ## Build Cases
 

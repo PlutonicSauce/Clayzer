@@ -33,12 +33,14 @@ uv sync --extra ui --extra tools
 ### 2. Start the web app
 
 ```sh
+uv run clayzer push --from fixtures/caption   # load the team's 63 Cases, no AWS needed
 uv run clayzer ui
 ```
 
-Open <http://127.0.0.1:8770>. It runs locally and is read-only. Without AWS set up, its store (the
-local `data/` and `batches/` folders) is empty, but **How it works**, **For Dev Team → Tasks**, and
-the linked docs work straight away.
+Open <http://127.0.0.1:8770>. It runs locally and is read-only. The first command copies the
+committed [development Cases](fixtures/caption/README.md) into your store (the local `data/`
+folder, or your bucket once `CLAYZER_STORE` is set), so the **Cases** page shows them. Batches
+appear once you run one, which needs AWS (step 3).
 
 | Page | What's there |
 |---|---|
@@ -62,18 +64,19 @@ AWS_DEFAULT_REGION=us-west-2
 ```
 
 Results stay in local folders unless you point `CLAYZER_STORE` at an S3 bucket in your account
-([Storage](docs/cli.md#storage)).
+([Storage](docs/cli.md#storage)). If you set it, run `clayzer push --from fixtures/caption` again
+to load the Cases into the bucket.
 
 ### 4. Run your first Batch
 
+A Batch captions every Case several times, and all 63 cost real Bedrock time, so start with two:
+
 ```sh
-uv run clayzer case uspvdb 400117          # a solar Case around USPVDB site 400117
-uv run clayzer case neg -119.20 35.45      # a negative Case, with no USGS site nearby
-uv run clayzer batch --repeats 3 --label first
+uv run clayzer batch --repeats 1 --label first --only fixed-dev-uspvdb-400117 fixed-dev-neg-1
 ```
 
 Refresh the web app's **Batches** page to see the result, or open the `report.html` the command
-prints.
+prints. To add a Case of your own, see [Build Cases](docs/cli.md#build-cases).
 
 ## Using the CLI
 
