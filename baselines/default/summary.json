@@ -114,8 +114,13 @@
       "mean": 0.8935185185185185,
       "spread": 0.021215628217388132
     },
+    "retrieval_recall_at_1": {
+      "mean": 0.6666666666666666,
+      "spread": 0.0
+    },
     "unscored_share": 0.29543650793650794,
     "label_prep_seconds": 173.6,
+    "label_prep_seconds_per_case": 43.4,
     "seconds_per_caption": 3.8699999999999997,
     "tokens_per_caption": 2634.1666666666665,
     "runs": {
@@ -123,7 +128,14 @@
       "ok": 12,
       "harness_faults": 0,
       "sandbox_failures": 0
+    },
+    "step_faults": {
+      "harness": 0,
+      "environment": 0,
+      "sandbox": 0,
+      "soft": 0
     }
   },
-  "stopped": null
+  "stopped": null,
+  "rescored": "2026-11-04T08:11:52+00:00"
 }

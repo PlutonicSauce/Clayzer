@@ -126,16 +126,155 @@ function stepState(step, tasks) {
 
 // ── Pages ────────────────────────────────────────────────────────────────────────────────
 
+// ── Home page pieces ─────────────────────────────────────────────────────────────────────
+
+const pct = (x) => (x === null || x === undefined ? "—" : `${Math.round(100 * x)}%`);
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+// The home page's scorecard follows Clay's rubric: five criteria, in the brief's order, each
+// reported on its own because weights aren't set (CAP-15).
+function meter(label, value, note) {
+  const w = value === null || value === undefined ? 0 : Math.max(2, Math.round(100 * value));
+  return `<div class="meter">
+    ${label ? `<div class="meter-q">${esc(label)}</div>` : ""}
+    <div class="meter-row"><div class="meter-bar" role="img" aria-label="${pct(value)}"><span style="width:${w}%"></span></div>
+      <b>${pct(value)}</b></div>
+    <div class="meter-a">${note}</div></div>`;
+}
+
+function criterion(n, name, question, body, tag = "") {
+  return `<div class="crit">
+    <div class="crit-head"><span class="crit-n">${n}</span><span class="crit-name">${esc(name)}</span>${tag}</div>
+    <div class="crit-q">${esc(question)}</div>${body}</div>`;
+}
+
+function scorecard(B) {
+  const secs = (x) => (x === null || x === undefined ? "—" : `${x.toFixed(1)} s`);
+  const grounding = criterion(1, "Grounding", "Does the caption match what's on the ground?",
+    meter("Right", B.correctness, "of what the captions claim checks out against the map (USGS, OSM)") +
+    meter("Enough", B.coverage, "of what the map shows gets mentioned") +
+    (B.unscored_share ? `<p class="crit-note">${pct(B.unscored_share)} of claims are about things no map covers yet (like vegetation), so they aren't scored.</p>` : ""),
+    '<span class="badge b-warn">most important</span>');
+  const fidelity = criterion(2, "Fidelity", "Would a reviewer agree with the caption?",
+    meter("", B.fidelity, "the Judge's rating of each caption against its image"));
+  const retrieval = criterion(3, "Retrieval quality", "Can you find the right caption by searching for it?",
+    meter("", B.retrieval_top1, `of searches put the right caption first <span class="sub">· ranking score (MRR) ${pct(B.retrieval?.mean)}</span>`));
+  const cost = criterion(4, "Cost", "How fast is captioning, and on what hardware?",
+    `<div class="figure"><b>${secs(B.seconds_per_caption)}</b> per caption</div>
+     <p class="crit-note">Partial: Clay measures cost in GPU time and GPU count and size, which Bedrock
+     doesn't report. It comes with the open-VLM endpoint. (${B.tokens_per_caption ? Math.round(B.tokens_per_caption).toLocaleString() : "—"} tokens per caption, not the rubric's measure.)</p>`,
+    '<span class="badge b-na">partial</span>');
+  const prep = criterion(5, "Label preparation time", "How long does it take to prepare the labels?",
+    `<div class="figure"><b>≈ ${secs(B.label_prep_seconds_per_case)}</b> per Case
+       <span class="sub">(${secs(B.label_prep_seconds)} for ${plural(B.cases, "Case")})</span></div>
+     <p class="crit-note">Time to build each Case's Reference Labels. Whether Clay means this or the time to
+     write the Captions is a question for Clay.</p>`);
+  return grounding + fidelity + retrieval + cost + prep;
+}
+
+// A Chip with its Claims drawn on the 3×3 grid, like the Batch report.
+const CELLS = ["north_west", "north", "north_east", "west", "centre", "east", "south_west", "south", "south_east"];
+function chipFigure(sc) {
+  const C = 512 / 3;
+  const per = {};
+  const pills = sc.claims.map((c) => {
+    const i = CELLS.indexOf(c.position);
+    if (i < 0) return "";
+    const n = (per[c.position] = (per[c.position] || 0) + 1) - 1;
+    const x = (i % 3) * C + 8, y = Math.floor(i / 3) * C + 10 + n * 26;
+    const cls = c.verdict !== "matched" ? "bad" : c.position_score === 1 ? "good" : "near";
+    const label = `${c.count} × ${c.object.replace(/_/g, " ")}`;
+    return `<g class="pill ${cls}"><rect x="${x}" y="${y}" width="${C - 16}" height="22" rx="11"/>
+      <text x="${x + (C - 16) / 2}" y="${y + 15}" text-anchor="middle">${esc(label)}</text></g>`;
+  }).join("");
+  const covered = new Set(sc.labels.flatMap((l) => l.cells));
+  const refs = [...covered].map((cell) => {
+    const i = CELLS.indexOf(cell);
+    return `<rect class="ref" x="${(i % 3) * C + 3}" y="${Math.floor(i / 3) * C + 3}" width="${C - 6}" height="${C - 6}" rx="4"/>`;
+  }).join("");
+  const grid = [1, 2].map((k) => `<line x1="${k * C}" y1="0" x2="${k * C}" y2="512"/><line x1="0" y1="${k * C}" x2="512" y2="${k * C}"/>`).join("");
+  return `<div class="chip-fig">
+    <img src="/api/chips/${encodeURIComponent(sc.chip.id)}.png" alt="Aerial image ${esc(sc.chip.id)}">
+    <svg viewBox="0 0 512 512" aria-hidden="true"><g class="grid">${grid}</g><g>${refs}</g>${pills}</svg></div>`;
+}
+
+function showcaseCard(list, i) {
+  if (!list.length) {
+    return `<div class="showcase empty">Run a Batch and accept it as the Baseline to see a featured Caption here.</div>`;
+  }
+  const sc = list[i % list.length];
+  const missed = sc.missed.map((m) => m.replace(/_/g, " "));
+  return `<div class="showcase">
+    <div class="showcase-head"><span class="kicker">A caption from the Baseline</span>
+      <span class="showcase-nav">${i % list.length + 1} of ${list.length}
+        <button type="button" class="btn secondary" id="sc-next" aria-label="Show another caption">Show another →</button></span></div>
+    ${chipFigure(sc)}
+    <blockquote>${esc(sc.text)}</blockquote>
+    <p class="showcase-score"><b>${sc.right} of ${sc.gradable}</b> Claims check out exactly
+      ${missed.length ? `· missed: ${esc(missed.join(", "))}` : "· nothing missed"}</p>
+    <p class="legend-row"><span><i class="dot good"></i>right, right place</span>
+      <span><i class="dot near"></i>right, wrong cell</span> <span><i class="dot bad"></i>not there</span>
+      <span><i class="sq"></i>where the map says things are</span></p>
+    <p class="sub">${esc(sc.chip.id)} · NAIP ${esc(sc.chip.date)}</p></div>`;
+}
+
+const VERDICT = {
+  baseline: ["★", "Baseline", "v-base"],
+  pass: ["✓", "passed the gate", "v-pass"],
+  fail: ["✗", "failed the gate", "v-fail"],
+  inconclusive: ["?", "inconclusive", "v-na"],
+  partial: ["·", "test run on some Cases", "v-na"],
+  "different Cases": ["·", "different Cases: not comparable", "v-na"],
+  "no Baseline": ["·", "no Baseline yet", "v-na"],
+};
+
+function experimentLog(rows) {
+  if (!rows.length) return '<p class="sub">No Batches yet.</p>';
+  return `<ol class="xlog">${rows.map((r) => {
+    const [icon, text, cls] = VERDICT[r.verdict] || ["·", r.verdict, "v-na"];
+    const when = (r.created || "").replace("T", " ").slice(5, 16);
+    const moves = r.moves.filter((m) => Math.abs(m.points) >= 3).slice(0, 2).map((m) =>
+      `<span class="move ${m.points > 0 ? "up" : "down"}">${esc(m.name)} ${m.points > 0 ? "▲" : "▼"}${Math.abs(m.points)} pts</span>`).join("");
+    return `<li class="${cls}"><span class="xicon" aria-hidden="true">${icon}</span>
+      <a href="#/batches/${esc(r.batch_id)}"><b>${esc(r.label)}</b></a>
+      <span class="xmeta">${esc(when)} · ${plural(r.cases, "Case")} × ${plural(r.repeats, "Repeat")}</span>
+      <span class="xverdict">${esc(text)}</span>${moves}</li>`;
+  }).join("")}</ol>`;
+}
+
+function loopMission(core, tasks) {
+  const segs = core.map((s) => {
+    const [state] = stepState(s, tasks);
+    const cls = state === "built" ? "built" : state === "partly built" ? "partly" : "not";
+    return `<a class="seg ${cls}" href="#/how/${esc(s.key)}" title="${esc(s.title)}: ${esc(state)}"><span>${esc(s.title)}</span></a>`;
+  }).join("");
+  const built = core.filter((s) => stepState(s, tasks)[0] === "built").length;
+  const going = core.filter((s) => stepState(s, tasks)[0] === "partly built").length;
+  return `<div class="mission"><div class="mission-top"><span>Core loop</span>
+    <b>${built} built · ${going} under way</b></div><div class="segs">${segs}</div>
+    <small>capture, summarize, score, report: the brief's heart of the build</small></div>`;
+}
+
+function mission(title, done, total, note) {
+  const w = total ? Math.round((100 * done) / total) : 0;
+  return `<div class="mission"><div class="mission-top"><span>${esc(title)}</span><b>${done} / ${total}</b></div>
+    <div class="meter-bar"><span style="width:${Math.max(w, 2)}%"></span></div><small>${esc(note)}</small></div>`;
+}
+
 async function overview() {
   const me = SEQ;
   const o = await api("/api/overview");
   if (stale(me)) return;
-  const tasks = o.tasks;
+  const tasks = o.tasks, B = o.baseline;
+  const byId = Object.fromEntries(tasks.map((t) => [t.id, t]));
   const must = tasks.filter((t) => t.tier === "Must");
   const mustDone = must.filter((t) => t.status === "done").length;
-  const L = o.latest, B = o.baseline;
-  const card = (title, big, note, cls = "") =>
-    `<div class="card ${cls}"><small>${esc(title)}</small><div class="big">${big}</div><small>${note}</small></div>`;
+  const core = FLOW.filter((s) => PHASES.find((p) => p.key === s.phase).core);
+  // Unclaimed Must work with nothing open in front of it; decisions first, they unblock most.
+  const rank = { decide: 0, todo: 1 };
+  const ready = must.filter((t) => t.status in rank &&
+    (t.after || []).every((id) => !byId[id] || byId[id].status === "done"))
+    .sort((a, b) => rank[a.status] - rank[b.status]).slice(0, 3);
 
   $view.innerHTML = `
     <section class="hero" aria-labelledby="hero-title">
@@ -152,15 +291,44 @@ async function overview() {
       </div>
     </section>
 
-    <h2>Where we are</h2>
-    <div class="cards">
-      ${card("Must tasks done", `${mustDone} / ${must.length}`,
-        `<div class="progress"><span style="width:${must.length ? (100 * mustDone) / must.length : 0}%"></span></div>`, "data")}
-      ${card("Cases", o.cases, "development Cases in the store; the plan needs ~60", "data")}
-      ${L ? card("Latest grounding: correctness · coverage", `${f2(L.correctness)} · ${f2(L.coverage)}`, `<a href="#/batches/${esc(L.batch_id)}">${esc(L.batch_id)}</a>`) : card("Latest Batch", "—", "none yet")}
-      ${L ? card("Latest fidelity · retrieval", `${f2(L.fidelity)} · ${f2(L.retrieval?.mean)}`, `${L.cases} Cases × ${L.repeats} Repeats`) : ""}
-      ${B ? card("Baseline: correctness · coverage", `${f2(B.correctness)} · ${f2(B.coverage)}`, `${esc(B.batch_id)} · ${B.cases} Cases × ${B.repeats}`, "platform") : card("Baseline", "—", "none accepted yet", "platform")}
+    <section class="home-score" aria-labelledby="score-title">
+      <div>
+        <h2 id="score-title">How good are the captions?</h2>
+        <p class="sub">${B ? `Scored on Clay's five criteria, from the accepted ${term("Baseline")}: ${plural(B.cases, "Case")} × ${plural(B.repeats, "Repeat")}, captioned by ${esc(B.caption_model.replace(/^us\./, ""))}. Weights aren't set yet, so each criterion stands on its own.` : "No Baseline accepted yet."}</p>
+        ${B ? scorecard(B) : ""}
+      </div>
+      <div id="showcase">${showcaseCard(o.showcase, 0)}</div>
+    </section>
+
+    <div class="home-row">
+      <section aria-labelledby="xlog-title">
+        <h2 id="xlog-title">Experiments</h2>
+        <p class="sub">Every change is a Batch. The regression gate compares it with the Baseline and keeps it only if nothing got worse.</p>
+        ${experimentLog(o.experiments)}
+      </section>
+      <section aria-labelledby="missions-title">
+        <h2 id="missions-title">Missions</h2>
+        <div class="missions">
+          ${mission("Cases built", o.cases, 60, "the plan needs about 60 development Cases")}
+          ${mission("Must tasks done", mustDone, must.length, "what the hackathon has to deliver")}
+          ${loopMission(core, tasks)}
+        </div>
+        <h3 class="grab-title">Grab a task</h3>
+        <ul class="grab">${ready.map((t) => `<li><a href="#/tasks/${esc(t.id)}">${esc(t.title)}</a>
+          ${t.status === "decide" ? '<span class="badge b-warn">needs a decision</span>' : `<span class="badge b-na">${esc(t.area)}</span>`}</li>`).join("") || "<li class='sub'>Nothing unblocked right now.</li>"}</ul>
+      </section>
     </div>`;
+
+  let shown = 0;
+  const wire = () => {
+    const next = document.getElementById("sc-next");
+    if (next) next.addEventListener("click", () => {
+      shown += 1;
+      document.getElementById("showcase").innerHTML = showcaseCard(o.showcase, shown);
+      wire();
+    });
+  };
+  wire();
 }
 
 const STEP_STATE = {

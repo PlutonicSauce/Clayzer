@@ -98,9 +98,27 @@ def create_app(settings: Settings, region: str = "dev", allow_launch: bool = Fal
     app = FastAPI(title="Clayzer", docs_url=None, redoc_url=None)
     jobs: dict[str, dict] = {}
     lock = threading.Lock()
+    # A finished Batch never changes, so its summary and showcase are read from the store once.
+    finished: dict[str, tuple] = {}
+    showcases: dict[str, list] = {}
 
-    def summary_row(batch_id: str) -> dict:
-        cfg, s = batches.load_summary(store, batch_id)
+    def summary_of(batch_id: str):
+        if batch_id in finished:
+            return finished[batch_id]
+        cfg, summ = batches.load_summary(store, batch_id)
+        if summ and not summ.get("stopped") and not summ["batch"]["runs"]["sandbox_failures"]:
+            finished[batch_id] = (cfg, summ)
+        return cfg, summ
+
+    def summaries(ids: list[str]) -> dict[str, tuple]:
+        """Summaries for many Batches, reading the uncached ones from the store in parallel."""
+        from concurrent.futures import ThreadPoolExecutor
+
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            return dict(zip(ids, pool.map(summary_of, ids), strict=True))
+
+    def summary_row(batch_id: str, loaded: tuple | None = None) -> dict:
+        cfg, s = loaded or summary_of(batch_id)
         row = {
             "batch_id": batch_id, "label": cfg.label, "created": cfg.created,
             "cases": len(cfg.case_ids), "repeats": cfg.repeats,
@@ -138,25 +156,121 @@ def create_app(settings: Settings, region: str = "dev", allow_launch: bool = Fal
             "embed_model": settings.embed_model,
         }
 
+    def showcase(batch_id: str, limit: int = 8) -> list[dict]:
+        """The best Run of each Case in a Batch, with what's needed to draw it: the Chip, the
+        Caption, each Claim's verdict and cell, and the Reference Labels' cells."""
+        if batch_id in showcases:
+            return showcases[batch_id]
+        try:
+            b = batches.load(store, batch_id)
+        except Exception:  # noqa: BLE001 -- the Baseline may live in another teammate's store
+            return []
+        caps = {(c["case_id"], c["repeat"]): c for c in b["captions"]}
+        cases = {c["id"]: c for c in b["cases"]}
+        best: dict[str, dict] = {}
+        for r in b["results"]:
+            g = r.get("grounding")
+            if r["status"] != "ok" or not g or (r["case_id"], r["repeat"]) not in caps:
+                continue
+            score = (g.get("correctness") or 0) + (g.get("coverage") or 0)
+            if r["case_id"] not in best or score > best[r["case_id"]]["_score"]:
+                best[r["case_id"]] = {**r, "_score": score}
+        out = []
+        for case_id, r in sorted(best.items(), key=lambda kv: -kv[1]["_score"])[:limit]:
+            case, cap, g = cases[case_id], caps[(case_id, r["repeat"])], r["grounding"]
+            claims = [
+                {"object": row["claim"]["object"], "count": row["claim"]["count"],
+                 "position": row["claim"]["position"], "verdict": row["verdict"],
+                 "position_score": row.get("position")}
+                for row in g.get("rows", [])
+            ]  # fmt: skip
+            right = sum(c["verdict"] == "matched" and c["position_score"] == 1.0 for c in claims)
+            out.append({
+                "case_id": case_id, "run_id": r["run_id"], "chip": case["chips"][0],
+                "text": cap["text"], "claims": claims,
+                "labels": [{"object": lb["object"], "cells": lb["cells"]} for lb in case["reference_labels"]],
+                "missed": g.get("missed", []), "unscored": g.get("unscored", []),
+                "right": right, "gradable": len(claims),
+                "correctness": g.get("correctness"), "coverage": g.get("coverage"),
+                "fidelity": (r.get("fidelity") or {}).get("score"),
+            })  # fmt: skip
+        showcases[batch_id] = out
+        return out
+
+    def experiments(base, limit: int = 6) -> list[dict]:
+        """Recent Batches, each judged against the Baseline."""
+        rows = []
+        ids = list(reversed(batches.list_batches(store)))[: limit + 4]
+        loaded = summaries(ids)
+        for batch_id in ids:
+            if len(rows) >= limit:
+                break
+            cfg, summ = loaded[batch_id]
+            if not summ:
+                continue
+            b = summ["batch"]
+            row = {"batch_id": batch_id, "label": cfg.label or "unlabelled", "created": cfg.created,
+                   "cases": len(cfg.case_ids), "repeats": cfg.repeats, "moves": []}  # fmt: skip
+            if base is None:
+                row["verdict"] = "no Baseline"
+            elif batch_id == base["config"].batch_id:
+                row["verdict"] = "baseline"
+            elif cfg.cases_sha != base["config"].cases_sha:
+                same_ids = set(cfg.case_ids) == set(base["config"].case_ids)
+                row["verdict"] = (
+                    "different Cases"
+                    if same_ids or len(cfg.case_ids) >= len(base["config"].case_ids)
+                    else "partial"
+                )
+            else:
+                row["verdict"] = gate(base, {"config": cfg, "summary": summ}).verdict
+            # Moves only mean something when the two Batches scored the same Cases.
+            if base is not None and row["verdict"] in ("pass", "fail", "inconclusive"):
+                bb = base["summary"]["batch"]
+                pairs = [("right", "correctness"), ("say enough", "coverage"),
+                         ("Judge", "fidelity")]  # fmt: skip
+                for name, key in pairs:
+                    if b.get(key) is not None and bb.get(key) is not None:
+                        row["moves"].append(
+                            {"name": name, "points": round(100 * (b[key] - bb[key]))}
+                        )
+                rb, rc = bb["retrieval_mrr"]["mean"], b["retrieval_mrr"]["mean"]
+                if rb is not None and rc is not None:
+                    row["moves"].append({"name": "search", "points": round(100 * (rc - rb))})
+                row["moves"].sort(key=lambda m: -abs(m["points"]))
+            rows.append(row)
+        return rows
+
     @app.get("/api/overview")
     def overview():
         ids = batches.list_batches(store)
         latest = summary_row(ids[-1]) if ids else None
         base = baseline_or_none()
         cases = load_cases(store, cases_key(region))
-        return {
-            "latest": latest,
-            "baseline": {
+        baseline = None
+        if base:
+            bb = base["summary"]["batch"]
+            baseline = {
                 "batch_id": base["config"].batch_id,
-                "correctness": base["summary"]["batch"].get("correctness"),
-                "coverage": base["summary"]["batch"].get("coverage"),
-                "fidelity": base["summary"]["batch"]["fidelity"],
-                "retrieval": base["summary"]["batch"]["retrieval_mrr"],
+                "correctness": bb.get("correctness"),
+                "coverage": bb.get("coverage"),
+                "fidelity": bb["fidelity"],
+                "retrieval": bb["retrieval_mrr"],
+                "retrieval_top1": (bb.get("retrieval_recall_at_1") or {}).get("mean"),
+                "label_prep_seconds": bb.get("label_prep_seconds"),
+                "label_prep_seconds_per_case": bb.get("label_prep_seconds_per_case"),
+                "seconds_per_caption": bb.get("seconds_per_caption"),
+                "tokens_per_caption": bb.get("tokens_per_caption"),
+                "unscored_share": bb.get("unscored_share"),
                 "cases": len(base["config"].case_ids),
                 "repeats": base["config"].repeats,
+                "caption_model": base["config"].caption_model,
             }
-            if base
-            else None,
+        return {
+            "latest": latest,
+            "baseline": baseline,
+            "showcase": showcase(base["config"].batch_id) if base else [],
+            "experiments": experiments(base),
             "batches": len(ids),
             "cases": len(cases),
             "tasks": load_tasks(),
@@ -200,7 +314,9 @@ def create_app(settings: Settings, region: str = "dev", allow_launch: bool = Fal
 
     @app.get("/api/batches")
     def list_all():
-        return [summary_row(b) for b in reversed(batches.list_batches(store))]
+        ids = list(reversed(batches.list_batches(store)))
+        loaded = summaries(ids)
+        return [summary_row(b, loaded[b]) for b in ids]
 
     def light(batch_id: str) -> dict:
         """Configuration and summary only: all that compare and the regression gate read."""
