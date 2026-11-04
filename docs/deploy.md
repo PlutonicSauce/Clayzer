@@ -20,7 +20,8 @@ A full deploy takes about 4.5 minutes, most of it building and pushing the image
 ### 1. Tools
 
 - uv, with the `infra` group: `uv sync --group infra`
-- Node 22 or 24, for the CDK CLI (`npx aws-cdk@2`)
+- Node 24, for the CDK CLI (`npx aws-cdk@2`). `.nvmrc` pins it for nvm (`nvm use`), fnm, and
+  CI's `setup-node`.
 - Docker or Podman, to build the image. With Podman, `export CDK_DOCKER=podman`.
 
 ### 2. Credentials
