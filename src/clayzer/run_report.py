@@ -158,6 +158,7 @@ def build(store, b: dict, result: dict) -> tuple[str, dict]:
                     "position",
                     "attributes",
                     "relations",
+                    "change",
                     "unscored_share",
                 )
             },
@@ -186,7 +187,8 @@ def build(store, b: dict, result: dict) -> tuple[str, dict]:
         "config": {
             "caption_model": cfg.caption_model,
             "judge_model": cfg.judge_model,
-            "prompt_sha": cfg.prompt_sha,
+            # A Change Case's Run used the change prompt; its Trace records which.
+            "prompt_sha": info.prompt_sha if info is not None else cfg.prompt_sha,
             "cases_sha": cfg.cases_sha,
             "scorer_version": cfg.scorer_version,
         },
@@ -204,6 +206,15 @@ def build(store, b: dict, result: dict) -> tuple[str, dict]:
             "how well the Harness worked, from its Trace",
         ),
     ]
+    if g.get("change") is not None:  # a Change Case
+        cards.insert(
+            2,
+            (
+                "Grounding: change",
+                g["change"],
+                "of Claims that got appeared, disappeared, or unchanged right",
+            ),
+        )
     png = store.get(chip["uri"]) if store.exists(chip["uri"]) else None
     html = [
         "<!doctype html><html lang='en'><head><meta charset='utf-8'>",
@@ -212,7 +223,7 @@ def build(store, b: dict, result: dict) -> tuple[str, dict]:
         f"<style>{STYLE}{STEP_STYLE}</style></head><body>",
         f"<header><h1>Run {escape(result['run_id'])}</h1>",
         (f"<p class='sub'>Batch {escape(cfg.batch_id)} · Repeat {repeat} · {escape(cfg.caption_model)}"
-        f" · prompt <code>{escape(cfg.prompt_sha)}</code></p>"),
+        f" · prompt <code>{escape(record['config']['prompt_sha'])}</code></p>"),
         (f"<p class='status-row'><span class='badge {status_cls}'>{escape(result['status'].replace('_', ' '))}</span>"
         f"<b>{escape(verdict)}</b></p></header><main>"),
         "<div class='scores'>" + "".join(

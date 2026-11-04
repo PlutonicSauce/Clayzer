@@ -9,7 +9,7 @@ from test_loop import CAPTIONS, SOLAR, FakeBedrock
 
 from clayzer import answer_keys as ak
 from clayzer import batch as batches
-from clayzer import harness
+from clayzer import harness, run_report
 from clayzer.cases import change_labels
 from clayzer.config import Settings
 from clayzer.grounding import grounding
@@ -148,6 +148,10 @@ def test_a_change_case_runs_end_to_end(tmp_path, monkeypatch):
     assert cfg.change_prompt_sha == batches._sha(harness.CHANGE_PROMPT.encode())
     run, _ = loads(store.get(trace_key(bid, case["id"], 1)))
     assert run.prompt_sha == cfg.change_prompt_sha != cfg.prompt_sha
+    # Its report shows the change score and the prompt the Run actually used.
+    html, record = run_report.build(store, batches.load(store, bid), result)
+    assert record["config"]["prompt_sha"] == cfg.change_prompt_sha
+    assert "Grounding: change" in html and record["scores"]["grounding"]["change"] is not None
 
 
 def test_a_chip_pair_step_is_summarized_and_digested():

@@ -392,6 +392,16 @@ def create_app(
                 "chip_uri": chip["uri"],
                 "chip_store_url": store.url(chip["uri"]),
                 "chip_sha256": chip_shas.get(chip["uri"]),
+                # Every Chip the Run was given: one, or a Change Case's pair, earlier first.
+                "chips": [
+                    {
+                        "uri": c["uri"],
+                        "date": c.get("date"),
+                        "store_url": store.url(c["uri"]),
+                        "sha256": chip_shas.get(c["uri"]),
+                    }
+                    for c in case["chips"]
+                ],
             },
             "files": provenance.run_files(store, bid, case_id, repeat),
         }

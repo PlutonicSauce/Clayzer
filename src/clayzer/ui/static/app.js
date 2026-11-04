@@ -628,7 +628,7 @@ async function casePage(id) {
         <h3>Reference Labels</h3>
         <ul>${c.labels.map((l) => `<li>${l.count !== null ? `${esc(l.count)} × ` : ""}${esc(l.object.replace(/_/g, " "))}
           at ${esc(l.position)}${(l.cells || []).length > 1 ? ` <small>(covers ${l.cells.map((x) => esc(x.replace(/_/g, " "))).join(", ")})</small>` : ""}
-          ${l.change ? ` <small>(${esc(l.change)})</small>` : ""}<small>· ${esc(l.source)}</small></li>`).join("") || "<li>no labels: nothing mapped here</li>"}</ul>
+          ${l.change ? ` <small>(${esc(l.change)})</small>` : ""} <small>· ${esc(l.source)}</small></li>`).join("") || "<li>no labels: nothing mapped here</li>"}</ul>
         <h3>${c.kind === "change" ? "Chip Pair" : "Chip"}</h3>
         ${c.kind === "change" ? `<p class="sub">A ${term("Change Case")}: the labels are drawn on the later Chip (above); the earlier one is below.</p>
         <img class="chip-earlier" src="/api/chips/${encodeURIComponent(c.chips[0].id)}.png" alt="Earlier aerial image ${esc(c.chips[0].id)}" style="width:100%">
@@ -841,9 +841,9 @@ async function runPage(batchId, caseId, repeat) {
       <table class="prov-settings">
         <tr><td>Case</td><td><code>${esc(k.id)}</code>, frozen in the Batch as <code>${esc(k.sha)}</code>
           with ${k.reference_labels} Reference Labels</td></tr>
-        <tr><td>Chip</td><td><code>${esc(k.chip_uri)}</code>
-          ${k.chip_sha256 ? `· SHA-256 <code title="${esc(k.chip_sha256)}">${esc(k.chip_sha256.slice(0, 12))}</code>, checked before the Run`
-            : '<span class="badge b-na">hash not recorded</span>'}</td></tr>
+        ${(k.chips || [{ uri: k.chip_uri, sha256: k.chip_sha256 }]).map((ch, i, all) => `<tr><td>${all.length > 1 ? (i ? "Later Chip" : "Earlier Chip") : "Chip"}</td><td><code>${esc(ch.uri)}</code>
+          ${ch.sha256 ? `· SHA-256 <code title="${esc(ch.sha256)}">${esc(ch.sha256.slice(0, 12))}</code>, checked before the Run`
+            : '<span class="badge b-na">hash not recorded</span>'}</td></tr>`).join("")}
         <tr><td>Settings</td><td>the Batch's: <a href="#/batches/${esc(batchId)}/provenance">models, prompts, Judge rubric, ontology, commit</a></td></tr>
       </table>
       ${provFiles(p.files)}

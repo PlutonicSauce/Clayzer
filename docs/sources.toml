@@ -265,7 +265,7 @@ used_in = [
   { path = "ontology/objects.toml", symbol = "\"grw\"", what = "solar_array and wind_turbine list GRW as a future key" },
 ]
 notes = "Should: construction dates for Change Cases. Could: an Answer Key outside the US, where USGS has nothing. Model-detected, so less exact than USGS within the US."
-tasks = ["change-cases"]
+tasks = ["change-cases", "grw-change-dates"]
 
 [[source]]
 id = "uspvdb"

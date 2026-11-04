@@ -91,6 +91,8 @@ def test_the_app_shows_a_runs_provenance(client):  # noqa: F811
     p = app.get(f"/api/batches/{bid}/runs/fixed-dev-solar--r1/provenance").json()
     assert p["case"]["chip_uri"] == "chips/c-solar.png"
     assert p["case"]["chip_sha256"] == hashlib.sha256(b"c-solar").hexdigest()
+    assert [c["uri"] for c in p["case"]["chips"]] == ["chips/c-solar.png"]
+    assert p["case"]["chips"][0]["sha256"] == p["case"]["chip_sha256"]
     assert p["case"]["reference_labels"] == 1
     files = {f["name"]: f for f in p["files"]}
     assert files["traces/fixed-dev-solar--r1.jsonl"]["exists"]
