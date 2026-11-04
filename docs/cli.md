@@ -60,6 +60,10 @@ Positives use the latest NAIP image taken after the site was built. Site and tur
 from the USGS APIs (`https://energy.usgs.gov/api/uspvdb/v1/projects`,
 `https://energy.usgs.gov/api/uswtdb/v1/turbines`).
 
+Where a Chip clearly contradicts its labels (houses OSM never mapped, a dry wash mapped as
+water), record the fix in `fixtures/caption/cases/label-corrections.toml`. Every build applies
+it, so the fix survives a rebuild; hand-added labels have `source = "manual"` and no count.
+
 ## The evaluation loop
 
 A **Run** is one Harness execution on one Case; a **Batch** runs every Case several times
