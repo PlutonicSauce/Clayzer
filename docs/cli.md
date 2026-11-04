@@ -248,6 +248,27 @@ uv run clayzer import data/rsicd-test.jsonl --name rsicd-test
 The captions file is downloaded once into `~/.cache/clayzer/rsicd/`. RSICD states no license:
 never commit its captions or images, and cite Lu et al. 2017.
 
+## Embeddings for the Chips
+
+LGND's Clay v1.5 embeddings (256 numbers per 1,280 m Sentinel-2 cell per month, from 2017) are
+open data on Source Cooperative, read anonymously: no LGND sign-in or quota, no AWS charge.
+`clayzer embeddings` joins each of the region's Chips to the cell holding its centre, in the
+month of its NAIP date (or the nearest within two months), and saves one row per Chip to
+`embeddings/caption-<region>.jsonl` in the store:
+
+```sh
+uv sync --extra embeddings
+uv run clayzer embeddings                 # the dev Chips
+uv run clayzer --region test embeddings   # the Texas Chips
+```
+
+It reads only the row groups around the Chips, never whole files (a geohash-month is one file
+of several GB). One cell covers several Chips, so nearby Chips can share an embedding. A Chip
+from before 2017 has none.
+
+**Attribution (CC BY 4.0):** LGND embeddings (Clay v1.5), https://source.coop/clay/lgnd-embeddings.
+Every row carries it; anything built on them must credit it too.
+
 ## Claims from free text
 
 Grounding scores structured Claims, but most caption sets are text only. `clayzer extract` has a

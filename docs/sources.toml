@@ -101,7 +101,7 @@ name = "LGND embeddings (Clay v1.5)"
 group = "Embeddings"
 url = "https://source.coop/clay/lgnd-embeddings"
 license = "CC BY 4.0"
-status = "planned"
+status = "used"
 data = "Clay v1.5 foundation-model embeddings of global Sentinel-2 L2A (10 m), Jan 2017 – Apr 2026: one 256- or 1024-dim vector per Major TOM grid cell (1,280 m or 2,560 m) per month. ~15.2 B embeddings."
 format = "GeoParquet 1.1, hive-partitioned by model_version / collection / chip_size / dims / geohash / year / month; ~340 MB files, Hilbert-ordered."
 access = "Anonymous (s3://us-west-2.opendata.source.coop/clay/lgnd-embeddings/). Query rows with DuckDB and a bbox filter; don't download whole files."
@@ -115,9 +115,11 @@ datetime      timestamp  acquisition time
 embedding     float32[256]  [0.013, -0.402, 0.118, …]
 bbox          struct     {xmin, ymin, xmax, ymax}
 geometry      WKB        cell footprint, EPSG:4326'''
-used_in = []
+used_in = [
+  { path = "src/clayzer/embeddings.py", symbol = "for_chips", what = "joins each dev and Texas Chip to the cell holding it, in its NAIP month (`clayzer embeddings`)" },
+]
 notes = "Planned for step 1 of two-step selection (caption-plan.md §3): pick diverse or look-alike cells, then cut NAIP Chips inside them. Sentinel-2 cells are coarser than a Chip, so embeddings choose what to caption; they are never an Answer Key."
-tasks = ["dev-cases", "lookalike-negatives"]
+tasks = ["dev-cases", "lookalike-negatives", "embeddings-access"]
 
 # ── Geospatial MCP tools ────────────────────────────────────────────────────────────────
 
