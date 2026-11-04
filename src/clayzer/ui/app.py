@@ -30,6 +30,20 @@ STATIC = Path(__file__).parent / "static"
 SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$")
 
 
+def _public_report(body: bytes) -> HTMLResponse:
+    """Apply accessible presentation to legacy HTML without changing its stored bytes or scores."""
+    from clayzer.report_html import REPORT_A11Y_STYLE
+
+    html = body.decode().replace("</head>", f"<style>{REPORT_A11Y_STYLE}</style></head>", 1)
+    html = re.sub(
+        r"<table\b(?![^>]*\btabindex=)",
+        '<table tabindex="0" aria-label="Recorded evaluation details"',
+        html,
+        flags=re.IGNORECASE,
+    )
+    return HTMLResponse(html)
+
+
 def _safe(value: str) -> str:
     """Ids end up in store keys: refuse anything that could leave its folder."""
     if not SAFE_ID.match(value) or ".." in value:
@@ -530,14 +544,14 @@ def create_app(
         key = f"batches/{_safe(batch_id)}/report.html"
         if not store.exists(key):
             raise HTTPException(404, "no report yet")
-        return HTMLResponse(store.get(key).decode())
+        return _public_report(store.get(key))
 
     @app.get("/api/batches/{batch_id}/runs/{name}.html", response_class=HTMLResponse)
     def run_html(batch_id: str, name: str):
         key = f"batches/{_safe(batch_id)}/runs/{_safe(name)}.html"
         if not store.exists(key):
             raise HTTPException(404, "no report for this Run yet")
-        return HTMLResponse(store.get(key).decode())
+        return _public_report(store.get(key))
 
     @app.get("/api/batches/{batch_id}/runs/{name}.json")
     def run_json(batch_id: str, name: str):
