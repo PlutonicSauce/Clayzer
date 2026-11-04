@@ -13,8 +13,9 @@ output into the `aws` environment's AWS_DEPLOY_ROLE_ARN secret.
 GitHub names the repo in the token's `sub` claim in one of two ways: by name
 (`repo:<owner>/<name>`) or, with immutable subjects, by name and numeric id
 (`repo:<owner>@<id>/<name>@<id>`). This repo uses the second. The role accepts both, so it keeps
-working if the setting changes. For a fork, pass `-c repo=<owner>/<name>` and `-c
-sub_prefix=<prefix>`, where the prefix is `sub_claim_prefix` from
+working if the setting changes. For a fork, pass `-c repo=<owner>/<name>`; this trusts only
+the fork's name-based subject by default. If the fork uses immutable subjects, also pass
+`-c sub_prefix=<prefix>`, where the prefix is `sub_claim_prefix` from
 `gh api repos/<owner>/<name>/actions/oidc/customization/sub`.
 """
 
@@ -25,6 +26,7 @@ from aws_cdk import aws_iam as iam
 from constructs import Construct
 
 GITHUB = "token.actions.githubusercontent.com"
+REPO = "PlutonicSauce/Clayzer"
 # The ids are public: they are in the repo's OIDC settings and in every token it issues.
 SUB_PREFIX = "repo:PlutonicSauce@127466756/Clayzer@1444863531"
 
@@ -65,11 +67,15 @@ class GitHubDeployStack(cdk.Stack):
 
 app = cdk.App()
 cdk.Tags.of(app).add("project", "clayzer")
+repo = app.node.try_get_context("repo") or REPO
+sub_prefix = app.node.try_get_context("sub_prefix") or (
+    SUB_PREFIX if repo == REPO else f"repo:{repo}"
+)
 GitHubDeployStack(
     app,
     "ClayzerGitHubDeploy",
-    repo=app.node.try_get_context("repo") or "PlutonicSauce/Clayzer",
-    sub_prefix=app.node.try_get_context("sub_prefix") or SUB_PREFIX,
+    repo=repo,
+    sub_prefix=sub_prefix,
     env=cdk.Environment(
         account=os.environ.get("CDK_DEFAULT_ACCOUNT"),
         region=os.environ.get("CDK_DEFAULT_REGION", "us-west-2"),
