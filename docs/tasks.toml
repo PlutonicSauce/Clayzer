@@ -98,7 +98,7 @@ status = "done"
 closes = ["CAP-18"]
 start = "LGND Geo search_place_find; then uv run clayzer case neg <lon> <lat>"
 after = ["dev-cases"]
-notes = "Done 2026-11-04: 10 look-alike negatives in fixtures/caption-lookalike (4 greenhouses, 4 parking lots, 2 reflective roofs), found with LGND Geo's search_place_find over NAIP in eastern Kern County (the queries are in its README), each checked by eye for panels USPVDB misses (one dropped; one kept after LGND's imagery check). First Batch (Nova Pro, 1 Repeat): 4 of 10 Captions claimed a solar array: 3 of 4 greenhouses, 1 of 2 roofs (storage units), 0 of 4 parking lots. Folded into the development set on 2026-11-04, after dev-cases, with a new Baseline."
+notes = "Done 2026-11-04: 10 look-alike negatives in fixtures/caption-lookalike (4 greenhouses, 4 parking lots, 2 reflective roofs), found with LGND Geo's search_place_find over NAIP in eastern Kern County (the queries are in its README), each checked by eye for panels USPVDB misses (one dropped; one kept after LGND's imagery check). First Batch (Nova Pro, 1 Repeat): 4 of 10 Captions claimed a solar array: 3 of 4 greenhouses, 1 of 2 roofs (storage units), 0 of 4 parking lots. Folded into the development set on 2026-11-04 with a new Baseline (20261104T193330Z-dev74-base): over 3 Repeats, greenhouses fooled the captioner in 9 of 12 Runs, reflective roofs 3 of 6, parking lots 0 of 12."
 context = "Negatives that look like positives test whether the captioner can tell a greenhouse or a parking lot from a solar array. LGND Geo's `search_place_find` takes a text description (\"greenhouse\", \"solar farm\") or an example, inside a bounding box, over NAIP. Keep results USGS doesn't list; `clayzer case neg` refuses a point with a USGS record within about 300 m. The ontology lists each class's look-alikes (`confusers`)."
 done_when = [
   "At least 8 look-alike negatives (greenhouses, parking lots, reflective roofs)",
@@ -395,10 +395,11 @@ step = "case"
 title = "Relabel water in the committed Cases: only water there all year"
 area = "Data and Cases"
 tier = "Should"
-status = "todo"
+status = "done"
 closes = ["CAP-10"]
 start = "src/clayzer/answer_keys.py osm_object; fixtures/caption/cases/"
 after = ["ontology-review"]
+notes = "Done 2026-11-04 with lookalike-negatives, for one re-baseline. relabel_water rebuilt only the water label of each Case with water under the year-round rule; every other label stayed as it was. 13 Cases changed, only in water: 10 lost it (7 dev wind sites, 1 dev solar site, 2 Texas sites), 2 shrank, and Texas neg-10's wet pond came back by hand correction (north and north-east, from the image). New dev Baseline 20261104T193330Z-dev74-base (74 Cases x 3): coverage on the 9 relabelled dev Cases rose from 0.612 to 0.857; the other Cases moved by -0.009 on average."
 context = "ontology-review changed osm_object so intermittent streams, ditches, and intermittent water no longer count as water: in the desert they are dry washes, and their labels counted as misses against coverage though no Caption claims water there. The committed Cases still carry the old labels: 11 lose their water label (8 of them dev turbines in dry hills) and 2 shrink. Relabel the OSM labels of the dev and Texas Cases with the new rule, keep the hand corrections applied, and add water back by hand where an intermittent pond is wet in the image (Texas neg-10). The dev Baseline then needs a new Batch of its own (about an hour): lookalike-negatives kept its Cases apart and didn't re-baseline. Its one water label (fixed-dev-lookalike-neg-107) is a canal, so the look-alike set doesn't change."
 done_when = [
   "OSM labels of the committed Cases rebuilt with the new water rule, hand corrections still applied",
@@ -409,6 +410,33 @@ refs = [
   "ontology/objects.toml (water)",
   "fixtures/caption/cases/label-corrections.toml",
   "docs/caption-plan.md §3",
+]
+see_it = "`fixtures/caption/cases/caption-dev.jsonl` and `caption-test.jsonl`; the Baseline in `baselines/default/` (`clayzer gate <batch>`)."
+changes = [
+  "src/clayzer/cases.py: relabel_water rebuilds a Case's water label from OSM under the current rule and applies the hand corrections again",
+  "fixtures/caption/cases/caption-dev.jsonl: 9 dev Cases relabelled (water only)",
+  "fixtures/caption/cases/caption-test.jsonl: 4 Texas Cases relabelled (water only)",
+  "fixtures/caption/cases/label-corrections.toml: Texas neg-10's wet pond added by hand",
+  "baselines/default/batch.json: the new dev Baseline, 74 Cases x 3 Repeats",
+  "tests/test_relabel.py: only water changes, corrections apply again, a Change Case's water stays unknown",
+]
+
+[[task]]
+id = "run-report-speed"
+step = "report"
+title = "Write per-Run reports faster: a 222-Run Batch spends about an hour on them"
+area = "Platform"
+tier = "Could"
+status = "todo"
+start = "src/clayzer/run_report.py (write_run_reports)"
+context = "The dev Baseline on 2026-11-04 took about 45 minutes for its Runs and then about 15 seconds per Run writing their reports (about an hour for 222), longer than the Runs themselves, and a resume writes them all again. Every score is saved before this step, so nothing waits on it, but it ties up the process and a resume. Likely each report re-reads the Batch and its files from the store; read once, write in parallel, and skip reports that are already up to date."
+done_when = [
+  "A 222-Run Batch writes its reports in a few minutes",
+  "A resume rewrites only the reports of Runs it re-ran",
+]
+refs = [
+  "src/clayzer/run_report.py",
+  "src/clayzer/batch.py (write_reports)",
 ]
 
 [[task]]

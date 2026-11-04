@@ -41,6 +41,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 from clayzer import harness, lgnd, provenance, verifiers
 from clayzer.cases import parse_jsonl, to_jsonl
 from clayzer.config import Settings, bedrock
+from clayzer.faults import HARNESS_CODES
 from clayzer.grounding import grounding
 from clayzer.judge import fidelity
 from clayzer.retrieval import retrieval
@@ -161,6 +162,26 @@ def _classify(e: Exception) -> str:
     return SANDBOX_FAILURE
 
 
+def _harness_fault(base: dict, case: dict, cfg: BatchConfig, tracer, error: str, step: dict):
+    """A Run whose Harness produced no usable Caption: scored 0, since it's the fault of the
+    system under test (module docstring)."""
+    empty = {"text": "", "objects": [], "relations": [], "uncertain": []}
+    result = {
+        **base, "status": HARNESS_FAULT, "error": error,
+        "grounding": {
+            **grounding(empty, case["reference_labels"]),
+            "correctness": 0.0,
+            "coverage": 0.0 if case["reference_labels"] else None,
+        },
+        "fidelity": {"score": 0.0, "issues": ["no Caption"]} if cfg.judge_model else None,
+        "seconds_to_caption": step.get("seconds"),
+        "caption_tokens": (step.get("usage") or {}).get("totalTokens"),
+    }  # fmt: skip
+    result["faults"] = tracer.finish(HARNESS_FAULT, None, error)
+    result["workflow"] = workflow_score(tracer.run, tracer.steps)
+    return result, {**base, **empty}
+
+
 def _run_one(
     client, cfg: BatchConfig, prompt: str, case: dict, repeat: int, store, toolbox=None,
     verifier=None, chip_shas: dict[str, str] | None = None,
@@ -216,23 +237,14 @@ def _run_one(
                 toolbox, cfg.max_turns, verifier, footprint,
             )  # fmt: skip
         except harness.HarnessFault as e:
-            empty = {"text": "", "objects": [], "relations": [], "uncertain": []}
-            result = {
-                **base, "status": HARNESS_FAULT, "error": str(e),
-                "grounding": {
-                    **grounding(empty, case["reference_labels"]),
-                    "correctness": 0.0,
-                    "coverage": 0.0 if case["reference_labels"] else None,
-                },
-                "fidelity": {"score": 0.0, "issues": ["no Caption"]} if cfg.judge_model else None,
-                "seconds_to_caption": e.step["seconds"],
-                "caption_tokens": e.step["usage"].get("totalTokens"),
-            }  # fmt: skip
-            result["faults"] = tracer.finish(HARNESS_FAULT, None, str(e))
-            result["workflow"] = workflow_score(tracer.run, tracer.steps)
-            return result, {**base, **empty}
+            return _harness_fault(base, case, cfg, tracer, str(e), e.step)
         except (ClientError, BotoCoreError) as e:
             status = _classify(e)
+            # A request the captioner's model rejected or answered malformed is the system under
+            # test failing, as faults.py attributes it (ADR-0003): scored 0, not retried.
+            code = e.response["Error"]["Code"] if isinstance(e, ClientError) else None
+            if code in HARNESS_CODES:
+                return _harness_fault(base, case, cfg, tracer, str(e)[:500], {})
             faults = tracer.finish(status, None, str(e)[:500])
             return {**base, "status": status, "error": str(e)[:500], "faults": faults}, None
 
