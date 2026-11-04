@@ -29,6 +29,7 @@ from OpenStreetMap, so `cases/` is under the ODbL ([NOTICE.md](cases/NOTICE.md))
 ```sh
 uv run clayzer push --from fixtures/caption-lookalike    # into your store
 uv run clayzer --region dev-lookalike batch --repeats 3 --label lookalike
+uv run clayzer --region dev-lookalike ui                  # the Cases page shows them
 ```
 
 They live apart from the development set (`fixtures/caption`) until `dev-cases` is finished,
