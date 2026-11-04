@@ -183,18 +183,25 @@ def _claim_table(g: dict, labels: list[dict]) -> str:
         cl = row["claim"]
         attrs = " ".join(f"{k}={v}" for k, v in (cl.get("attributes") or {}).items())
         claim = f"{cl['count']} × {_short(cl['object'])} at {cl['position']} {attrs}".strip()
+        if cl.get("change"):  # a Change Case's Claim
+            claim += f" ({cl['change']})"
         ref = refs.get(cl["object"])
         if ref:
             ref_attrs = " ".join(f"{k}={v}" for k, v in ref["attributes"].items())
             count = f"{ref['count']} × " if ref["count"] is not None else ""
             reference = (
                 f"{count}{_short(ref['object'])} at {ref['position']} "
-                f"(covers {', '.join(ref['cells'])}) {ref_attrs} · {ref['source']}"
+                f"(covers {', '.join(ref['cells'])}) {ref_attrs}"
+                + (f" ({ref['change']})" if ref.get("change") else "")
+                + f" · {ref['source']}"
             )
             verdict = '<span class="badge b-ok">matched</span>'
         else:
             reference = "none"
             verdict = '<span class="badge b-bad">false positive</span>'
+        if "change" in row:  # scored only where the label's change is known
+            ok = row["change"] == 1.0
+            verdict += f' <span class="badge {"b-ok" if ok else "b-bad"}">change {"right" if ok else "wrong"}</span>'
         out.append(
             f"<tr><td>{escape(claim)}</td><td>{verdict}</td><td>{escape(reference)}</td>"
             f'<td class="num">{_badge(row.get("position"))}</td></tr>'
@@ -423,7 +430,8 @@ def render_html(b: dict, store) -> str:
     by_id = {c["id"]: c for c in b["cases"]}
     for case_id, summ in s["cases"].items():
         case = by_id[case_id]
-        chip = case["chips"][0]
+        # The later Chip of a Change Case's pair: Claims' positions are in it.
+        chip = case["chips"][-1]
         rows = sorted(
             (r for r in b["results"] if r["case_id"] == case_id), key=lambda r: r["repeat"]
         )

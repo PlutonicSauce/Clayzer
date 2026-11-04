@@ -187,9 +187,28 @@ step = "case"
 title = "Change Cases: Chip Pairs from USGS install years and GRW construction dates"
 area = "Data and Cases"
 tier = "Should"
-status = "todo"
+status = "done"
 closes = ["CAP-02"]
 start = "caption-plan.md §5.1 (kind = change)"
+notes = "Done 2026-11-04 from USGS install years; GRW construction dates are left for later (only USGS's `p_year` dates a Pair today). Checked live on Kingbird B Solar (USPVDB 401501, built 2016): farmland in NAIP 2014, panels edge to edge in NAIP 2022. A one-Case Batch with Nova Pro and Opus 5.5 ran end to end: change 1.0 (the solar array appeared), fidelity 0.3 (the Judge saw from both images that the panels fill the frame, not only the centre). USGS doesn't record removals, so `disappeared` comes up only in tests for now."
+see_it = "`uv run clayzer case uspvdb 401501 --change`, then a Case's page (#/cases/change-dev-uspvdb-401501): the later Chip with its labels, the earlier Chip below it, and each label's change."
+changes = [
+  "src/clayzer/cases.py: build_change cuts a Chip Pair around one point with one offset; change_labels marks each USGS label appeared, disappeared, or unchanged, and OSM labels unknown",
+  "src/clayzer/chips.py: find_naip takes `before_year` for the earlier Chip",
+  "src/clayzer/answer_keys.py: existed_by moved here from importer.py, shared by both",
+  "src/clayzer/harness.py: CHANGE_PROMPT, a `change` field on Claims, and both images sent earlier first",
+  "src/clayzer/judge.py: the Judge sees both images and is told it's judging a change",
+  "src/clayzer/grounding.py: a `change` score where the label's change is known",
+  "src/clayzer/batch.py: a Change Case's Run uses the change prompt and records its hash; the Batch records `change_prompt_sha` and won't resume if it changed",
+  "src/clayzer/provenance.py: the change prompt is listed in a Batch's Provenance",
+  "src/clayzer/gate.py: a different change prompt counts as a captioner change",
+  "src/clayzer/cli.py: `clayzer case uspvdb|uswtdb <id> --change`",
+  "src/clayzer/ui/static/app.js: Cases pages show the Chip Pair and each label's change",
+  "src/clayzer/ui/app.py: a Run's provenance lists every Chip it was given, each with its hash",
+  "src/clayzer/run_report.py: a Change Case's Run report shows its change score and the prompt the Run used",
+  "src/clayzer/report_html.py: each Claim and label shows its change, with a right or wrong badge",
+  "tests/test_change.py: labels, the Harness and Judge on a pair, grounding, and a Change Case end to end",
+]
 context = "The briefs' second task type: two dates of one place (a Chip Pair), and a Caption that says what changed. Build Change Cases where a USGS install year or a Global Renewables Watch construction date falls between two NAIP dates; each Reference Label gets a `change` field (appeared, disappeared, unchanged)."
 done_when = [
   "`clayzer case` can build `kind = \"change\"` Cases with two Chips",
@@ -201,6 +220,29 @@ refs = [
   "docs/caption-plan.md §5.2",
   "docs/caption-design.md §2.1 (CAP-02)",
   "GLOSSARY.md (Chip Pair, Change Case)",
+]
+
+[[task]]
+id = "grw-change-dates"
+step = "case"
+title = "Change Cases from Global Renewables Watch construction dates, where USGS has no install year"
+area = "Data and Cases"
+tier = "Should"
+status = "todo"
+closes = ["CAP-02"]
+start = "src/clayzer/cases.py (build_change, change_labels)"
+after = ["change-cases"]
+context = "Change Cases date a Chip Pair from USGS's install year (`p_year`) only. Global Renewables Watch v1.0 (MIT) estimates a construction quarter for 86,410 solar farms and 375,197 wind turbines worldwide (Q4 2017 to Q2 2024), and the land use before each, so it can date sites USGS has no year for and confirm the ones it has. A quarter is finer than a year, so a Pair's NAIP dates can bracket it more tightly. GRW is model-detected, so less exact than USGS inside the US: where both date a site and disagree by more than a year, flag the Case for a look by eye instead of picking one. Read the GeoPackages' columns first (docs/sources.toml has only the release listing); download at run time, never commit."
+done_when = [
+  "GRW's construction quarter read for the sites near a Chip, with the release version recorded on each Case as an Answer Key",
+  "`clayzer case ... --change` brackets the quarter with two NAIP dates when USGS has no year, and says which source dated it",
+  "A Case where USGS and GRW disagree by more than a year is flagged, not silently dated",
+  "At least one GRW-dated Change Case built and checked by eye",
+]
+refs = [
+  "docs/sources.toml (grw)",
+  "docs/caption-plan.md §3 (Global Renewables Watch row)",
+  "src/clayzer/cases.py (build_change)",
 ]
 
 [[task]]

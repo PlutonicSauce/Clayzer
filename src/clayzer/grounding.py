@@ -49,7 +49,7 @@ def grounding(caption: dict, labels: list[dict]) -> dict:
     claims = [o for o in caption["objects"] if o["object"] in KEYED]
     unkeyed = [o for o in caption["objects"] if o["object"] not in KEYED]
 
-    rows, counts, positions, attributes = [], [], [], []
+    rows, counts, positions, attributes, changes = [], [], [], [], []
     for cl in claims:
         ref = refs.get(cl["object"])
         if ref is None:
@@ -60,6 +60,10 @@ def grounding(caption: dict, labels: list[dict]) -> dict:
         if cl.get("position") is not None:
             row["position"] = _position_score(cl["position"], ref["cells"])
             positions.append(row["position"])
+        # Change Cases: a Claim's change against its label's, where the label's is known.
+        if ref.get("change") in ("appeared", "disappeared", "unchanged"):
+            row["change"] = 1.0 if cl.get("change") == ref["change"] else 0.0
+            changes.append(row["change"])
         for key, value in (cl.get("attributes") or {}).items():
             if key in ref["attributes"]:
                 ok = 1.0 if value == ref["attributes"][key] else 0.0
@@ -107,6 +111,8 @@ def grounding(caption: dict, labels: list[dict]) -> dict:
         "position": _mean(positions),
         "attributes": _mean(attributes),
         "relations": relations,
+        # Only Change Cases' labels carry a known change, so a Fixed Case has none to score.
+        "change": _mean(changes),
     }
     total = len(caption["objects"])
     return {

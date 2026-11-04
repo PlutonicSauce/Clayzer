@@ -37,6 +37,11 @@ def _solar_nearby(chip: Chip) -> list[str]:
             if x["case_id"] in outlines and outlines[x["case_id"]].intersects(around)]  # fmt: skip
 
 
+def _chip_record(chip: Chip) -> dict:
+    return {"id": chip.id, "uri": f"chips/{chip.png}", "date": chip.date,
+            "bbox": list(chip.bbox), "source": chip.source}  # fmt: skip
+
+
 def _case(case_id: str, region: str, chip: Chip, labels: list[dict], started: float) -> dict:
     return {
         "id": case_id,
@@ -82,6 +87,57 @@ def build_positive(
     item = find_naip(lon, lat, after_year=rec.get("p_year"), offset_m=offset)
     chip = cut_chip(item, lon, lat, prefix, store, naip_source, offset)
     return _case(f"fixed-{region}-{answer_key}-{source_id}", region, chip, _labels(chip), started)
+
+
+def change_labels(before: Chip, after: Chip) -> list[dict]:
+    """Reference Labels for a Chip Pair. USGS records carry the year they were built, so each
+    USGS label says whether its object appeared, disappeared, or was there on both dates; the
+    count and position are those of the date it's present on (the later, unless it
+    disappeared). OSM is today's map with no history, so OSM labels are the later Chip's with
+    `change: unknown`, which grounding doesn't score for change."""
+    solar, turbines = ak.usgs_near(after.bbox, ak.SOLAR_SEARCH_DEG, turbine_buffer_deg=0.0)
+
+    def at(chip: Chip) -> dict[str, dict]:
+        year = int(chip.date[:4])
+        built = ak.usgs_labels(chip, ak.existed_by(solar, year), ak.existed_by(turbines, year))
+        return {lb["object"]: lb for lb in built}
+
+    then, now = at(before), at(after)
+    labels = []
+    for obj in sorted(then.keys() | now.keys()):
+        if obj in now:
+            labels.append({**now[obj], "change": "unchanged" if obj in then else "appeared"})
+        else:
+            labels.append({**then[obj], "change": "disappeared"})
+    osm = ak.osm_labels(after, ak.overpass(after.bbox))
+    return labels + [{**lb, "change": "unknown"} for lb in osm]
+
+
+def build_change(
+    answer_key: str, source_id: int, region: str, store, naip_source: str = "pc"
+) -> dict:
+    """A Change Case: the same place before and after a USGS site was built, a Chip Pair cut
+    around the same point with the same offset, so both Chips share one footprint."""
+    started = time.monotonic()
+    rec = ak.uspvdb_site(source_id) if answer_key == "uspvdb" else ak.uswtdb_turbine(source_id)
+    year = rec.get("p_year")
+    if not year:
+        raise ValueError(f"{answer_key} {source_id} has no install year (p_year)")
+    state = rec.get("p_state") or rec.get("t_state")
+    lon, lat = rec["xlong"], rec["ylat"]
+    offset = offset_for(f"{answer_key}-{source_id}")
+    prefix = f"{state.lower()}-{answer_key}-{source_id}"
+    early = find_naip(lon, lat, before_year=year, offset_m=offset)
+    late = find_naip(lon, lat, after_year=year, offset_m=offset)
+    before = cut_chip(early, lon, lat, prefix, store, naip_source, offset)
+    after = cut_chip(late, lon, lat, prefix, store, naip_source, offset)
+    labels = change_labels(before, after)
+    case = _case(f"change-{region}-{answer_key}-{source_id}", region, after, labels, started)
+    case["kind"] = "change"
+    case["chips"] = [_chip_record(before), _chip_record(after)]  # earlier first
+    case["answer_keys"]["osm"] = "today's map: no history, so OSM labels have change unknown"
+    case["prep_seconds"] = round(time.monotonic() - started, 1)
+    return case
 
 
 def build_negative(
