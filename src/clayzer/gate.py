@@ -23,7 +23,8 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Literal
 
-from clayzer.batch import SANDBOX_FAILURE, BatchConfig
+from clayzer.batch import SANDBOX_FAILURE, BatchConfig, config_from
+from clayzer.provenance import RECORDED_SINCE  # None there means "not recorded", not "off"
 
 Verdict = Literal["pass", "fail", "inconclusive"]
 EXIT_CODES: dict[Verdict, int] = {"pass": 0, "fail": 1, "inconclusive": 2}
@@ -33,9 +34,12 @@ SPREAD_WARNING = 3.0  # warn when a Case's Spread grows this many times (and by 
 METRICS = ("correctness", "coverage", "fidelity", "workflow")
 
 # Settings that change the measuring stick itself: a difference makes scores less comparable.
-MEASUREMENT = ("judge_model", "embed_model", "cases_sha", "scorer_version")
+MEASUREMENT = ("judge_model", "judge_prompt_sha", "embed_model", "cases_sha", "chips_sha",
+               "ontology_version", "ontology_sha", "scorer_version")  # fmt: skip
 # Settings a change to the captioner is expected to vary.
-CAPTIONER = ("caption_model", "prompt_sha", "prompt_source")
+CAPTIONER = ("caption_model", "prompt_sha", "prompt_source", "tools", "max_turns")
+# The code itself: a change can move either, so it's shown but not warned about.
+CODE = ("code_commit", "code_dirty")
 
 
 # ── Baselines ───────────────────────────────────────────────────────────────────────────
@@ -83,7 +87,7 @@ def load_baseline(root: Path, name: str = "default") -> dict:
     if not (d / "summary.json").exists():
         raise FileNotFoundError(f"no Baseline named {name!r} in {root}")
     return {
-        "config": BatchConfig(**json.loads((d / "batch.json").read_text())),
+        "config": config_from(json.loads((d / "batch.json").read_text())),
         "summary": json.loads((d / "summary.json").read_text()),
         "results": [json.loads(x) for x in (d / "results.jsonl").read_text().splitlines() if x],
     }
@@ -94,11 +98,16 @@ def load_baseline(root: Path, name: str = "default") -> dict:
 
 def setting_changes(a: BatchConfig, b: BatchConfig) -> list[dict]:
     out = []
-    for key in CAPTIONER + MEASUREMENT + ("repeats",):
+    for key in CAPTIONER + MEASUREMENT + CODE + ("repeats",):
         va, vb = getattr(a, key), getattr(b, key)
-        if va != vb:
-            kind = "measurement" if key in MEASUREMENT else "captioner"
-            out.append({"setting": key, "a": va, "b": vb, "kind": kind})
+        if va == vb:
+            continue
+        if key in RECORDED_SINCE and (va is None or vb is None):
+            kind = "not recorded"
+        else:
+            kind = ("measurement" if key in MEASUREMENT else "code" if key in CODE
+                    else "captioner")  # fmt: skip
+        out.append({"setting": key, "a": va, "b": vb, "kind": kind})
     return out
 
 
@@ -285,11 +294,18 @@ def gate(
     else:
         verdict = "pass"
 
+    changes = setting_changes(baseline["config"], candidate["config"])
     warnings = [
         f"{s['setting']} differs ({s['a']!r} → {s['b']!r}): scores may not be comparable"
-        for s in setting_changes(baseline["config"], candidate["config"])
+        for s in changes
         if s["kind"] == "measurement"
     ]
+    unrecorded = [s["setting"] for s in changes if s["kind"] == "not recorded"]
+    if unrecorded:
+        warnings.append(
+            f"{', '.join(unrecorded)} not recorded for one side, so a change there can't be "
+            "detected; re-run the Baseline to record them"
+        )
     rb, rc = baseline["config"].repeats, candidate["config"].repeats
     if rb < 3 or rc < 3:
         warnings.append(

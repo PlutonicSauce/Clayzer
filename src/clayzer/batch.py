@@ -12,9 +12,12 @@ Results are written after every Run, so a Batch interrupted by expired session c
 keeps its progress. Expired credentials stop the Batch instead of failing every later Run.
 
 Store layout, under batches/<batch-id>/:
-    batch.json       the configuration (models, prompt hash, Cases hash, repeats, scorer version)
+    batch.json       the configuration: models, hashes of the prompt, Cases, Chips, Judge rubric
+                     and ontology, repeats, scorer version, git commit (provenance.py)
     prompt.txt       the caption prompt template used
+    judge-prompt.txt the Judge's rubric: its prompt and verdict tool
     cases.jsonl      the Cases as scored, frozen at the start
+    chips.json       a SHA-256 of every Chip image, checked before each Run
     results.jsonl    one row per Run: outcome and scores
     captions.jsonl   one Caption per Run
     traces/          one Trace per Run (<case-id>--r<repeat>.jsonl): every model call as a Step
@@ -30,12 +33,12 @@ import json
 import re
 import statistics
 from contextlib import nullcontext
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from datetime import UTC, datetime
 
 from botocore.exceptions import BotoCoreError, ClientError
 
-from clayzer import harness
+from clayzer import harness, provenance
 from clayzer.cases import parse_jsonl, to_jsonl
 from clayzer.config import Settings, bedrock
 from clayzer.grounding import grounding
@@ -81,10 +84,19 @@ class BatchConfig:
     max_turns: int = harness.MAX_TURNS
     # The MCP server that verifies drafted Claims (verify.py), or None for no verification.
     verify: str | None = None
+    # Provenance (provenance.py). None means the Batch predates recording it.
+    judge_prompt_sha: str | None = None
+    ontology_version: str | None = None
+    ontology_sha: str | None = None
+    chips_sha: str | None = None
+    code_commit: str | None = None
+    code_dirty: bool | None = None
+    summary_model: str | None = None
+    # Settings this version doesn't know, from a Batch another branch wrote to the shared store.
+    extra: dict = field(default_factory=dict)
 
 
-def _sha(data: bytes) -> str:
-    return hashlib.sha256(data).hexdigest()[:12]
+_sha = provenance.sha
 
 
 def _mean(xs):
@@ -106,7 +118,14 @@ def _load_jsonl(store, key: str) -> list[dict]:
 
 
 def load_config(store, batch_id: str) -> BatchConfig:
-    return BatchConfig(**json.loads(store.get(_key(batch_id, "batch.json"))))
+    return config_from(json.loads(store.get(_key(batch_id, "batch.json"))))
+
+
+def config_from(raw: dict) -> BatchConfig:
+    """A BatchConfig from its JSON; settings this version doesn't know are kept in `extra`."""
+    known = {f.name for f in fields(BatchConfig)}
+    extra = {**raw.get("extra", {}), **{k: v for k, v in raw.items() if k not in known}}
+    return BatchConfig(**{k: v for k, v in raw.items() if k in known and k != "extra"}, extra=extra)
 
 
 def load_summary(store, batch_id: str) -> tuple[BatchConfig, dict | None]:
@@ -139,12 +158,14 @@ def _classify(e: Exception) -> str:
 
 def _run_one(
     client, cfg: BatchConfig, prompt: str, case: dict, repeat: int, store, toolbox=None,
-    verifier=None,
+    verifier=None, chip_shas: dict[str, str] | None = None,
 ):  # fmt: skip
     """One Run: caption the Case's Chip, then score it. Returns (result, caption).
 
     Every model call is recorded in the Run's Trace, which is written whatever the outcome,
-    including when expired credentials stop the Batch mid-Run.
+    including when expired credentials stop the Batch mid-Run. A Chip whose image no longer
+    matches the one hashed when the Batch started is a Sandbox Failure: scoring it would score
+    a different input under the same name.
     """
     chip = case["chips"][0]
     run_id = f"{case['id']}#{repeat}"
@@ -154,10 +175,15 @@ def _run_one(
     if not chip["uri"].startswith("chips/"):
         raise ValueError(f"Chip uri must be a chips/ key: {chip['uri']}")
     png = store.get(chip["uri"])
+    expected = (chip_shas or {}).get(chip["uri"])
+    if expected and hashlib.sha256(png).hexdigest() != expected:
+        error = f"{chip['uri']} changed since the Batch started (SHA-256 no longer matches)"
+        return {**base, "status": SANDBOX_FAILURE, "error": error}, None
     tracer = Tracer(
         RunInfo(run_id=run_id, task="caption", case_id=case["id"], repeat=repeat,
                 batch_id=cfg.batch_id, model_id=cfg.caption_model, prompt_sha=cfg.prompt_sha,
-                tools=[], metadata={"chip_id": chip["id"], "judge_model": cfg.judge_model}),
+                tools=[], metadata={"chip_id": chip["id"], "chip_sha256": expected,
+                          "judge_model": cfg.judge_model}),
         [StoreSink(store), SummarySink(store)],
     )  # fmt: skip
     try:
@@ -259,6 +285,12 @@ def create(
     label = re.sub(r"[^A-Za-z0-9_-]+", "-", label).strip("-")[:40]
     batch_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ") + (f"-{label}" if label else "")
     frozen = to_jsonl(cases)
+    judge_prompt = provenance.judge_prompt().encode()
+    chips = (json.dumps(provenance.chip_manifest(store, cases), indent=2) + "\n").encode()
+    onto_version, onto_sha = provenance.ontology_version()
+    commit, dirty = provenance.code_version()
+    from clayzer.narrate import summary_model
+
     cfg = BatchConfig(
         batch_id=batch_id,
         label=label,
@@ -274,12 +306,22 @@ def create(
         prompt_source=prompt_source,
         tools=list(tools or []),
         verify=verify,
+        judge_prompt_sha=_sha(judge_prompt) if judge else None,
+        ontology_version=onto_version,
+        ontology_sha=onto_sha,
+        chips_sha=_sha(chips),
+        code_commit=commit,
+        code_dirty=dirty,
+        summary_model=summary_model(),
     )
     store.put(
         _key(batch_id, "batch.json"), (json.dumps(asdict(cfg), indent=2) + "\n").encode(), JSON
     )
     store.put(_key(batch_id, "prompt.txt"), prompt.encode(), "text/plain")
     store.put(_key(batch_id, "cases.jsonl"), frozen, NDJSON)
+    store.put(_key(batch_id, "chips.json"), chips, JSON)
+    if judge:
+        store.put(_key(batch_id, "judge-prompt.txt"), judge_prompt, "text/plain")
     return batch_id
 
 
@@ -289,6 +331,11 @@ def resume(batch_id: str, settings: Settings, store, progress=print, narrate: bo
     b = load(store, batch_id)
     cfg, cases = b["config"], b["cases"]
     prompt = store.get(_key(batch_id, "prompt.txt")).decode()
+    chips_key = _key(batch_id, "chips.json")
+    chip_shas = json.loads(store.get(chips_key)) if store.exists(chips_key) else None
+    if cfg.judge_prompt_sha and _sha(provenance.judge_prompt().encode()) != cfg.judge_prompt_sha:
+        # Finishing with a different rubric would mix two Judges in one Batch.
+        raise ValueError(f"the Judge's rubric changed since {batch_id} started; start a new Batch")
     client = bedrock(settings)  # models come from the Batch's own config, not the settings
     watch_retries(client)
     done = {(r["case_id"], r["repeat"]) for r in b["results"] if r["status"] != SANDBOX_FAILURE}
@@ -312,8 +359,9 @@ def resume(batch_id: str, settings: Settings, store, progress=print, narrate: bo
         for i, (case, repeat) in enumerate(todo, 1):
             try:
                 result, cap = _run_one(
-                    client, cfg, prompt, case, repeat, store, model_tools, verifier
-                )
+                    client, cfg, prompt, case, repeat, store,
+                    toolbox=model_tools, verifier=verifier, chip_shas=chip_shas,
+                )  # fmt: skip
             except CredentialsExpired as e:
                 stopped = f"credentials expired after {i - 1} of {len(todo)} Runs: {e}"[:300]
                 break

@@ -1,32 +1,58 @@
 # Clayzer
 
 Caption generation and evaluation for the text-native Clay v2 model, built for the Clay Earth
-Dataset Foundry hackathon. The plan is [docs/caption-plan.md](docs/caption-plan.md); terms are
-in [GLOSSARY.md](GLOSSARY.md).
+Dataset Foundry hackathon.
 
-## Walking skeleton
-
-One path end to end, with crude parts (caption-plan.md §7, Day 1):
+Clayzer cuts aerial images (NAIP) around places whose contents are known from public data (USGS
+solar and wind sites, OpenStreetMap). An AI model captions each image without seeing those
+answers, and every caption is scored against them. Each experiment runs every image several
+times and is compared with the current best, so a change to the captioner is kept only when the
+scores show it helps.
 
 ```
-USGS site ──► NAIP Chip (Planetary Computer) ──► Case with USGS + OSM Reference Labels
-                                                   │
-                       Chip only (ADR-0006) ◄──────┘
-                              │
-                        Nova Pro Caption ──► grounding · fidelity (Opus 5.5) · retrieval (Titan)
-                                              ──► batches/<batch-id>/report.html
+USGS site ──► NAIP Chip ──► Case (Chip + Reference Labels)
+                               │
+          Chip only ◄──────────┘
+              │
+        Caption (Nova Pro) ──► grounding · fidelity (Opus 5.5) · retrieval (Titan) · Workflow Score
+                                 ──► report, Compare, regression gate
 ```
 
-### Set up
+## Getting started
 
-Needs Python 3.12 and [uv](https://docs.astral.sh/uv/).
+### 1. Install
+
+You need Python 3.12+, [uv](https://docs.astral.sh/uv/), and git.
 
 ```sh
-uv sync
+git clone https://github.com/PlutonicSauce/Clayzer.git
+cd Clayzer
+uv sync --extra ui --extra tools
 ```
 
-Put AWS credentials for an account with Bedrock access to Nova Pro, Opus 5.5, and Titan Text
-Embeddings v2 in `.env` at the repo root (gitignored). `export` lines are fine:
+### 2. Start the web app
+
+```sh
+uv run clayzer ui
+```
+
+Open <http://127.0.0.1:8770>. It runs locally and is read-only. Without AWS set up, its store (the
+local `data/` and `batches/` folders) is empty, but **How it works**, **For Dev Team → Tasks**, and
+the linked docs work straight away.
+
+| Page | What's there |
+|---|---|
+| Overview | the latest scores against the Baseline, and a sample caption on its image |
+| How it works | the ten steps from image to kept change, each linked to its plan and design sections |
+| Cases | every image with its Reference Labels |
+| Batches | every experiment: its report, provenance, regression gate, and Compare |
+| For Dev Team | Tasks, Data sources, Concepts (the glossary), and the pitch deck |
+
+### 3. Connect your AWS account
+
+Building Cases and running Batches call Amazon Bedrock. Use your own hackathon account with access
+to Nova Pro, Claude Opus 5.5, and Titan Text Embeddings v2. Put its credentials in `.env` at the
+repo root; it's gitignored, so never commit it.
 
 ```sh
 AWS_ACCESS_KEY_ID=...
@@ -35,242 +61,78 @@ AWS_SESSION_TOKEN=...
 AWS_DEFAULT_REGION=us-west-2
 ```
 
-Credentials in `.env` take precedence over a shell's AWS profile, region, or Bedrock bearer
-token.
+Results stay in local folders unless you point `CLAYZER_STORE` at an S3 bucket in your account
+([Storage](docs/cli.md#storage)).
 
-### Storage
-
-Each teammate has their own hackathon AWS account, so each uses their own bucket; git is the
-shared layer (caption-plan.md §3). In your account:
+### 4. Run your first Batch
 
 ```sh
-# one-time: a private bucket (public access blocked, encrypted by default)
-aws s3api create-bucket --bucket clayzer-<account-id>-us-west-2 --region us-west-2 \
-  --create-bucket-configuration LocationConstraint=us-west-2
-aws s3api put-public-access-block --bucket clayzer-<account-id>-us-west-2 \
-  --public-access-block-configuration \
-  BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+uv run clayzer case uspvdb 400117          # a solar Case around USPVDB site 400117
+uv run clayzer case neg -119.20 35.45      # a negative Case, with no USGS site nearby
+uv run clayzer batch --repeats 3 --label first
 ```
 
-Then add to `.env`:
+Refresh the web app's **Batches** page to see the result, or open the `report.html` the command
+prints.
 
-```sh
-CLAYZER_STORE=s3://clayzer-<account-id>-us-west-2/caption
-CLAYZER_NAIP_SOURCE=aws
-```
+## Using the CLI
 
-`uv run clayzer push --from <dir>` copies a local `chips/` + `cases/` folder (such as the
-committed fixtures) into your bucket.
+Every command reads from and writes to the store. `uv run clayzer --help` lists them all.
 
-### Build Cases
-
-Each command cuts a 512 × 512 Chip, fetches Reference Labels, and adds the Case to
-`cases/caption-dev.jsonl` in the store:
-
-```sh
-uv run clayzer case uspvdb 400117              # solar: USPVDB site id
-uv run clayzer case uswtdb 3025453             # wind: USWTDB turbine id
-uv run clayzer case neg -119.20 35.45 --n 1    # negative: lon lat; refused if USGS is nearby
-```
-
-Positives use the latest NAIP image taken after the site was built. Site and turbine ids come
-from the USGS APIs (`https://energy.usgs.gov/api/uspvdb/v1/projects`,
-`https://energy.usgs.gov/api/uswtdb/v1/turbines`).
-
-### The evaluation loop
-
-A **Run** is one Harness execution on one Case; a **Batch** runs every Case several times
-(**Repeats**) under one fixed configuration. Change one thing, run a Batch, compare it with
-the **Baseline**, and let the regression gate decide whether to keep the change.
-
-```sh
-uv run clayzer batch --repeats 3 --label base         # every Case × 3 Repeats
-uv run clayzer baseline accept <batch-id>              # writes baselines/default/ (commit it)
-
-uv run clayzer batch --repeats 3 --label terse --prompt prompts/terse.txt
-uv run clayzer compare <baseline-batch-id> <candidate-batch-id>
-uv run clayzer gate <candidate-batch-id>               # exit 0 pass, 1 fail, 2 inconclusive
-```
-
-Other options: `--caption-model`, `--only <case-id> ...`, `--no-judge`. `clayzer batches`
-lists Batches; `clayzer report <batch-id>` rebuilds a Batch's reports; `clayzer rescore
-<batch-id>` scores its stored Captions again with the current scorer, without calling a model.
-
-Each Run ends `ok`, `harness_fault` (no usable Caption: scored 0), or `sandbox_failure`
-(Bedrock, network, or credentials: no valid score, excluded). Results are saved after every Run.
-Expired session credentials stop the Batch cleanly; refresh `.env` and finish it with:
-
-```sh
-uv run clayzer batch --resume <batch-id>
-```
-
-**Tools.** With `--tools`, the Harness becomes a tool-use loop: the captioning model may call
-MCP tools before it submits its Caption, for up to 8 model turns. Each tool call is a `tool`
-Step in the Run's Trace, and `batch.json` records the servers. Only servers allowed for the
-caption Harness are known (`src/clayzer/tools.py`; ADR-0006). Needs the `tools` extra and `uvx`:
-
-```sh
-uv sync --extra tools
-uv run clayzer batch --tools roda --label roda
-```
-
-LGND Geo (`lgnd`) is remote and signs each person in through OAuth. Sign in once; the sign-in
-is saved in `~/.clayzer/auth/` (or `CLAYZER_AUTH_DIR`), outside the repo, and refreshes itself.
-A Batch never opens a browser: without a saved sign-in it stops and says to run `login`.
-
-```sh
-uv run clayzer login lgnd     # opens the browser once
-uv run clayzer tools lgnd     # its 18 tools
-uv run clayzer tools lgnd --call search_chip_lat_lon --args '{"index": "naip", "lat": 35.2294, "lon": -118.1930}'
-uv run clayzer tools lgnd --call reasoning_imagery_check \
-  --args '{"claim": "Rows of solar panels cover the ground here.", "kind": "place", "nodes": ["naip/obs:613218812"]}'
-```
-
-The first call returns the newest NAIP observation at a point (`naip/obs:...`); the second asks
-LGND's image model whether that observation supports a claim. Behind a TLS-intercepting proxy,
-set `CLAYZER_MCP_SYSTEM_TRUST=1`.
-
-**Verify, then write.** With `--verify`, the Harness checks each drafted Claim with LGND Geo
-before the Caption commits (`src/clayzer/verify.py`): it looks up LGND's NAIP image at the centre
-of the Claim's grid cell and asks LGND's image model whether the object is there. Claims it
-confirms stay; the rest move to `uncertain`, and a text-only call rewrites the prose from what
-is left. A Claim LGND couldn't check (an LGND failure) stays, marked unverified. The code, not
-the model, makes these calls from the Chip's footprint, so the model still sees only the image
-(ADR-0009). Every lookup and check is a `tool` Step with `role: verify`, and each Run result has
-counts (`verification`). LGND's images are about 160 m across, bigger than a 102 m cell, so the
-check catches wrong objects far better than a Claim one cell off.
-
-```sh
-uv run clayzer login lgnd
-uv run clayzer batch --repeats 3 --verify --label verify
-```
-
-A Batch writes `batches/<batch-id>/` in the store: `batch.json` (models, prompt hash, Cases
-hash, Repeats, scorer version), `prompt.txt`, `cases.jsonl` (frozen at the start),
-`results.jsonl`, `captions.jsonl`, `retrieval.jsonl`, `summary.json` (per-Case mean and
-Spread), `report.md`, `report.html`, and `traces/`: one Trace per Run
-(`<case-id>--r<repeat>.jsonl`). A Trace records every model call as a Step, with the full
-prompt and response, the image by key and hash, wall time and Bedrock's own latency, tokens,
-retries, and the error code of anything that failed; Judge calls are marked as scoring. Each
-failed Step is attributed (ADR-0003, `faults.py`): a Harness Fault (a bad request, a missing
-`submit_caption` call, anything unrecognized), an Environment Fault (throttling, timeouts,
-network, access), or a Sandbox Failure (the Judge). Runs and Batch summaries carry the counts.
-
-Every Run also gets a **summary** of its Trace: what the Harness did, where it struggled and whose
-fault, and a one-line verdict. Code writes the facts (`summarize.py`); a model writes a readable
-narrative from the Trace alone (`narrate.py`, `CLAYZER_SUMMARY_MODEL`, default Nova Pro), once,
-at the end of the Batch. The narrative is saved with a hash of its Trace, so replays and reports
-never call a model, and one that names a fault the Trace doesn't have is rejected.
-`--no-narrate` skips it; `clayzer summarize <batch-id>` rebuilds the facts offline, and
-`--narrate` writes any missing narratives.
-
-Every Run also gets a **Workflow Score** (`workflow.py`, REQ-06): how well the Harness worked,
-from its Trace alone, with no model call. It's the weighted mean of the parts that apply:
-finishing with a Caption, the tool plan (finishing through `submit_caption`, no forbidden MCP
-server), tool-call success, recovery after Harness Faults, turns against the budget, and tokens
-against `CLAYZER_TOKEN_BUDGET` if set. Environment Faults never lower it. It's in Batch
-summaries, Compare, the regression gate, and the reports.
-
-Every Run also gets its own **report**, `batches/<batch-id>/runs/<case-id>--r<repeat>.html` (and
-`.json` for machines): the verdict, both scores with their reasons, the Chip with its Claims, the
-Caption, the summary, and every Step with its prompt and response. It's built from stored files
-only, so it rebuilds offline. In the web app it's at `#/runs/<batch-id>/<case-id>/<repeat>`, and
-each Repeat in a Batch report links to it.
-
-```sh
-uv run clayzer trace <batch-id> <case-id> --repeat 1          # one Run, Step by Step
-uv run clayzer trace <batch-id> <case-id> --repeat 1 --json   # the raw Trace
-```
-
-`report.html` is the one to open: a single self-contained file (no server, no network) with
-each Chip, its Claims and Reference Labels drawn on the 3×3 grid, mean ± Spread per Case, and
-every Repeat's Caption, Claims, and Judge notes.
-
-**Grounding** is two numbers: **correctness** (of what the Caption claimed, how much is right:
-precision, count, position, attributes, relations) and **coverage** (how much of the Answer Key
-it mentions). A terse Caption scores high on the first and low on the second.
-
-**The regression gate.** A Case's grounding correctness, grounding coverage, or fidelity, or
-the Batch's retrieval, regresses when its mean drops by more than max(0.05, the Baseline's
-Spread), Spread being the run-to-run standard deviation across Repeats. Any regression, or a
-Baseline Case missing from the candidate, fails the gate. A Case whose Spread grows sharply
-gets a warning: the captioner became erratic there. Sandbox Failures make it inconclusive. It warns when a measurement
-setting differs (Judge, embedding model, Cases, scorer version), when there are fewer than 3
-Repeats, and when tokens per Caption rise more than 25% (`--max-token-increase 0.5` makes that
-fail instead).
-
-### The team web app
-
-```sh
-uv sync --extra ui
-uv run clayzer ui                  # http://127.0.0.1:8770, read-only
-uv run clayzer ui --allow-launch   # also lets the browser run Batches
-```
-
-- **Overview:** the workflow, step by step (what each step is, why it's there, where it lives,
-  and whether it's built), plus the latest Batch next to the Baseline.
-- **Tasks:** the work board from [`docs/tasks.toml`](docs/tasks.toml), by functional area. Each
-  task has a **Brief** (context, the requirements it closes, what done means, what to read first)
-  and a **Copy brief for your agent** button that puts all of it, plus the repo rules, on the
-  clipboard as Markdown. `#/tasks/<task-id>` links straight to one. To take a task, put your
-  name in its `owner` field and open a PR.
-- **Cases:** every Chip in the store with its Reference Labels.
-- **Batches:** every Batch, its report, its regression gate against the Baseline, and
-  Compare between any two.
-- **Concepts:** the glossary.
-
-It reads whatever store your settings point at (your bucket, or local folders) and listens on
-localhost only.
-
-### Settings
-
-| Variable | Default |
+| Command | What it does |
 |---|---|
-| `CLAYZER_CAPTION_MODEL` | `us.amazon.nova-pro-v1:0` |
-| `CLAYZER_JUDGE_MODEL` | `us.anthropic.claude-opus-5-5` |
-| `CLAYZER_EMBED_MODEL` | `amazon.titan-embed-text-v2:0` |
-| `CLAYZER_BEDROCK_ENDPOINT_URL` | unset (a private Bedrock endpoint, if your network needs one) |
-| `CLAYZER_OVERPASS_URL` | `https://overpass-api.de/api/interpreter` |
-| `CLAYZER_STORE` | unset: local `data/` and `batches/`. `s3://<bucket>/<prefix>` for S3 |
-| `CLAYZER_NAIP_SOURCE` | `pc` (Planetary Computer). `aws` reads `naip-visualization` (Requester-Pays, us-west-2) |
-| `CLAYZER_DATA_DIR`, `CLAYZER_BATCHES_DIR` | `data/`, `batches/` (local store, and local copies of reports) |
-| `CLAYZER_BASELINES_DIR` | `baselines/` (committed) |
+| `clayzer case uspvdb <id>` / `uswtdb <id>` / `neg <lon> <lat>` | build a Case |
+| `clayzer batch --repeats 3 --label <name>` | run every Case 3 times under one configuration |
+| `clayzer batch --resume <batch-id>` | finish a stopped Batch |
+| `clayzer compare <batch-a> <batch-b>` | what changed between two Batches, and by how much |
+| `clayzer baseline accept <batch-id>` | make a Batch the Baseline |
+| `clayzer gate <batch-id>` | keep or reject a change: exit 0 pass, 1 fail, 2 inconclusive |
+| `clayzer trace <batch-id> <case-id> -r 1` | one Run's summary and Trace, Step by Step |
+| `clayzer login lgnd` / `clayzer tools lgnd` | sign in to LGND Geo, and list or call its tools |
+| `clayzer ui [--allow-launch]` | the web app; `--allow-launch` lets the browser start Batches |
 
-Behind a TLS-intercepting proxy, set `SSL_CERT_FILE` to the proxy's CA bundle; it's passed to
-GDAL for NAIP reads too. MCP servers that ignore it (RODA does) need `CLAYZER_MCP_SYSTEM_TRUST=1`,
-which starts them with the OS trust store.
+Options, what a Batch stores, how scoring works, settings, and AWS hosting are in the
+[CLI and configuration reference](docs/cli.md).
 
-### Hosting it on AWS
+## Find your way around
 
-One CDK app ([`infra/app.py`](infra/app.py)) puts the read-only web app in your own account
-behind an HTTPS CloudFront URL: CloudFront → Application Load Balancer → one ECS Fargate task
-(ARM64) that reads your store bucket. It needs Node (for the CDK CLI) and Docker or Podman.
+| Looking for | Go to |
+|---|---|
+| Something to work on | the web app's **For Dev Team → Tasks**, or [docs/tasks.toml](docs/tasks.toml). Each task has a brief you can paste into your coding agent. |
+| How it fits together | the web app's **How it works** page |
+| The plan: what we build and why | [docs/caption-plan.md](docs/caption-plan.md) |
+| The design: requirements and architecture | [docs/caption-design.md](docs/caption-design.md) |
+| What a term means (Case, Chip, Run, Trace…) | [GLOSSARY.md](GLOSSARY.md) |
+| Why a decision was made | [docs/adr/](docs/adr/) |
+| The hackathon briefs | [technical](docs/tech-hackathon.md), [vision](docs/vision-hackathon.md) |
+| Every command and setting | [docs/cli.md](docs/cli.md) |
 
-```sh
-uv sync --group infra
-cd infra
-npx aws-cdk@2 bootstrap                                   # once per account and region
-npx aws-cdk@2 deploy -c store=s3://<your bucket>/<prefix>  # prints the Url output
+## Project layout
+
+```
+src/clayzer/        the package: Cases, Harness, scoring, Batches, Traces, CLI
+src/clayzer/ui/     the web app (FastAPI and a no-build front end)
+docs/               plan, design, ADRs, tasks, data sources, CLI reference
+ontology/           the object classes a Claim can name
+baselines/          the accepted Baseline (committed)
+infra/              the CDK app that hosts the web app on AWS
+tests/              offline tests: no AWS needed
 ```
 
-Leave out `-c store=...` to have the stack create a new bucket. With Podman, set
-`CDK_DOCKER=podman`. The hosted app never starts Batches, and its role can only read the store
-prefix. `npx aws-cdk@2 destroy` removes everything except the bucket.
+## Contributing
 
-To build the image on its own: `docker build -t clayzer .` (see the
-[Dockerfile](Dockerfile) for mirror and proxy options).
+1. Pick a task, put your name in its `owner` field in [docs/tasks.toml](docs/tasks.toml), and work
+   on a branch for that task.
+2. Before opening a PR, run the lint, format, and test checks:
 
-### Tests
+   ```sh
+   uv run ruff check src tests
+   uv run ruff format --check src tests
+   uv run pytest
+   ```
 
-```sh
-uv run pytest
-```
+3. In the PR, update the task's `status`. Done tasks also get `see_it` and `changes`.
 
-### Not built yet
-
-- Verify-then-write and the LGND Geo sign-in; the tool-use loop has only RODA so far.
-- Workflow Score and Trace summaries (REQ-05, REQ-06 in
-  [caption-design.md §2.3](docs/caption-design.md#23-evaluation-loop-requirements)).
-- Change Cases and the RSICD and VRSBench benchmarks.
-- The open work, by area, is on the Tasks page (`docs/tasks.toml`).
-- USGS positions use site centroids, not polygons.
+**This repo is public.** Never commit `.env`, AWS keys or account ids, `data/`, `batches/`,
+downloaded datasets or benchmark images, or private hostnames and package indexes. Use the
+[glossary](GLOSSARY.md)'s terms, and record decisions as ADRs.
