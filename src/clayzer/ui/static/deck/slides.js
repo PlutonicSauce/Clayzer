@@ -241,8 +241,6 @@ function Next() {
         <span>Open source: the pipeline, the scoring, and this deck</span>
       </a>
     </div>
-    <p class="big">The ask: Clay's real caption set and its rubric weights, so the verdict is Clay's,
-      not our stand-in's.</p>
     <p class="source">Any slide reads itself aloud: press <b>A</b> or the Listen button.</p>
   </div>`;
 }
@@ -291,6 +289,6 @@ export const SLIDES = [
       "If asked about scoring: an Opus judge on every caption would cost $1.1M; our grounding needs no model (footnote).",
       "The script runs about 43 s against a 20 s budget: keep it brisk, or give only the first and last price."] },
   { title: "Thank you", seconds: 16, component: Next,
-    spoken: "Thank you. You can see it live on our site, and read every line of the code on GitHub. Our ask is Clay's real caption set and its rubric weights. And any slide here reads itself aloud.",
-    notes: ["Point at the two links; leave this slide up for questions.", "Close on the ask: Clay's real caption set and its rubric weights.", "Mention Listen (A) as the accessibility point."] },
+    spoken: "Thank you. You can see it live on our site, and read every line of the code on GitHub. And any slide here reads itself aloud.",
+    notes: ["Point at the two links; leave this slide up for questions.", "Mention Listen (A) as the accessibility point."] },
 ];

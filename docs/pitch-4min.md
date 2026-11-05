@@ -167,19 +167,20 @@ the quality bar, and the gate catches it.
 **On screen:** the closing slide, with links to the live site and the repository. Leave it up
 for questions.
 
-> Thank you. You can see it live on our site, and read every line of the code on GitHub. Our ask
-> is Clay's real caption set and its rubric weights. And any slide here reads itself aloud.
+> Thank you. You can see it live on our site, and read every line of the code on GitHub. And any
+> slide here reads itself aloud.
 
 ---
 
 ## Rehearsal notes
 
-- At a calm 145 words a minute the whole script is about 645 words, 4:27, so it runs about 27
+- At a calm 145 words a minute the whole script is about 640 words, 4:24, so it runs about 24
   seconds over. Slide 9 is most of it: about 104 words, 43 seconds against a 20-second budget.
   Rehearse it fast, or give only the first and last price and the time line. Slide 5 runs about
   6 seconds long (it now carries the cross-check rule), slide 3 about 5 (65 words against 22
-  seconds; drop "No map layer, no GIS skills" if you need it), and slide 7 about 2. Slide 2 fits
-  its 35 seconds. Slide 8 has about 7 seconds spare, which the clicks will use.
+  seconds; drop "No map layer, no GIS skills" if you need it), slide 4 about 3, and slide 7
+  about 2. Slide 2 fits its 35 seconds. Slide 8 has about 7 seconds spare, which the clicks will
+  use, and slide 10 about 5, now that it no longer carries the ask.
 - Verify-then-write is part of the approach, but the Baseline ran without it. If asked whether
   77% includes it, say no: the Baseline is the plain captioner. In the 4-image test, every object
   it named was really there, and correctness rose from 0.53 to 0.65.
