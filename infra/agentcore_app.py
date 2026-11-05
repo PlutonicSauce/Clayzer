@@ -80,6 +80,7 @@ class AgentCoreStack(cdk.Stack):
         user: str = "clayzer-team",
         models: list[str] | None = None,
         return_url: str = DEFAULT_RETURN_URL,
+        traces: bool = False,
         build: str = "unknown",
         **kwargs,
     ) -> None:
@@ -145,6 +146,19 @@ class AgentCoreStack(cdk.Stack):
                 resources=["*"],
             )
         )
+        if traces:
+            role.add_to_policy(
+                iam.PolicyStatement(
+                    sid="UnifiedTraceLogPolicy",
+                    actions=["logs:PutResourcePolicy"],
+                    resources=[
+                        (
+                            f"arn:aws:logs:{self.region}:{self.account}:log-group:"
+                            f"/aws/bedrock-agentcore/runtimes/{RUNTIME_NAME}-*"
+                        )
+                    ],
+                )
+            )
         role.add_to_policy(
             iam.PolicyStatement(
                 sid="RuntimeMetrics",
@@ -228,7 +242,8 @@ class AgentCoreStack(cdk.Stack):
                 "CLAYZER_AGENTCORE_PROVIDER": provider,
                 "CLAYZER_AGENTCORE_RETURN_URL": return_url,
                 "CLAYZER_BUILD": build,
-                "UNIFIED_TRACES_DESTINATION_ENABLED": "false",
+                "UNIFIED_TRACES_DESTINATION_ENABLED": str(traces).lower(),
+                "OTEL_TRACES_EXPORTER": "otlp" if traces else "none",
             },
         )  # fmt: skip
         runtime.node.add_dependency(role)  # the role's policy must exist before the first Run
@@ -337,6 +352,7 @@ def main() -> None:
         user=ctx("user") or os.environ.get("CLAYZER_AGENTCORE_USER_ID", "clayzer-team"),
         models=[m.strip() for m in models.split(",") if m.strip()] if models else None,
         return_url=ctx("return_url") or DEFAULT_RETURN_URL,
+        traces=str(ctx("traces") or "false").lower() == "true",
         build=ctx("build") or git_build(),
         env=cdk.Environment(
             account=os.environ.get("CDK_DEFAULT_ACCOUNT"),

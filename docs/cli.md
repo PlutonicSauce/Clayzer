@@ -413,9 +413,12 @@ What to know:
   `AlreadyExists`. The configuration provider's diagnostic logs also expire after seven days.
   The ARM64 image uses a hashed telemetry dependency lock and contains Harness modules and
   ontology configuration; Cases, Chips, scorers and the web app are excluded.
-  Spans use X-Ray through the account's existing destination. This stack sets
-  `UNIFIED_TRACES_DESTINATION_ENABLED=false`; it does not change account-wide Transaction
-  Search settings. The Batch's stored JSONL Trace remains the complete replay record.
+  Span export defaults off; the Batch's JSONL Trace is always complete. After an account owner
+  enables CloudWatch Transaction Search, deploy with `-c traces=true` to send OTLP spans to the
+  encrypted Runtime log group. This adds the scoped `logs:PutResourcePolicy` permission that
+  AgentCore requires. The stack does not change account-wide trace routing or indexing.
+  Sending OTLP spans while the account's destination is still `XRay` returns HTTP 400, even
+  with valid execution-role permissions.
 - **Tear down.** From `infra`, run
   `npx --no-install cdk --app "uv run --group infra python agentcore_app.py" destroy ClayzerAgentCore`.
   It removes the Runtime, role, workload identity, Cognito resources and Runtime log group,

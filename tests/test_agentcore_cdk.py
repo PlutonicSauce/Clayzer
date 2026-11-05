@@ -58,6 +58,8 @@ def test_one_runtime_runs_the_image_publicly_with_the_sign_in_taken_from_identit
             "CLAYZER_AGENTCORE_PROVIDER": "clayzer-lgnd",
             "CLAYZER_BUILD": "abc123",
             "AWS_REGION": "us-west-2",
+            "OTEL_TRACES_EXPORTER": "none",
+            "UNIFIED_TRACES_DESTINATION_ENABLED": "false",
         }),
     })  # fmt: skip
     assert "-" not in module.RUNTIME_NAME  # AgentCore allows letters, digits and underscores
@@ -157,7 +159,7 @@ def test_options_change_the_names_and_models(tmp_path):
     app = cdk.App(outdir=str(tmp_path))
     stack = module.AgentCoreStack(app, "T2", workload="team-b", provider="team-b-lgnd",
                                   user="team-b-user", models=["amazon.nova-lite-v1:0"],
-                                  build="x", env=ENV)  # fmt: skip
+                                  build="x", traces=True, env=ENV)  # fmt: skip
     template = Template.from_stack(stack)
     template.has_resource_properties("AWS::BedrockAgentCore::WorkloadIdentity", {"Name": "team-b"})
     template.has_resource_properties("AWS::BedrockAgentCore::Runtime", {
@@ -166,3 +168,15 @@ def test_options_change_the_names_and_models(tmp_path):
     })  # fmt: skip
     blob = json.dumps(statements(template))
     assert "nova-lite" in blob and "nova-pro" not in blob
+    assert "logs:PutResourcePolicy" in blob
+    template.has_resource_properties(
+        "AWS::BedrockAgentCore::Runtime",
+        {
+            "EnvironmentVariables": Match.object_like(
+                {
+                    "OTEL_TRACES_EXPORTER": "otlp",
+                    "UNIFIED_TRACES_DESTINATION_ENABLED": "true",
+                }
+            ),
+        },
+    )
