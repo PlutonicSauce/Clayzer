@@ -8,6 +8,15 @@ const imageCategory = (c) =>
       : c.labels.some((l) => /wind/.test(l.object) && l.count !== 0)
         ? "Wind"
         : "Other landscapes";
+const referenceEntry = (label) => {
+  const object = esc(readable(label.object));
+  const source = esc(label.source || "source not recorded");
+  if (label.count === 0)
+    return label.absence_verified
+      ? `No ${object} (checked: ${source})`
+      : `Reference count: 0 ${object} (absence unverified; ${source})`;
+  return `${label.count == null ? "" : esc(label.count) + " × "}${object}${label.position ? " at " + esc(label.position) : ""}${label.change ? " (" + esc(label.change) + ")" : ""} (${source})`;
+};
 const imageAlt = (c) =>
   `NAIP aerial image, ${c.chip.date}. ${imageCategory(c)} example ${c.id}. Independent reference information follows; this is not an AI detection.`;
 const pageHead = (k, h, p) =>
@@ -98,7 +107,7 @@ async function publicGallery() {
       filtered
         .map(
           (c) =>
-            `<article class="case-card"><a href="#/cases/${encodeURIComponent(c.id)}" class="gallery-image"><img src="/api/chips/${encodeURIComponent(c.chip.id)}.png" alt="${esc(imageAlt(c))}" loading="lazy" width="512" height="512"><span class="image-tag">${esc(imageCategory(c))}</span></a><div class="body"><p class="eyebrow">NAIP · ${esc(c.chip.date)}</p><h2><a href="#/cases/${encodeURIComponent(c.id)}">${esc(readable(c.id))}</a></h2><p>${c.labels.length} reference entries · ${c.kind === "change" ? "Two image dates" : "One image date"}</p><a class="text-link" href="#/cases/${encodeURIComponent(c.id)}">Inspect image and evidence →</a></div></article>`,
+            `<article class="case-card"><a href="#/cases/${encodeURIComponent(c.id)}" class="gallery-image"><img src="/api/chips/${encodeURIComponent(c.chip.id)}.png" alt="${esc(imageAlt(c))}" loading="lazy" width="512" height="512"><span class="image-tag">${esc(imageCategory(c))}</span></a><div class="body"><p class="eyebrow">NAIP · ${esc(c.chip.date)}</p><h2><a href="#/cases/${encodeURIComponent(c.id)}">${esc(readable(c.id))}</a></h2><p>${c.labels.length} reference entries · ${c.kind === "change" ? "Two image dates" : "One image date"}</p><details class="gallery-references"><summary>Reference entries</summary><ul>${c.labels.map(l => `<li>${referenceEntry(l)}</li>`).join("") || "<li>No reference entries</li>"}</ul></details><a class="text-link" href="#/cases/${encodeURIComponent(c.id)}">Inspect image and evidence →</a></div></article>`,
         )
         .join("") ||
       '<div class="empty"><h2>No matching examples</h2><p>Try another reference type, clear the search or select All landscapes.</p></div>';

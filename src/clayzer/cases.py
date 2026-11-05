@@ -71,6 +71,24 @@ def relabel_water(case: dict, chip: Chip, elements: list[dict], corrections: lis
     return {**case, "reference_labels": apply_corrections(case["id"], labels, corrections)}
 
 
+# A negative is refused when USPVDB has an array within NEGATIVE_BUFFER_DEG or a polygon reaching
+# the Chip, and its Chip is checked by eye for the rooftop and car-park panels USPVDB leaves out.
+# That is sourced, verified absence, which the Output Score needs before a solar Claim on the
+# Chip can count as a false positive (docs/output-score.md); a missing record alone is unknown.
+SOLAR_ABSENCE = {"object": "solar_array", "count": 0, "position": None, "cells": [],
+                 "attributes": {}, "source": "uspvdb+manual", "source_ids": [],
+                 "absence_verified": True}  # fmt: skip
+
+
+def declare_solar_absence(case: dict) -> dict:
+    """A negative Case with its checked solar absence as a Reference Label; others unchanged."""
+    if "-neg-" not in case["id"] or any(
+        lb["object"] == "solar_array" for lb in case["reference_labels"]
+    ):
+        return case
+    return {**case, "reference_labels": [*case["reference_labels"], dict(SOLAR_ABSENCE)]}
+
+
 def _labels(chip: Chip) -> list[dict]:
     # Wider than the Chip: a large array centred outside it can still cover part of it.
     solar, turbines = ak.usgs_near(chip.bbox, ak.SOLAR_SEARCH_DEG, turbine_buffer_deg=0.0)
@@ -234,7 +252,7 @@ def build_negative(
     except Exception:
         _discard(store, chip)
         raise
-    return _case(f"fixed-{region}-neg-{n}", region, chip, labels, started)
+    return declare_solar_absence(_case(f"fixed-{region}-neg-{n}", region, chip, labels, started))
 
 
 def _discard(store, chip: Chip) -> None:

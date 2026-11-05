@@ -112,6 +112,55 @@ const base = process.env.CLAYZER_UI_URL || "http://127.0.0.1:8788";
     await page.keyboard.press("Enter");
     await page.locator("#onto-node-detail h3").waitFor();
     await page.unroute("https://cdn.jsdelivr.net/npm/mermaid@11/**");
+    const cases = await (await page.request.get(base + "/api/cases")).json();
+    const absenceCase = cases.find((c) =>
+      c.labels.some(
+        (l) =>
+          l.object === "solar_array" && l.count === 0 && l.absence_verified,
+      ),
+    );
+    assert.ok(
+      absenceCase,
+      "The latest development references include verified solar absence",
+    );
+    const absenceCard = () =>
+      page
+        .locator("#image-gallery .case-card")
+        .filter({
+          has: page.locator(
+            `a.gallery-image[href="#/cases/${absenceCase.id}"]`,
+          ),
+        });
+    await page.goto(base + "/#/cases");
+    await absenceCard().locator(".gallery-references > summary").click();
+    assert.match(await absenceCard().innerText(), /No solar array \(checked:/);
+    assert.ok(!(await absenceCard().innerText()).includes("0 × solar array"));
+    await page.route("**/api/cases", (route) =>
+      route.fulfill({
+        json: cases.map((c) =>
+          c.id === absenceCase.id
+            ? {
+                ...c,
+                labels: c.labels.map((l) => ({
+                  ...l,
+                  absence_verified: false,
+                })),
+              }
+            : c,
+        ),
+      }),
+    );
+    await page.goto(base + "/#/about");
+    await page.goto(base + "/#/cases");
+    await absenceCard().locator(".gallery-references > summary").click();
+    assert.match(
+      await absenceCard().innerText(),
+      /Reference count: 0 solar array \(absence unverified;/,
+    );
+    assert.ok(
+      !(await absenceCard().innerText()).includes("No solar array (checked:"),
+    );
+    await page.unroute("**/api/cases");
     await page.goto(base + "/#/overview");
     await page.locator(".hero h1").waitFor();
     assert.equal(

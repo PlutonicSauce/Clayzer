@@ -273,7 +273,9 @@ def pairs_from_cases(cases: list[dict]) -> list[tuple[str, list[float]]]:
             emb = chip.get("embedding")
             if not emb:
                 continue
-            classes = {lb["object"] for lb in case.get("reference_labels", [])}
+            classes = {
+                lb["object"] for lb in case.get("reference_labels", []) if lb.get("count") != 0
+            }
             for cid in classes:
                 pairs.append((cid, [float(x) for x in emb]))
     return pairs

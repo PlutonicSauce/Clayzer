@@ -23,3 +23,4 @@ batches/
 # CDK output, and lookups that record the account ID.
 infra/cdk.out/
 infra/cdk.context.json
+infra/node_modules/

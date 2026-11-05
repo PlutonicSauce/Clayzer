@@ -22,8 +22,9 @@ attrs==26.1.0 \
     # via
     #   jsonschema
     #   referencing
-aws-opentelemetry-distro==0.12.1 \
-    --hash=sha256:529e7879c25546fb2d8015f73a1e41b48ddd98eb5dfc49caefde4a809f7c0ad0
+aws-opentelemetry-distro==0.22.0 \
+    --hash=sha256:5a15658d83c17dd46d1a119620e6a8088cbf563548c8623f8eeb344748604610 \
+    --hash=sha256:e0972cf1abe04a5a10755089004a90a0b7e47aafbd1327c9fa2688a1792324ce
     # via -r infra/agentcore/requirements.in
 boto3==1.43.123 \
     --hash=sha256:055fabb990c5d2f31fce4ca569255bd640cdd11a3ca68c9ecad35f4f8a5b83b5 \
@@ -35,10 +36,16 @@ botocore==1.43.123 \
     # via
     #   boto3
     #   s3transfer
+cachetools==6.2.4 \
+    --hash=sha256:69a7a52634fed8b8bf6e24a050fb60bff1c9bd8f6d24572b99c32d4e71e62a51 \
+    --hash=sha256:82c5c05585e70b6ba2d3ae09ea60b79548872185d2f24ae1f2709d37299fd607
+    # via aws-opentelemetry-distro
 certifi==2026.10.23 \
     --hash=sha256:a9895e6e2758b371e0545e321a3a8fd1fcfd9829ada8824a936dfb16aaaf36cd \
     --hash=sha256:e9b54de76e530bb6cf0ccd036787103acb58fd42ba930ea8bf948ddbaa2f61d1
-    # via requests
+    # via
+    #   aws-opentelemetry-distro
+    #   requests
 cffi==2.1.1 \
     --hash=sha256:046bfc24911b37851ee1b51aab8bffe713d89c68c6a057b09484ce9fd5f69b4e \
     --hash=sha256:06c72bb76605a4b0cd0aad6930b69d4baf7dd5d806cfc409b824191099700e66 \
@@ -380,15 +387,6 @@ cryptography==50.0.2 \
     --hash=sha256:fa8f5efb344d6908a1ce62f4a24e2e5780f825d6f53f5f50ec5ffacac72936cb \
     --hash=sha256:fdd28f912fccfec1846a94e2e1e8f9b0012f557f0c46fe4f3eb0d7a87afcf90b
     # via pyjwt
-deprecated==3.0.1 \
-    --hash=sha256:2f5a9fecc9961e26462846cf1e57f73a612b1d0b79c27dceeed8de647beadcee \
-    --hash=sha256:eda314c115e8bc0fe52b90a6869e19240ac3cedb7449adfdba5981cf9ef693e1
-    # via
-    #   opentelemetry-api
-    #   opentelemetry-exporter-otlp-proto-grpc
-    #   opentelemetry-exporter-otlp-proto-http
-    #   opentelemetry-propagator-b3
-    #   opentelemetry-semantic-conventions
 googleapis-common-protos==1.75.0 \
     --hash=sha256:53a062ff3c32552fbd62c11fe23768b78e4ddf0494d5e5fd97d3f4689c75fbbd \
     --hash=sha256:961ed60399c457ceb0ee8f285a84c870aabc9c6a832b9d37bb281b5bebde43ed
@@ -479,10 +477,6 @@ idna==3.20 \
     #   anyio
     #   httpx2
     #   requests
-importlib-metadata==8.6.1 \
-    --hash=sha256:02a89390c1e15fdfdc0d7c6b25cb3e62650d0494005c97d6f148bf5b9787525e \
-    --hash=sha256:310b41d755445d74569f993ccfc22838295d9fe005425094fad953d7f15c8580
-    # via opentelemetry-api
 jmespath==1.1.0 \
     --hash=sha256:472c87d80f36026ae83c6ddd0f1d05d4e510134ed462851fd5f754c8c3cbb88d \
     --hash=sha256:a5663118de4908c91729bea0acadca56526eb2698e83de10cd116ae0f4e97c64
@@ -505,22 +499,23 @@ mcp-types==2.3.0 \
     --hash=sha256:968efdbdaedfab06adae40d378a34395f1090c5921d4be3c9cde283aaf76d91d \
     --hash=sha256:d1e46549edb35ee19a94940fcee6d1addd7e589ab7ea92dda83f5d84781fc362
     # via mcp
-opentelemetry-api==1.33.1 \
-    --hash=sha256:1c6055fc0a2d3f23a50c7e17e16ef75ad489345fd3df1f8b8af7c0bbf8a109e8 \
-    --hash=sha256:4db83ebcf7ea93e64637ec6ee6fabee45c5cbe4abd9cf3da95c43828ddb50b83
+opentelemetry-api==1.45.1 \
+    --hash=sha256:aa38ed19bcc084ba42782a73255b3582283eced7ad6dddbd6695189e69adfb75 \
+    --hash=sha256:b31553efa588ae44bc306f863c785c5333a9ecc091248c6ee68b4b6c87fdedfb
     # via
     #   aws-opentelemetry-distro
     #   mcp
     #   opentelemetry-distro
+    #   opentelemetry-exporter-http-transport
     #   opentelemetry-exporter-otlp-proto-grpc
     #   opentelemetry-exporter-otlp-proto-http
     #   opentelemetry-instrumentation
     #   opentelemetry-instrumentation-aio-pika
     #   opentelemetry-instrumentation-aiohttp-client
+    #   opentelemetry-instrumentation-aiokafka
     #   opentelemetry-instrumentation-aiopg
     #   opentelemetry-instrumentation-asgi
     #   opentelemetry-instrumentation-asyncpg
-    #   opentelemetry-instrumentation-boto
     #   opentelemetry-instrumentation-boto3sqs
     #   opentelemetry-instrumentation-botocore
     #   opentelemetry-instrumentation-cassandra
@@ -528,7 +523,6 @@ opentelemetry-api==1.33.1 \
     #   opentelemetry-instrumentation-confluent-kafka
     #   opentelemetry-instrumentation-dbapi
     #   opentelemetry-instrumentation-django
-    #   opentelemetry-instrumentation-elasticsearch
     #   opentelemetry-instrumentation-falcon
     #   opentelemetry-instrumentation-fastapi
     #   opentelemetry-instrumentation-flask
@@ -552,6 +546,7 @@ opentelemetry-api==1.33.1 \
     #   opentelemetry-instrumentation-sqlite3
     #   opentelemetry-instrumentation-starlette
     #   opentelemetry-instrumentation-system-metrics
+    #   opentelemetry-instrumentation-threading
     #   opentelemetry-instrumentation-tornado
     #   opentelemetry-instrumentation-tortoiseorm
     #   opentelemetry-instrumentation-urllib
@@ -564,38 +559,48 @@ opentelemetry-api==1.33.1 \
     #   opentelemetry-propagator-ot-trace
     #   opentelemetry-sdk
     #   opentelemetry-semantic-conventions
-opentelemetry-distro==0.54b1 \
-    --hash=sha256:009486513b32b703e275bb2f9ccaf5791676bbf5e2dcfdd90201ddc8f56f122b \
-    --hash=sha256:61d6b97bb7a245fddbb829345bb4ad18be39eb52f770fab89a127107fca3149f
+opentelemetry-distro==0.66b1 \
+    --hash=sha256:bf29f42ed11397c6fbea36c1e45481d9430a27ea116719c4902bdfbdeee54605 \
+    --hash=sha256:c2f679de6a0540fabef6d39fb43fce4c0ceb1a506e667c1fd7153abf362c0368
     # via aws-opentelemetry-distro
-opentelemetry-exporter-otlp-proto-common==1.33.1 \
-    --hash=sha256:b81c1de1ad349785e601d02715b2d29d6818aed2c809c20219f3d1f20b038c36 \
-    --hash=sha256:c57b3fa2d0595a21c4ed586f74f948d259d9949b58258f11edb398f246bec131
+opentelemetry-exporter-http-transport==0.66b1 \
+    --hash=sha256:2f95404bdee7f9d2d529c7de56c7bd86d014d774d8fbf137810e0167f8a492bf \
+    --hash=sha256:443080203bf52586ce0b2ad901e8951c61833eab1aa539ae6f1f16fe9e8e7952
+    # via opentelemetry-exporter-otlp-proto-http
+opentelemetry-exporter-otlp-common==0.66b1 \
+    --hash=sha256:00ff8592c3a7cb729ff3fdc7ffa12372c243bdf2163e80c180994d0c7bd83ee9 \
+    --hash=sha256:6b1403487a2185ac1feb45fd5546fdf8630ce71c36bcefaadf51e2130e9e23f9
+    # via
+    #   opentelemetry-exporter-otlp-proto-grpc
+    #   opentelemetry-exporter-otlp-proto-http
+opentelemetry-exporter-otlp-proto-common==1.45.1 \
+    --hash=sha256:2e4adcc3a67bcf57804fc49514f0ef64974ca7590aa3491da389852b4a0628f6 \
+    --hash=sha256:2f446183ae7047b036226f1d846c41a834b0e8755ad13b51a51dd38952eb466c
     # via
     #   aws-opentelemetry-distro
     #   opentelemetry-exporter-otlp-proto-grpc
     #   opentelemetry-exporter-otlp-proto-http
-opentelemetry-exporter-otlp-proto-grpc==1.33.1 \
-    --hash=sha256:345696af8dc19785fac268c8063f3dc3d5e274c774b308c634f39d9c21955728 \
-    --hash=sha256:7e8da32c7552b756e75b4f9e9c768a61eb47dee60b6550b37af541858d669ce1
+opentelemetry-exporter-otlp-proto-grpc==1.45.1 \
+    --hash=sha256:3b3dcfbfdcb4e35149fcf309972282054b45228f5c10547d0095d6578510a9a0 \
+    --hash=sha256:e42ecb789d2fc5d8145e3dadc3e2991c9f18cd166d7c7514e234702540274b76
     # via aws-opentelemetry-distro
-opentelemetry-exporter-otlp-proto-http==1.33.1 \
-    --hash=sha256:46622d964a441acb46f463ebdc26929d9dec9efb2e54ef06acdc7305e8593c38 \
-    --hash=sha256:ebd6c523b89a2ecba0549adb92537cc2bf647b4ee61afbbd5a4c6535aa3da7cf
+opentelemetry-exporter-otlp-proto-http==1.45.1 \
+    --hash=sha256:24a97cf3753c7fb52fad44a696e452ff371686339e2acf3309e2eda3d0230700 \
+    --hash=sha256:45c218405ce3fd879596924b1874bf9a8f6880206d61065c5a912c8e5c297fb7
     # via aws-opentelemetry-distro
-opentelemetry-instrumentation==0.54b1 \
-    --hash=sha256:7658bf2ff914b02f246ec14779b66671508125c0e4227361e56b5ebf6cef0aec \
-    --hash=sha256:a4ae45f4a90c78d7006c51524f57cd5aa1231aef031eae905ee34d5423f5b198
+opentelemetry-instrumentation==0.66b1 \
+    --hash=sha256:4c4aa14dc9a24a02325a9d4c42c4d0208dbb1374c2b1b8fe6c9392d59f3e1008 \
+    --hash=sha256:e79a510f7d87c72d95e964ddb42193a0d9a75668c027d980eab032ea1322a5ce
     # via
     #   aws-opentelemetry-distro
     #   opentelemetry-distro
     #   opentelemetry-instrumentation-aio-pika
     #   opentelemetry-instrumentation-aiohttp-client
+    #   opentelemetry-instrumentation-aiokafka
     #   opentelemetry-instrumentation-aiopg
     #   opentelemetry-instrumentation-asgi
     #   opentelemetry-instrumentation-asyncpg
     #   opentelemetry-instrumentation-aws-lambda
-    #   opentelemetry-instrumentation-boto
     #   opentelemetry-instrumentation-boto3sqs
     #   opentelemetry-instrumentation-botocore
     #   opentelemetry-instrumentation-cassandra
@@ -603,7 +608,6 @@ opentelemetry-instrumentation==0.54b1 \
     #   opentelemetry-instrumentation-confluent-kafka
     #   opentelemetry-instrumentation-dbapi
     #   opentelemetry-instrumentation-django
-    #   opentelemetry-instrumentation-elasticsearch
     #   opentelemetry-instrumentation-falcon
     #   opentelemetry-instrumentation-fastapi
     #   opentelemetry-instrumentation-flask
@@ -627,65 +631,66 @@ opentelemetry-instrumentation==0.54b1 \
     #   opentelemetry-instrumentation-sqlite3
     #   opentelemetry-instrumentation-starlette
     #   opentelemetry-instrumentation-system-metrics
+    #   opentelemetry-instrumentation-threading
     #   opentelemetry-instrumentation-tornado
     #   opentelemetry-instrumentation-tortoiseorm
     #   opentelemetry-instrumentation-urllib
     #   opentelemetry-instrumentation-urllib3
     #   opentelemetry-instrumentation-wsgi
-opentelemetry-instrumentation-aio-pika==0.54b1 \
-    --hash=sha256:a1b9f2d2735f1e9808bac263776f445c446c19580c3a24d0ecc02e289b55b21d \
-    --hash=sha256:c1d1a52296937e54a8c69878434c86bdc038d53c1eba6f133c0e63f479484990
+opentelemetry-instrumentation-aio-pika==0.66b1 \
+    --hash=sha256:225c6fce4c6c341cddcec8342a5536c9f66927aa21968b233721673f465e520e \
+    --hash=sha256:72ae37f1a579151b404635145efa92d97e24384505bc123f24532e98e400e764
     # via aws-opentelemetry-distro
-opentelemetry-instrumentation-aiohttp-client==0.54b1 \
-    --hash=sha256:c51c643a5587b9efce6c4cae0f5e2202a25fac69caa89643465f57d5d8ba3789 \
-    --hash=sha256:d9b53c04865e8a4c984c1330e4f1d5570bc28543833a4718cbe4265091ee0e71
+opentelemetry-instrumentation-aiohttp-client==0.66b1 \
+    --hash=sha256:6f853dadc53916fd6af41413bcb627b3e36c4a01b581e03b61b2f8eb6031d69f \
+    --hash=sha256:bb3d412ae30e83e0692c8e9b600c5990bdab736c7c048847461b4567d504078d
     # via aws-opentelemetry-distro
-opentelemetry-instrumentation-aiopg==0.54b1 \
-    --hash=sha256:1d162793c4dee9db469d89c962f161801027abc55002eeb23c076ab5f1f334d4 \
-    --hash=sha256:d00a6845bb8f8d45e81d42bc8ba38df88bb7efdc2cd0e572968dc5359f5b8355
+opentelemetry-instrumentation-aiokafka==0.66b1 \
+    --hash=sha256:185e18196d52f13db75910bc5fa1900ff858dc3743c473e6bf4d57c712125448 \
+    --hash=sha256:6a13ce65a2557b03989e0c096dfe02ee038ca16e5a191cb6b0b08de318bece6f
     # via aws-opentelemetry-distro
-opentelemetry-instrumentation-asgi==0.54b1 \
-    --hash=sha256:84674e822b89af563b283a5283c2ebb9ed585d1b80a1c27fb3ac20b562e9f9fc \
-    --hash=sha256:ab4df9776b5f6d56a78413c2e8bbe44c90694c67c844a1297865dc1bd926ed3c
+opentelemetry-instrumentation-aiopg==0.66b1 \
+    --hash=sha256:986d4e1d62e366d3da6d6ecf5ba19ddc172bd5467bc7973c1a0f8fba6d626235 \
+    --hash=sha256:aa4606515172b23c8c70c5afa3254e408ff1eace4862a7167f0e8b24d6a768e0
+    # via aws-opentelemetry-distro
+opentelemetry-instrumentation-asgi==0.66b1 \
+    --hash=sha256:78b3f9bdf0fa38c65935a2ab46d59e0f9de873a51e0c95b0329f106e2ccb5274 \
+    --hash=sha256:78cdc5e45e897e16a8dac9d282e8d5bdf9af2d58e1313fa0bdd4a134c6f9dafc
     # via
     #   aws-opentelemetry-distro
     #   opentelemetry-instrumentation-fastapi
     #   opentelemetry-instrumentation-starlette
-opentelemetry-instrumentation-asyncpg==0.54b1 \
-    --hash=sha256:2348843f0c6f0cefb0badc974cbeae244ee89c57e1ae2a587e5f641c23e16fdc \
-    --hash=sha256:58e50de68b40221c2d6e22d626e5d03d9d6b950ba59504a5fc060c95cdc7c4fb
+opentelemetry-instrumentation-asyncpg==0.66b1 \
+    --hash=sha256:7fe611aa899ac59f4a34b05e817a61f4011dc50d1545c4f48b77a4c62e663f05 \
+    --hash=sha256:ac244bd5cb23363880a7937763d0810035815dc74a8389d2aa1f73d532ae47aa
     # via aws-opentelemetry-distro
-opentelemetry-instrumentation-aws-lambda==0.54b1 \
-    --hash=sha256:51bc4301b9733fcda616d68197ee5f15108175a217f5fd8db349d53ba14cc172 \
-    --hash=sha256:c40f011581abf3cd28d8833fb6218bac75eec3adda7774ff2685f41b279a9fdd
+opentelemetry-instrumentation-aws-lambda==0.66b1 \
+    --hash=sha256:48a237c5418f5a00d366822f17bd271514be7e2cec18e28cbd4b0dfed88183a8 \
+    --hash=sha256:a270279181f7759a417535c6a90a92f22c6b6c6c551940e37e2cd5b50556b7d1
     # via aws-opentelemetry-distro
-opentelemetry-instrumentation-boto==0.54b1 \
-    --hash=sha256:83407a5f6f69cd0bebff802da0d228eb13196a1de713b43e1348b77f80033c6a \
-    --hash=sha256:b52b1216bee095858bcd0d992360911b6e870acc4f4c9090f8ca1081d9fdede6
+opentelemetry-instrumentation-boto3sqs==0.66b1 \
+    --hash=sha256:71387b8f89d38d521f172b80473f858c879718fc58b24cca3fb5ed1afa2458b2 \
+    --hash=sha256:71cee26e1bd5d7fda6bf41afb427937d8d91115b7fb1699691a8c63857a14646
     # via aws-opentelemetry-distro
-opentelemetry-instrumentation-boto3sqs==0.54b1 \
-    --hash=sha256:40ae98fe53584e5b1d61725fc8e153a1be2d6b308f65f56deb4f276a23b43cf4 \
-    --hash=sha256:c8bf67bc836bb66da6a1b000e6c1b07229481c75731ea6a0ed0b59b256e035b9
+opentelemetry-instrumentation-botocore==0.66b1 \
+    --hash=sha256:6352ceb4f204b13cd5b448f4df10de4a1a82f345fd0a81f8816a60e9ce3fdfc2 \
+    --hash=sha256:c601923e40aa008f4c0466b714c112fe47da07adb72ae6c69e2ac95992bcd66e
     # via aws-opentelemetry-distro
-opentelemetry-instrumentation-botocore==0.54b1 \
-    --hash=sha256:54f7b0b48398dfc8b8e98deec89df5b4c8c359d803a0d6c8ce4bd972d50c03dd \
-    --hash=sha256:74d3a36d5bab8447669b25f915a3db6c37ae14a5faa198500471d5b1bbd1902f
+opentelemetry-instrumentation-cassandra==0.66b1 \
+    --hash=sha256:8c83b2644659c052cb5dbab21d2077e86569d6ef3e7412d03eb7f9cf6fa4f59d \
+    --hash=sha256:c0138995fa99b6a37a6b66bfa714dcdae72ae5323d0dd17edae14135d7793578
     # via aws-opentelemetry-distro
-opentelemetry-instrumentation-cassandra==0.54b1 \
-    --hash=sha256:81b8d963a02ea43ea4a9d00c88cd0b01dda69daf914d6e4984b2e98b1e8fdeb7 \
-    --hash=sha256:f9a79c0139888eaedb58bb50da42709c7bc6ead9b9f5263164873e4275cefbce
+opentelemetry-instrumentation-celery==0.66b1 \
+    --hash=sha256:145b5eece41331141edc8f454984238b05b107d7ead928b49e7a1916d5e48e99 \
+    --hash=sha256:3b6c5539c8d4a060edbc0eb1f334ef909d0f9a5ecb7af545bdd73644e6e2e814
     # via aws-opentelemetry-distro
-opentelemetry-instrumentation-celery==0.54b1 \
-    --hash=sha256:892ec6bf829a0d60cf3bffd1a8bb6fd8055f1194167b4e132e33321de8e05c24 \
-    --hash=sha256:f2bd019afe9286214083ae2db95ed24adf9a0aa2e943177462d64ceb8380d78e
+opentelemetry-instrumentation-confluent-kafka==0.66b1 \
+    --hash=sha256:834ae99cd024695946e7b72ce8f8060e0cc6b015c125b310f79ccd3069c585f4 \
+    --hash=sha256:c3f067b0537817c1a8d311f8aeb0e510bceb2fdec98bc6223b4b7c9cea9d0608
     # via aws-opentelemetry-distro
-opentelemetry-instrumentation-confluent-kafka==0.54b1 \
-    --hash=sha256:1e378b5c88170c7fcd23b07054a61d2af7a7ec5af1aba120446514ef27b7ad82 \
-    --hash=sha256:9dc896233a973705e1ac25950ababe23322338f4cd3fff0ccd509759aeb2e802
-    # via aws-opentelemetry-distro
-opentelemetry-instrumentation-dbapi==0.54b1 \
-    --hash=sha256:21bc20cd878a78bf44bab686e9679cef1eed77e53c754c0a09f0ca49f5fd0283 \
-    --hash=sha256:69421c36994114040d197f7e846c01869d663084c6c2025e85b2d6cfce2f8299
+opentelemetry-instrumentation-dbapi==0.66b1 \
+    --hash=sha256:715be3080f644de2314d84388a73571acdbeca85bfbc7dc682f214c88cc18022 \
+    --hash=sha256:a38043a8a907a321ae6b838f778ad19c8e78c0bfc2f336d6d30c5fdce112e88d
     # via
     #   aws-opentelemetry-distro
     #   opentelemetry-instrumentation-aiopg
@@ -694,199 +699,203 @@ opentelemetry-instrumentation-dbapi==0.54b1 \
     #   opentelemetry-instrumentation-psycopg2
     #   opentelemetry-instrumentation-pymysql
     #   opentelemetry-instrumentation-sqlite3
-opentelemetry-instrumentation-django==0.54b1 \
-    --hash=sha256:38414f989f60e9dba82928e13f6a20a26baf5cc700f1d891f27e0703ca577802 \
-    --hash=sha256:462fbd577991021f56152df21ca1fdcd7c4abdc10dd44254a44d515b8e3d61ca
+opentelemetry-instrumentation-django==0.66b1 \
+    --hash=sha256:23d1052940a025ae1dac70849b998cf9ba66731fa2b7e58254ab7dac5539a989 \
+    --hash=sha256:85b56193b6ce7b8db9c280c3ade4a4991601abc9ada4734c8911971423fd521f
     # via aws-opentelemetry-distro
-opentelemetry-instrumentation-elasticsearch==0.54b1 \
-    --hash=sha256:9f5c968954d72f15e133d06760294f13886d98c4da626374168094035f6dec50 \
-    --hash=sha256:d5b6996919679c91e5791457de24d9ff6472887a4e1426b8f2345c52f6ba6f10
+opentelemetry-instrumentation-falcon==0.66b1 \
+    --hash=sha256:08a1304c2e7a50888e2161ea31f87df2455a763b1166b651540caff1d722cddc \
+    --hash=sha256:8cb10d952e1897b0907a05a0d1efa8bce311614d244a62e7d6b10b02e3f64db5
     # via aws-opentelemetry-distro
-opentelemetry-instrumentation-falcon==0.54b1 \
-    --hash=sha256:06e72aac39fd4ac65555a8cb056428d7c4366bb1fafa65e60474d6e3d6c3eada \
-    --hash=sha256:6eaf3bf714a6e3398a5ddc132c3e77de851331ee00989302f88a4d4ce829e679
+opentelemetry-instrumentation-fastapi==0.66b1 \
+    --hash=sha256:584cf9d2c4417ff8b2d6ff2bc606bfe13c8b3456018bf94f50f2cf658492505b \
+    --hash=sha256:97f8ac8fd7537517f9e6988bd0aca04bfa5aad564bcd46c245530739e2be72d1
     # via aws-opentelemetry-distro
-opentelemetry-instrumentation-fastapi==0.54b1 \
-    --hash=sha256:1fcad19cef0db7092339b571a59e6f3045c9b58b7fd4670183f7addc459d78df \
-    --hash=sha256:fb247781cfa75fd09d3d8713c65e4a02bd1e869b00e2c322cc516d4b5429860c
+opentelemetry-instrumentation-flask==0.66b1 \
+    --hash=sha256:10f788aff95236f0dbaaa066687283bf6345bb3c77bbb437f0fb67cb6222d5eb \
+    --hash=sha256:2933e71b94cc9e8e943e648d872fd3dead9cdb61295dc6deffd5d6fa8f27a39b
     # via aws-opentelemetry-distro
-opentelemetry-instrumentation-flask==0.54b1 \
-    --hash=sha256:1f9d44b8ca9bc7d52e2aeb539bc64a88d6fc04f2f67c1ffb278148c99cc8ec6a \
-    --hash=sha256:683f9963f06d065fc07ceaffa106df1f6f20075318530328f69fde39dfb1192f
+opentelemetry-instrumentation-grpc==0.66b1 \
+    --hash=sha256:2055c8584ea67cebe9e39a13dca000cbba17c52366aa2aa7c6655fe454ec13b4 \
+    --hash=sha256:8d0b0594bf86ece324367b4614c14c9a1893d65f0c7f2366a8131b45fc9ad474
     # via aws-opentelemetry-distro
-opentelemetry-instrumentation-grpc==0.54b1 \
-    --hash=sha256:4198aab2a380b2807a50112892f9b8a50772169a3722fa99634ef70c6c017ea2 \
-    --hash=sha256:c01114c5c147c216f9144da065d4a84bffb2a43b3cb05763b40ec744bbf5206e
+opentelemetry-instrumentation-httpx==0.66b1 \
+    --hash=sha256:0342a4002c6dbc6c4bf22cc7e698f50f5c8b77f63325c6f40c94ab87e016bf4d \
+    --hash=sha256:5865a72c68098c85955a271ab8744b480a36e3ee492d35b8cadb93c7c4dbb618
     # via aws-opentelemetry-distro
-opentelemetry-instrumentation-httpx==0.54b1 \
-    --hash=sha256:37e1cd0190f98508d960ec1667c9f148f8c8ad9a6cab127b57c9ad92c37493c3 \
-    --hash=sha256:99b8e43ebf1d945ca298d84d32298ba26d1c3431738cea9f69a26c442661745f
+opentelemetry-instrumentation-jinja2==0.66b1 \
+    --hash=sha256:5b9a119a650dd91fa07ba0e0e7c60a872ea94babd9d2f88cddad3f9a80131f94 \
+    --hash=sha256:f50a78d1a7542d2d150b11d2c507dd7e617e5d943baa06b4ed2d727784bcba82
     # via aws-opentelemetry-distro
-opentelemetry-instrumentation-jinja2==0.54b1 \
-    --hash=sha256:21e435e2029e876e9c91277fb88e9cf235211f96973c64e494b8be7551c7b3e1 \
-    --hash=sha256:bcefb00e177c3481a0f735ffe96589ee40ba6b603092c19fca7b03fcb5c72a19
+opentelemetry-instrumentation-kafka-python==0.66b1 \
+    --hash=sha256:4fec4441aad9116605f0523b656c694c3d38cf7704aca3a5fd26267a3cf10a91 \
+    --hash=sha256:68574ccc6984be59b8856dea9546ad83d15cf6c2582a674d0e7bdd7d3952a1f4
     # via aws-opentelemetry-distro
-opentelemetry-instrumentation-kafka-python==0.54b1 \
-    --hash=sha256:8b3f18be44939a270ca55b8017c5f822b94bdc1372b59a49464b990c715d0ba4 \
-    --hash=sha256:ab53ed8af3281a337feb5c1fa01059d5af99ec7aa84f2b360627a20fed385ab7
+opentelemetry-instrumentation-logging==0.66b1 \
+    --hash=sha256:2250240ecb1fce36939f64eafd988832338684564fb4c7b401c9b9af0ee11d46 \
+    --hash=sha256:f13761110c52eecae9d7debedb0f88b46acc248c20437e97c2a5b3a2b4f96a02
     # via aws-opentelemetry-distro
-opentelemetry-instrumentation-logging==0.54b1 \
-    --hash=sha256:01a4cec54348f13941707d857b850b0febf9d49f45d0fcf0673866e079d7357b \
-    --hash=sha256:893a3cbfda893b64ff71b81991894e2fd6a9267ba85bb6c251f51c0419fbe8fa
+opentelemetry-instrumentation-mysql==0.66b1 \
+    --hash=sha256:5b7b20af1433269ca48b25a4e977e07a57f2db71c319a918cf68ba541ca65bfe \
+    --hash=sha256:9f6ae7627812a15fddf035f3f2862c7c04fbcc23c98774a8a09d40c746a335d0
     # via aws-opentelemetry-distro
-opentelemetry-instrumentation-mysql==0.54b1 \
-    --hash=sha256:07cd8c3003b439e0626e2b77f2b7f28f73c75879e28d9260f8d9a9600fb85fc2 \
-    --hash=sha256:de3a9367886523f30bd04b51edcf8d0777de7eac4a2467f52478231f51405b49
+opentelemetry-instrumentation-mysqlclient==0.66b1 \
+    --hash=sha256:283836cfa05c42450922ca54508b0b8762a207351d97958225fc728cf83ad9ba \
+    --hash=sha256:a451dc08832bfc01aa53ba30007384ec7b47c8f09db24c414a5aa0da9479e252
     # via aws-opentelemetry-distro
-opentelemetry-instrumentation-mysqlclient==0.54b1 \
-    --hash=sha256:462972e140586e00a5c0f0025585b2decfd0c4d7189cd42e2f786ca8e9fdab27 \
-    --hash=sha256:c14abdc5e19015ab7d6aa23ce96122c4f966fac629489eaa614e28da84e94d88
+opentelemetry-instrumentation-pika==0.66b1 \
+    --hash=sha256:1a5ea62f37537deefbb6673a2804421e82017deaf967053260201463fa973b54 \
+    --hash=sha256:1a6f24e65db23dda8539bde273bcf190724e38f6b47ac16e10d3592356a3d404
     # via aws-opentelemetry-distro
-opentelemetry-instrumentation-pika==0.54b1 \
-    --hash=sha256:3098ba31cdf3b390deb18c9eb824fccff9b8a2d51878fdcc7b69f1e6218963dc \
-    --hash=sha256:b8e20202233fee5aca35bd58db431bdcfeeddd85f83067800ab494c234479f51
+opentelemetry-instrumentation-psycopg2==0.66b1 \
+    --hash=sha256:e69ef26a8e50d7ac2149a89b5e0f66c1fe5c06c3355a2068b845d83742139348 \
+    --hash=sha256:f7454114191930b854fa7a176d4009d727084ab2fb3bf4016c8ab0719ac89a6e
     # via aws-opentelemetry-distro
-opentelemetry-instrumentation-psycopg2==0.54b1 \
-    --hash=sha256:2f493b180c2028bcab2ecaff8bd25560dd92a538bba8b9510411f182dd2a075e \
-    --hash=sha256:6e899baf7b6687320491b25d5ceadde5c614a95fb379da8e2a513d430f28102f
+opentelemetry-instrumentation-pymemcache==0.66b1 \
+    --hash=sha256:56c211af460634e76bdf2eec98671f0283d8594ba0e59dfe1c84af8f9706489e \
+    --hash=sha256:62e91a2924ad6c4efded0a157c3c0d12c2d6a09b6a6f21bdaeafec0f12b83177
     # via aws-opentelemetry-distro
-opentelemetry-instrumentation-pymemcache==0.54b1 \
-    --hash=sha256:03a272e3a416a633f83ee5b494a346d37fbe8249271bbf5e02686c354ae810a9 \
-    --hash=sha256:d752ccc03214cb079733d8d811ba9e624a7b6c76454ce96e30edccfed1f75f91
+opentelemetry-instrumentation-pymongo==0.66b1 \
+    --hash=sha256:3317c1cf5e68e0896e361f3ed2eeddba3388836f2c64191257ec0e5e69b16a09 \
+    --hash=sha256:a1b8ee770f769226b4b98c972d2ebfa770dbf81a230e7bbaa662c85e4a122ee0
     # via aws-opentelemetry-distro
-opentelemetry-instrumentation-pymongo==0.54b1 \
-    --hash=sha256:2331f4f0cbd5a5053edebb956b4dd288d60eb8971d9b6d5927f0753d0651161e \
-    --hash=sha256:75cbcfe499009d535e508b869825113fc0888d4d60c544d4337ef65eb4d299f0
+opentelemetry-instrumentation-pymysql==0.66b1 \
+    --hash=sha256:aa1d1e7d9a1a63341db24e990c5deb7554b3912f81c5e8ba80700d2c76517641 \
+    --hash=sha256:c6cf3da2834d7ca545ccaf714d3b79d883fbe0057df7e3ac5b8096ff7232bf48
     # via aws-opentelemetry-distro
-opentelemetry-instrumentation-pymysql==0.54b1 \
-    --hash=sha256:54cb13c6ab559cf14e6de94f778e286d8bc89a2262cff59ee3566a41c6ab5dd1 \
-    --hash=sha256:c22501ee104c34b70e37e5cdc59d74ffb833d473ac3ecfe899b707bf194e914b
+opentelemetry-instrumentation-pyramid==0.66b1 \
+    --hash=sha256:20f0ef859f96a95e15445d8fe695889a9aab926292e7503129e4f3133ca88356 \
+    --hash=sha256:769092e65dfc9254272ce62e0c2e1f45289bb976c386ae2b7ed9c3d029404e82
     # via aws-opentelemetry-distro
-opentelemetry-instrumentation-pyramid==0.54b1 \
-    --hash=sha256:11b7f210ff45b754db30f7522bb2e27be902ddea38a59cc16c08e16dd8061f42 \
-    --hash=sha256:c68d46de5cbf1e804b2b730f7f60bf87f0bc9735e3d21b8359d35705ff8457b3
+opentelemetry-instrumentation-redis==0.66b1 \
+    --hash=sha256:4e36651d553e63c8e8f4068d8a2362ae35ac5c9bbef53c27a0fcb96d9092dbb1 \
+    --hash=sha256:d6cc6aa473e23692ae1be9011e2cb3ae5894376158533a71f9710e1fb0906dc7
     # via aws-opentelemetry-distro
-opentelemetry-instrumentation-redis==0.54b1 \
-    --hash=sha256:89024c4752147d528e8c51fff0034193e628da339848cda78afe0cf4eb0c7ccb \
-    --hash=sha256:e98992bd38e93081158f9947a1a8eea51d96e8bfe5054894a5b8d1d82117c0c8
+opentelemetry-instrumentation-remoulade==0.66b1 \
+    --hash=sha256:900eb6afe12f7c0add765529c2017b431238cb819b57c62fb268b0ea723cc00e \
+    --hash=sha256:e0a2d022f1ee2b6541a0f3707797d3f72b6d2c0c617eb490446f225155823a08
     # via aws-opentelemetry-distro
-opentelemetry-instrumentation-remoulade==0.54b1 \
-    --hash=sha256:0c2f5571985375c55532402238dafb09d0e6b4b8c2a3c18925ef461bb3896c96 \
-    --hash=sha256:5d50d298a1d456e1008166d0a20cb7ccada93b502b99cf74f344fb6d1df947c9
+opentelemetry-instrumentation-requests==0.66b1 \
+    --hash=sha256:28578f72e68e3a5be3226c618ac9570ed360ef1dd22d5d6e0721c6905a4ccc67 \
+    --hash=sha256:7ba17d984a2bd876b88bf0aafcca27b5e3ff4c1821e0fe07641e380a3cf3a3a2
     # via aws-opentelemetry-distro
-opentelemetry-instrumentation-requests==0.54b1 \
-    --hash=sha256:3eca5d697c5564af04c6a1dd23b6a3ffbaf11e64887c6051655cee03998f4654 \
-    --hash=sha256:a0c4cd5d946224f336d6bd73cdabdecc6f80d5c39208f84eb96eb15f16cd41a0
+opentelemetry-instrumentation-sqlalchemy==0.66b1 \
+    --hash=sha256:a10043953fcba71911bf29a024f8cc337260c1ef0b4fc844b96cae0de0947baa \
+    --hash=sha256:aa30b10d880d7e91cf94b23a92ac85cec09ffddd8f0d40256d7c510e3dd33971
     # via aws-opentelemetry-distro
-opentelemetry-instrumentation-sqlalchemy==0.54b1 \
-    --hash=sha256:97839acf1c9b96ded857fca57a09b86a56cf8d9eb6d706b7ceaee9352a460e03 \
-    --hash=sha256:d2ca5edb4c7ecef120d51aad6793b7da1cc80207ccfd31c437ee18f098e7c4c4
+opentelemetry-instrumentation-sqlite3==0.66b1 \
+    --hash=sha256:e5d672a347deac385a71fb52d556ea443e2f3cc51eac05cac8f0a739cac0bb38 \
+    --hash=sha256:f282b712f56186c36d592d4ab856d978bc7dd60f4b10500113da8c9eb45ff9bc
     # via aws-opentelemetry-distro
-opentelemetry-instrumentation-sqlite3==0.54b1 \
-    --hash=sha256:756c8f51a3b738f4cd52556b2146a6e2e6a33516b494aa4dbb7478702af4a475 \
-    --hash=sha256:e32ec80a2f50df035bf16de142527157b98a60a3863ddcb6aa20beae8a64a24d
+opentelemetry-instrumentation-starlette==0.66b1 \
+    --hash=sha256:1ac11a70e345b57a4259f4a47311101b9eafa3b30d4133df25b36b2e6dfc2c88 \
+    --hash=sha256:ef8274216c67856ac02f2d23daede0819c77a9b4b6cc3f4decb84663b7ac5693
     # via aws-opentelemetry-distro
-opentelemetry-instrumentation-starlette==0.54b1 \
-    --hash=sha256:04f5902185166ad0a96bbc5cc184983bdf535ac92b1edc7a6093e9d14efa00d1 \
-    --hash=sha256:533e730308b5e6e99ab2a219c891f8e08ef5e67db76a148cc2f6c4fd5b6bcc0e
+opentelemetry-instrumentation-system-metrics==0.66b1 \
+    --hash=sha256:0654b41eb6db3c2f9ad9979487afcc6f461e5b35df282f0a11d0f465e906d967 \
+    --hash=sha256:b0fccbc1aecf35c182431a035ec4809b8f9607eec692243cf70f23b3bda51231
     # via aws-opentelemetry-distro
-opentelemetry-instrumentation-system-metrics==0.54b1 \
-    --hash=sha256:1b6f23cc8cf18b525bdb285c3664b521ce81b1e82c4f3db6a82210b8c37af1e4 \
-    --hash=sha256:2846ba1019e1672fb605eff3d3af198fa1b8f1540ece70da82a2d20d9b95779b
+opentelemetry-instrumentation-threading==0.66b1 \
+    --hash=sha256:2c217359439d09ca4a4be524db368c05a3cc7f218b85e8086f22664db0a03538 \
+    --hash=sha256:94039c60603060d26524e31aed1181a5d153e43f58462d110dbeb4830687d7d7
     # via aws-opentelemetry-distro
-opentelemetry-instrumentation-tornado==0.54b1 \
-    --hash=sha256:3f4773cb3adfd6fdd592f182a72be85ca6cf01500a9973ac17947ce81d9872ee \
-    --hash=sha256:73a5ba0f915688907dd4640653d3970167715c42a5ef4a948bbcf93ad9682b8d
+opentelemetry-instrumentation-tornado==0.66b1 \
+    --hash=sha256:6601f13698e80a89de1fcbe00bad845368c053aec54819bcab1c5628b6fa4cc1 \
+    --hash=sha256:d571e50cb4cf4b387e8496babbdafdaf8b11dcd93df8b9b7bb26c763da25263f
     # via aws-opentelemetry-distro
-opentelemetry-instrumentation-tortoiseorm==0.54b1 \
-    --hash=sha256:0335efcd4f5e240efecc36f909939dbc6fb8c9b0733dc3f0615a39c3f6544c7e \
-    --hash=sha256:f9ffe00bcdfa895dfa1a512f4fde186ebd816a4636afd26a7716f258b4c7e3f9
+opentelemetry-instrumentation-tortoiseorm==0.66b1 \
+    --hash=sha256:4a648a2387620645ae74efdb566e40a2bdb7db8a700416e2eb475b72f7e9385d \
+    --hash=sha256:8aec043c62f3b2d852e78602cd53a0f4d9e481fce20df421cec39a2c9d4fbbdc
     # via aws-opentelemetry-distro
-opentelemetry-instrumentation-urllib==0.54b1 \
-    --hash=sha256:94744470733f61f3dd282be7868e93f5bc277f07a0aeda7c836c913cbcf4f416 \
-    --hash=sha256:99943400b6814ebf072735e0fb42dc5c74705f30b64ebed3778f0e7c6e16d63e
+opentelemetry-instrumentation-urllib==0.66b1 \
+    --hash=sha256:6f679d785ebcb04b791a889d8a9c0e8edf897a85ab80a7a12b0139c461b14627 \
+    --hash=sha256:f00daa25375fbdf88b7e1a425ef54c704674d8bef639c834de93df9b3f88d7f4
     # via aws-opentelemetry-distro
-opentelemetry-instrumentation-urllib3==0.54b1 \
-    --hash=sha256:0d30ba3b230e4100cfadaad29174bf7bceac70e812e4f5204e681e4b55a74cd9 \
-    --hash=sha256:e87958c297ddd36d30e1c9069f34a9690e845e4ccc2662dd80e99ed976d4c03e
+opentelemetry-instrumentation-urllib3==0.66b1 \
+    --hash=sha256:31e84a2ccfa86ca1d4f1209ea66c1f709c335348d5c487477d3843172efcc408 \
+    --hash=sha256:e48b448fed4a127e54c584c37a443c91d80d34b9f9de324af9a00cead8b338b8
     # via aws-opentelemetry-distro
-opentelemetry-instrumentation-wsgi==0.54b1 \
-    --hash=sha256:261ad737e0058812aaae6bb7d6e0fa7344de62464c5df30c82bea180e735b903 \
-    --hash=sha256:6d99dca32ce232251cd321bf86e8c9d0a60c5f088bcbe5ad55d12a2006fe056e
+opentelemetry-instrumentation-wsgi==0.66b1 \
+    --hash=sha256:8c86390c32fe8d0924b3541f292122d3a2ba6c3accc2bcbcc73ae985ee8e799e \
+    --hash=sha256:ce803d8e828e75d7225c25a618b692cbd4687a11be64356308ed1feab0f70bab
     # via
     #   aws-opentelemetry-distro
     #   opentelemetry-instrumentation-django
     #   opentelemetry-instrumentation-falcon
     #   opentelemetry-instrumentation-flask
     #   opentelemetry-instrumentation-pyramid
-opentelemetry-processor-baggage==0.54b1 \
-    --hash=sha256:1502475016c90b68642c9377803fd77b7f295d0b33e0d3449ba113b405de2b49 \
-    --hash=sha256:d3ec2a99fb8b88ca1153cf9b1b8eae76bd2bb518fb900f758a8d24e439276055
+opentelemetry-processor-baggage==0.66b1 \
+    --hash=sha256:200c16de37b9afae685bdc368a261d1c091ac7ef4fb892ef93129e2be5036642 \
+    --hash=sha256:b43acdcb387d8934e04e8f265165b1d632ca62509c693941b31df69bf62d1fe5
     # via aws-opentelemetry-distro
-opentelemetry-propagator-aws-xray==1.0.1 \
-    --hash=sha256:49267a1d72b3f04880ac75e24f9ef38fe323e2f3156c4531e0e00c71c0829c0f \
-    --hash=sha256:6e8be667bbcf17c3d81d70b2a7cdec0b11257ff64d3829ffe75b810ba1b49f86
+opentelemetry-propagator-aws-xray==1.0.2 \
+    --hash=sha256:1c99181ee228e99bddb638a0c911a297fa21f1c3a0af951f841e79919b5f1934 \
+    --hash=sha256:6b2cee5479d2ef0172307b66ed2ed151f598a0fd29b3c01133ac87ca06326260
     # via
     #   aws-opentelemetry-distro
     #   opentelemetry-instrumentation-aws-lambda
     #   opentelemetry-instrumentation-botocore
-opentelemetry-propagator-b3==1.33.1 \
-    --hash=sha256:46bbe76d95ac7e1f50b263230aa1ce86445120f10c7008d66cb08266468561a3 \
-    --hash=sha256:5c65708fbecb317ab4f1880e81f7bb0bf48caa2e1d52fe31f89d1cb86172a69c
+opentelemetry-propagator-b3==1.45.1 \
+    --hash=sha256:0f7d346b2cc2e9ec157c4e5c03f787d8631e61edc4b71978bb3bca2bb228db94 \
+    --hash=sha256:cd811519968dced23dda1240f2adf488e579d1361340a666af8540cd8a1e17ac
     # via aws-opentelemetry-distro
-opentelemetry-propagator-jaeger==1.33.1 \
-    --hash=sha256:b4cd3f123a720db872401e2179f7384c70922a6b9bab2873f003419be82bb5e3 \
-    --hash=sha256:d5cfd139b245b32b45edda478b7be1fc52ecc93a199aa6ed7fd074086d81d083
+opentelemetry-propagator-jaeger==1.45.1 \
+    --hash=sha256:008705ce03fb827244e2bc310272d6324073b20cb08939cac09752e22481938d \
+    --hash=sha256:96b5a71ec3177715a2fad3653d93cbc05ac358f2cbe437681edf88a055674af6
     # via aws-opentelemetry-distro
-opentelemetry-propagator-ot-trace==0.54b1 \
-    --hash=sha256:3c7885bdee37b28562e17cd8cb72747102fdccd9d4e557f5b4afb109092db829 \
-    --hash=sha256:ce6bbebe9a3e57d8abada605b3ef296d363c764bb9a075677ea6f7aed7ddf8e6
+opentelemetry-propagator-ot-trace==0.66b1 \
+    --hash=sha256:0217b23e344f16b76cfcc9f0cea729e205ff4323d564a70d350f688f50c34370 \
+    --hash=sha256:d9891354966cf8941c85b90d483f52d6f79e5b9c27145eee2082c8767924f6eb
     # via aws-opentelemetry-distro
-opentelemetry-proto==1.33.1 \
-    --hash=sha256:243d285d9f29663fc7ea91a7171fcc1ccbbfff43b48df0774fd64a37d98eda70 \
-    --hash=sha256:9627b0a5c90753bf3920c398908307063e4458b287bb890e5c1d6fa11ad50b68
+opentelemetry-proto==1.45.1 \
+    --hash=sha256:79e0fb95e4616691a469439238aa9224d75779b3e108e895d1aa125ab29ca77c \
+    --hash=sha256:f38e2a8413053c180cd3d2637fbb279673ec2f6a6e09c995aafa2f452c52b46e
     # via
     #   opentelemetry-exporter-otlp-proto-common
     #   opentelemetry-exporter-otlp-proto-grpc
     #   opentelemetry-exporter-otlp-proto-http
-opentelemetry-sdk==1.33.1 \
-    --hash=sha256:19ea73d9a01be29cacaa5d6c8ce0adc0b7f7b4d58cc52f923e4413609f670112 \
-    --hash=sha256:85b9fcf7c3d23506fbc9692fd210b8b025a1920535feec50bd54ce203d57a531
+opentelemetry-sdk==1.45.1 \
+    --hash=sha256:63d24a6ca645019a631e6a51999c73e93adcac1196ca640b8ae78a7cc4762bf3 \
+    --hash=sha256:c604c11dc429810812348989115fa44bd558772a3d7442afc43d024f2c250ca4
     # via
     #   aws-opentelemetry-distro
     #   opentelemetry-distro
+    #   opentelemetry-exporter-otlp-common
     #   opentelemetry-exporter-otlp-proto-grpc
     #   opentelemetry-exporter-otlp-proto-http
     #   opentelemetry-processor-baggage
     #   opentelemetry-propagator-ot-trace
     #   opentelemetry-sdk-extension-aws
-opentelemetry-sdk-extension-aws==2.0.2 \
-    --hash=sha256:4c6e4b9fec01a4a9cfeac5272ce5aae6bc80e080a6bae1e52098746f53a7b32d \
-    --hash=sha256:9faa9bdf480d1c5c53151dabee75735c94dbde09e4762c68ff5c7bd4aa3408f3
+opentelemetry-sdk-extension-aws==2.1.0 \
+    --hash=sha256:c7cf6efc275d2c24108a468d954287ce5aab9733bac816a080cfb3117374e63a \
+    --hash=sha256:ff68ddecc1910f62c019d22ec0f7461713ead7f662d6a2304d4089c1a0b20416
     # via aws-opentelemetry-distro
-opentelemetry-semantic-conventions==0.54b1 \
-    --hash=sha256:29dab644a7e435b58d3a3918b58c333c92686236b30f7891d5e51f02933ca60d \
-    --hash=sha256:d1cecedae15d19bdaafca1e56b29a66aa286f50b5d08f036a145c7f3e9ef9cee
+opentelemetry-semantic-conventions==0.66b1 \
+    --hash=sha256:497ca63bf383723411e8eaf60c8779e9877633c936bb641080adab59d0eb6ec8 \
+    --hash=sha256:d4cddeb4315490b35213f55e2bdc9ac54bb1e4d318927475bed62b35545e581b
     # via
     #   opentelemetry-instrumentation
+    #   opentelemetry-instrumentation-aio-pika
     #   opentelemetry-instrumentation-aiohttp-client
+    #   opentelemetry-instrumentation-aiokafka
     #   opentelemetry-instrumentation-asgi
     #   opentelemetry-instrumentation-asyncpg
     #   opentelemetry-instrumentation-aws-lambda
-    #   opentelemetry-instrumentation-boto
     #   opentelemetry-instrumentation-boto3sqs
     #   opentelemetry-instrumentation-botocore
     #   opentelemetry-instrumentation-cassandra
     #   opentelemetry-instrumentation-celery
+    #   opentelemetry-instrumentation-confluent-kafka
     #   opentelemetry-instrumentation-dbapi
     #   opentelemetry-instrumentation-django
-    #   opentelemetry-instrumentation-elasticsearch
     #   opentelemetry-instrumentation-falcon
     #   opentelemetry-instrumentation-fastapi
     #   opentelemetry-instrumentation-flask
     #   opentelemetry-instrumentation-grpc
     #   opentelemetry-instrumentation-httpx
     #   opentelemetry-instrumentation-kafka-python
+    #   opentelemetry-instrumentation-logging
+    #   opentelemetry-instrumentation-pika
     #   opentelemetry-instrumentation-pymemcache
     #   opentelemetry-instrumentation-pymongo
     #   opentelemetry-instrumentation-pyramid
@@ -895,15 +904,16 @@ opentelemetry-semantic-conventions==0.54b1 \
     #   opentelemetry-instrumentation-requests
     #   opentelemetry-instrumentation-sqlalchemy
     #   opentelemetry-instrumentation-starlette
+    #   opentelemetry-instrumentation-system-metrics
     #   opentelemetry-instrumentation-tornado
     #   opentelemetry-instrumentation-tortoiseorm
     #   opentelemetry-instrumentation-urllib
     #   opentelemetry-instrumentation-urllib3
     #   opentelemetry-instrumentation-wsgi
     #   opentelemetry-sdk
-opentelemetry-util-http==0.54b1 \
-    --hash=sha256:b1c91883f980344a1c3c486cffd47ae5c9c1dd7323f9cbe9fdb7cadb401c87c9 \
-    --hash=sha256:f0b66868c19fbaf9c9d4e11f4a7599fa15d5ea50b884967a26ccd9d72c7c9d15
+opentelemetry-util-http==0.66b1 \
+    --hash=sha256:047dea1a628031f857a5a32261dc0e955bc162d39993ed1cffb8f2cff5ba8a62 \
+    --hash=sha256:8f443d7abcaf29c4a07b373bbd31b5b39132c0ed3c27d015a59dc0323d5b1c58
     # via
     #   opentelemetry-instrumentation-aiohttp-client
     #   opentelemetry-instrumentation-asgi
@@ -928,19 +938,19 @@ packaging==26.3 \
     #   opentelemetry-instrumentation-flask
     #   opentelemetry-instrumentation-pika
     #   opentelemetry-instrumentation-sqlalchemy
-protobuf==5.29.6 \
-    --hash=sha256:36ade6ff88212e91aef4e687a971a11d7d24d6948a66751abc1b3238648f5d05 \
-    --hash=sha256:62e8a3114992c7c647bce37dcc93647575fc52d50e48de30c6fcb28a6a291eb1 \
-    --hash=sha256:6b9edb641441b2da9fa8f428760fc136a49cf97a52076010cf22a2ff73438a86 \
-    --hash=sha256:76e07e6567f8baf827137e8d5b8204b6c7b6488bbbff1bf0a72b383f77999c18 \
-    --hash=sha256:7e6ad413275be172f67fdee0f43484b6de5a904cc1c3ea9804cb6fe2ff366eda \
-    --hash=sha256:831e2da16b6cc9d8f1654c041dd594eda43391affd3c03a91bea7f7f6da106d6 \
-    --hash=sha256:a8866b2cff111f0f863c1b3b9e7572dc7eaea23a7fae27f6fc613304046483e6 \
-    --hash=sha256:b5a169e664b4057183a34bdc424540e86eea47560f3c123a0d64de4e137f9269 \
-    --hash=sha256:cb4c86de9cd8a7f3a256b9744220d87b847371c6b2f10bde87768918ef33ba49 \
-    --hash=sha256:da9ee6a5424b6b30fd5e45c5ea663aef540ca95f9ad99d1e887e819cdf9b8723 \
-    --hash=sha256:e3387f44798ac1106af0233c04fb8abf543772ff241169946f698b3a9a3d3ab9
+protobuf==6.33.5 \
+    --hash=sha256:3093804752167bcab3998bec9f1048baae6e29505adaf1afd14a37bddede533c \
+    --hash=sha256:69915a973dd0f60f31a08b8318b73eab2bd6a392c79184b3612226b0a3f8ec02 \
+    --hash=sha256:6ddcac2a081f8b7b9642c09406bc6a4290128fce5f471cddd165960bb9119e5c \
+    --hash=sha256:8afa18e1d6d20af15b417e728e9f60f3aa108ee76f23c3b2c07a2c3b546d3afd \
+    --hash=sha256:8f04fa32763dcdb4973d537d6b54e615cc61108c7cb38fe59310c3192d29510a \
+    --hash=sha256:9b71e0281f36f179d00cbcb119cb19dec4d14a81393e5ea220f64b286173e190 \
+    --hash=sha256:a3157e62729aafb8df6da2c03aa5c0937c7266c626ce11a278b6eb7963c4e37c \
+    --hash=sha256:a5cb85982d95d906df1e2210e58f8e4f1e3cdc088e52c921a041f9c9a0386de5 \
+    --hash=sha256:cbf16ba3350fb7b889fca858fb215967792dc125b35c7976ca4818bee3521cf0 \
+    --hash=sha256:d71b040839446bac0f4d162e758bea99c8251161dae9d0983a3b88dee345153b
     # via
+    #   aws-opentelemetry-distro
     #   googleapis-common-protos
     #   opentelemetry-proto
 psutil==7.2.2 \
@@ -1126,7 +1136,9 @@ pyjwt==2.15.1 \
 python-dateutil==2.9.0.post0 \
     --hash=sha256:37dd54208da7e1cd875388217d5e00ebd4179249f90fb72437e91a35459a0ad3 \
     --hash=sha256:a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427
-    # via botocore
+    # via
+    #   aws-opentelemetry-distro
+    #   botocore
 python-dotenv==1.2.4 \
     --hash=sha256:42269a8a5b3fd54ffa6f3d84b18abed50064717576b4ecf03dc4a55d8aa04fdc \
     --hash=sha256:f0d53e69935a851c0dcc78f3ab7aaccd8cabef0b92382b576b824212902873c0
@@ -1135,6 +1147,81 @@ python-multipart==0.0.33 \
     --hash=sha256:8f16c07b36add9da6b2ee87d3efcaf0a45a6de9c3d0a5dd94e9ccf7675a7bc45 \
     --hash=sha256:b8112424a6abd162ec08d390565dd113ad699f2fe6fef3c987b8bbcbfe9e390d
     # via mcp
+pyyaml==6.0.3 \
+    --hash=sha256:00c4bdeba853cc34e7dd471f16b4114f4162dc03e6b7afcc2128711f0eca823c \
+    --hash=sha256:0150219816b6a1fa26fb4699fb7daa9caf09eb1999f3b70fb6e786805e80375a \
+    --hash=sha256:02893d100e99e03eda1c8fd5c441d8c60103fd175728e23e431db1b589cf5ab3 \
+    --hash=sha256:02ea2dfa234451bbb8772601d7b8e426c2bfa197136796224e50e35a78777956 \
+    --hash=sha256:0f29edc409a6392443abf94b9cf89ce99889a1dd5376d94316ae5145dfedd5d6 \
+    --hash=sha256:10892704fc220243f5305762e276552a0395f7beb4dbf9b14ec8fd43b57f126c \
+    --hash=sha256:16249ee61e95f858e83976573de0f5b2893b3677ba71c9dd36b9cf8be9ac6d65 \
+    --hash=sha256:1d37d57ad971609cf3c53ba6a7e365e40660e3be0e5175fa9f2365a379d6095a \
+    --hash=sha256:1ebe39cb5fc479422b83de611d14e2c0d3bb2a18bbcb01f229ab3cfbd8fee7a0 \
+    --hash=sha256:214ed4befebe12df36bcc8bc2b64b396ca31be9304b8f59e25c11cf94a4c033b \
+    --hash=sha256:2283a07e2c21a2aa78d9c4442724ec1eb15f5e42a723b99cb3d822d48f5f7ad1 \
+    --hash=sha256:22ba7cfcad58ef3ecddc7ed1db3409af68d023b7f940da23c6c2a1890976eda6 \
+    --hash=sha256:27c0abcb4a5dac13684a37f76e701e054692a9b2d3064b70f5e4eb54810553d7 \
+    --hash=sha256:28c8d926f98f432f88adc23edf2e6d4921ac26fb084b028c733d01868d19007e \
+    --hash=sha256:2e71d11abed7344e42a8849600193d15b6def118602c4c176f748e4583246007 \
+    --hash=sha256:34d5fcd24b8445fadc33f9cf348c1047101756fd760b4dacb5c3e99755703310 \
+    --hash=sha256:37503bfbfc9d2c40b344d06b2199cf0e96e97957ab1c1b546fd4f87e53e5d3e4 \
+    --hash=sha256:3c5677e12444c15717b902a5798264fa7909e41153cdf9ef7ad571b704a63dd9 \
+    --hash=sha256:3ff07ec89bae51176c0549bc4c63aa6202991da2d9a6129d7aef7f1407d3f295 \
+    --hash=sha256:41715c910c881bc081f1e8872880d3c650acf13dfa8214bad49ed4cede7c34ea \
+    --hash=sha256:418cf3f2111bc80e0933b2cd8cd04f286338bb88bdc7bc8e6dd775ebde60b5e0 \
+    --hash=sha256:44edc647873928551a01e7a563d7452ccdebee747728c1080d881d68af7b997e \
+    --hash=sha256:4a2e8cebe2ff6ab7d1050ecd59c25d4c8bd7e6f400f5f82b96557ac0abafd0ac \
+    --hash=sha256:4ad1906908f2f5ae4e5a8ddfce73c320c2a1429ec52eafd27138b7f1cbe341c9 \
+    --hash=sha256:501a031947e3a9025ed4405a168e6ef5ae3126c59f90ce0cd6f2bfc477be31b7 \
+    --hash=sha256:5190d403f121660ce8d1d2c1bb2ef1bd05b5f68533fc5c2ea899bd15f4399b35 \
+    --hash=sha256:5498cd1645aa724a7c71c8f378eb29ebe23da2fc0d7a08071d89469bf1d2defb \
+    --hash=sha256:5cf4e27da7e3fbed4d6c3d8e797387aaad68102272f8f9752883bc32d61cb87b \
+    --hash=sha256:5e0b74767e5f8c593e8c9b5912019159ed0533c70051e9cce3e8b6aa699fcd69 \
+    --hash=sha256:5ed875a24292240029e4483f9d4a4b8a1ae08843b9c54f43fcc11e404532a8a5 \
+    --hash=sha256:5fcd34e47f6e0b794d17de1b4ff496c00986e1c83f7ab2fb8fcfe9616ff7477b \
+    --hash=sha256:5fdec68f91a0c6739b380c83b951e2c72ac0197ace422360e6d5a959d8d97b2c \
+    --hash=sha256:6344df0d5755a2c9a276d4473ae6b90647e216ab4757f8426893b5dd2ac3f369 \
+    --hash=sha256:64386e5e707d03a7e172c0701abfb7e10f0fb753ee1d773128192742712a98fd \
+    --hash=sha256:652cb6edd41e718550aad172851962662ff2681490a8a711af6a4d288dd96824 \
+    --hash=sha256:66291b10affd76d76f54fad28e22e51719ef9ba22b29e1d7d03d6777a9174198 \
+    --hash=sha256:66e1674c3ef6f541c35191caae2d429b967b99e02040f5ba928632d9a7f0f065 \
+    --hash=sha256:6adc77889b628398debc7b65c073bcb99c4a0237b248cacaf3fe8a557563ef6c \
+    --hash=sha256:79005a0d97d5ddabfeeea4cf676af11e647e41d81c9a7722a193022accdb6b7c \
+    --hash=sha256:7c6610def4f163542a622a73fb39f534f8c101d690126992300bf3207eab9764 \
+    --hash=sha256:7f047e29dcae44602496db43be01ad42fc6f1cc0d8cd6c83d342306c32270196 \
+    --hash=sha256:8098f252adfa6c80ab48096053f512f2321f0b998f98150cea9bd23d83e1467b \
+    --hash=sha256:850774a7879607d3a6f50d36d04f00ee69e7fc816450e5f7e58d7f17f1ae5c00 \
+    --hash=sha256:8d1fab6bb153a416f9aeb4b8763bc0f22a5586065f86f7664fc23339fc1c1fac \
+    --hash=sha256:8da9669d359f02c0b91ccc01cac4a67f16afec0dac22c2ad09f46bee0697eba8 \
+    --hash=sha256:8dc52c23056b9ddd46818a57b78404882310fb473d63f17b07d5c40421e47f8e \
+    --hash=sha256:9149cad251584d5fb4981be1ecde53a1ca46c891a79788c0df828d2f166bda28 \
+    --hash=sha256:93dda82c9c22deb0a405ea4dc5f2d0cda384168e466364dec6255b293923b2f3 \
+    --hash=sha256:96b533f0e99f6579b3d4d4995707cf36df9100d67e0c8303a0c55b27b5f99bc5 \
+    --hash=sha256:9c57bb8c96f6d1808c030b1687b9b5fb476abaa47f0db9c0101f5e9f394e97f4 \
+    --hash=sha256:9c7708761fccb9397fe64bbc0395abcae8c4bf7b0eac081e12b809bf47700d0b \
+    --hash=sha256:9f3bfb4965eb874431221a3ff3fdcddc7e74e3b07799e0e84ca4a0f867d449bf \
+    --hash=sha256:a33284e20b78bd4a18c8c2282d549d10bc8408a2a7ff57653c0cf0b9be0afce5 \
+    --hash=sha256:a80cb027f6b349846a3bf6d73b5e95e782175e52f22108cfa17876aaeff93702 \
+    --hash=sha256:b30236e45cf30d2b8e7b3e85881719e98507abed1011bf463a8fa23e9c3e98a8 \
+    --hash=sha256:b3bc83488de33889877a0f2543ade9f70c67d66d9ebb4ac959502e12de895788 \
+    --hash=sha256:b865addae83924361678b652338317d1bd7e79b1f4596f96b96c77a5a34b34da \
+    --hash=sha256:b8bb0864c5a28024fac8a632c443c87c5aa6f215c0b126c449ae1a150412f31d \
+    --hash=sha256:ba1cc08a7ccde2d2ec775841541641e4548226580ab850948cbfda66a1befcdc \
+    --hash=sha256:bdb2c67c6c1390b63c6ff89f210c8fd09d9a1217a465701eac7316313c915e4c \
+    --hash=sha256:c1ff362665ae507275af2853520967820d9124984e0f7466736aea23d8611fba \
+    --hash=sha256:c2514fceb77bc5e7a2f7adfaa1feb2fb311607c9cb518dbc378688ec73d8292f \
+    --hash=sha256:c3355370a2c156cffb25e876646f149d5d68f5e0a3ce86a5084dd0b64a994917 \
+    --hash=sha256:c458b6d084f9b935061bc36216e8a69a7e293a2f1e68bf956dcd9e6cbcd143f5 \
+    --hash=sha256:d0eae10f8159e8fdad514efdc92d74fd8d682c933a6dd088030f3834bc8e6b26 \
+    --hash=sha256:d76623373421df22fb4cf8817020cbb7ef15c725b9d5e45f17e189bfc384190f \
+    --hash=sha256:ebc55a14a21cb14062aa4162f906cd962b28e2e9ea38f9b4391244cd8de4ae0b \
+    --hash=sha256:eda16858a3cab07b80edaf74336ece1f986ba330fdb8ee0d6c0d68fe82bc96be \
+    --hash=sha256:ee2922902c45ae8ccada2c5b501ab86c36525b883eff4255313a253a3160861c \
+    --hash=sha256:efd7b85f94a6f21e4932043973a7ba2613b059c4a000551892ac9f1d11f5baf3 \
+    --hash=sha256:f7057c9a337546edc7973c0d3ba84ddcdf0daa14533c2065749c9075001090e6 \
+    --hash=sha256:fa160448684b4e94d80416c0fa4aac48967a969efe22931448d853ada8baf926 \
+    --hash=sha256:fc09d0aa354569bc501d4e787133afc08552722d3ab34836a80547331bb5d4a0
+    # via aws-opentelemetry-distro
 referencing==0.37.0 \
     --hash=sha256:381329a9f99628c9069361716891d34ad94af76e461dcb0335825aecc7692231 \
     --hash=sha256:44aefc3142c5b842538163acb373e24cce6632bd54bdb01b21ad5863489f50d8
@@ -1144,7 +1231,10 @@ referencing==0.37.0 \
 requests==2.34.2 \
     --hash=sha256:2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0 \
     --hash=sha256:f288924cae4e29463698d6d60bc6a4da69c89185ad1e0bcc4104f584e960b9ed
-    # via opentelemetry-exporter-otlp-proto-http
+    # via
+    #   aws-opentelemetry-distro
+    #   opentelemetry-exporter-http-transport
+    #   opentelemetry-exporter-otlp-proto-http
 rpds-py==2026.9.1 \
     --hash=sha256:00ba2d8c7dd4ee537978ddf4b3fbd712bef2d8751603f7f3146b3f4287768e25 \
     --hash=sha256:01445c8d194aa032a08e944f16567672da1c62dbdbefd8b6d0693032e290cf68 \
@@ -1310,15 +1400,21 @@ typing-extensions==4.16.0 \
     #   httpx2
     #   mcp
     #   mcp-types
+    #   opentelemetry-api
+    #   opentelemetry-exporter-otlp-proto-grpc
+    #   opentelemetry-exporter-otlp-proto-http
+    #   opentelemetry-instrumentation-aiokafka
+    #   opentelemetry-propagator-b3
     #   opentelemetry-sdk
+    #   opentelemetry-semantic-conventions
     #   pydantic
     #   pydantic-core
     #   referencing
     #   starlette
     #   typing-inspection
-typing-inspection==0.4.5 \
-    --hash=sha256:7f16c411e7930dc79596d42ab44672a3fe5f60eb34b781a1647e7872363120c7 \
-    --hash=sha256:bc210535442b39e1bf2805e0c7a17dfd6a4ace760c84c7f7d16245d23a6b1c39
+typing-inspection==0.4.4 \
+    --hash=sha256:547274fa6b0a561ccf549cc9524b999a578e737d015d8709d021f9d0d13bea47 \
+    --hash=sha256:65b8397ba37ccbce054456aaccddfc91e6e3083c92824df348d96ca832f3f147
     # via
     #   mcp
     #   pydantic
@@ -1326,6 +1422,7 @@ urllib3==2.8.0 \
     --hash=sha256:0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3 \
     --hash=sha256:63bf2ead4c879426ebf22ef2a781eeb4aa3b4ae798a0435506f8687fd5bb9b63
     # via
+    #   aws-opentelemetry-distro
     #   botocore
     #   requests
 uv==0.12.22 \
@@ -1436,16 +1533,15 @@ wrapt==1.17.3 \
     --hash=sha256:fbd3c8319de8e1dc79d346929cd71d523622da527cca14e0c1d257e31c2b8b10 \
     --hash=sha256:fd341868a4b6714a5962c1af0bd44f7c404ef78720c7de4892901e540417111c
     # via
-    #   deprecated
     #   opentelemetry-instrumentation
     #   opentelemetry-instrumentation-aio-pika
     #   opentelemetry-instrumentation-aiohttp-client
     #   opentelemetry-instrumentation-aiopg
     #   opentelemetry-instrumentation-boto3sqs
+    #   opentelemetry-instrumentation-botocore
     #   opentelemetry-instrumentation-cassandra
     #   opentelemetry-instrumentation-confluent-kafka
     #   opentelemetry-instrumentation-dbapi
-    #   opentelemetry-instrumentation-elasticsearch
     #   opentelemetry-instrumentation-grpc
     #   opentelemetry-instrumentation-httpx
     #   opentelemetry-instrumentation-jinja2
@@ -1454,9 +1550,6 @@ wrapt==1.17.3 \
     #   opentelemetry-instrumentation-pyramid
     #   opentelemetry-instrumentation-redis
     #   opentelemetry-instrumentation-sqlalchemy
+    #   opentelemetry-instrumentation-threading
     #   opentelemetry-instrumentation-urllib3
     #   opentelemetry-processor-baggage
-zipp==4.1.2 \
-    --hash=sha256:b30cb6cd253122169c47de245ca24a86bac2a5d3802ba15bf7ba6414eb9e144d \
-    --hash=sha256:cf474b90b07ea932637e17c6b9479de2b2882900b0d311bdaf4f5c000a15a97f
-    # via importlib-metadata

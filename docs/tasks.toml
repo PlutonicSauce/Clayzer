@@ -180,9 +180,9 @@ step = "case"
 title = "Build the ~60 Texas test Cases, held out: scored once at the end, never tuned on"
 area = "Data and Cases"
 tier = "Must"
-status = "doing"
-notes = "61 Cases built and checked 2026-11-04, held out: no Batch has run on them. Left: score them once, at the end, next to the development results. Texas solar doesn't cluster like Mojave/Tehachapi (large sites in West Texas, small ones around San Antonio), so the region is the whole state, picked with seed 2026: 28 solar (8 under 5 MW, 10 at 5 to 50 MW, 10 over 50 MW; at most 2 per county), 13 turbines from 13 projects in 13 counties, and 20 negatives (6 near towns, 7 High Plains farmland, 7 open rangeland), every Chip at least 1 km from the others. Checked by eye: Samson Solar III (no panels yet in 2022) and a Brazos Wind turbine being repowered were replaced by the next picks; 18 Cases got hand corrections (unmapped houses, farmland, ponds, and dirt tracks)."
-see_it = "fixtures/caption/cases/caption-test.jsonl, or the Cases page after `uv run clayzer push --from fixtures/caption`"
+status = "done"
+notes = "Scored once, 2026-11-04: Batch 20261104T203549Z-texas-final (61 Cases x 3 Repeats, 183 Runs, all ok), from the same commit and captioner as the dev Baseline dev74-base (Nova Pro, built-in prompt, Opus 5.5 Judge, ontology 0.2). Texas against dev: correctness 0.76 vs 0.75, coverage 0.86 vs 0.76, fidelity 0.57 vs 0.56, retrieval 0.78. No drop on a held-out state: tuning on Mojave/Tehachapi carried over. Higher Texas coverage reflects sparser labels (fewer objects per Chip), not a better captioner. Built and checked 2026-11-04: Texas solar doesn't cluster like Mojave/Tehachapi (large sites in West Texas, small ones around San Antonio), so the region is the whole state, picked with seed 2026: 28 solar (8 under 5 MW, 10 at 5 to 50 MW, 10 over 50 MW; at most 2 per county), 13 turbines from 13 projects in 13 counties, and 20 negatives (6 near towns, 7 High Plains farmland, 7 open rangeland), every Chip at least 1 km from the others. Checked by eye: Samson Solar III (no panels yet in 2022) and a Brazos Wind turbine being repowered were replaced by the next picks; 18 Cases got hand corrections (unmapped houses, farmland, ponds, and dirt tracks)."
+see_it = "The Batches page: 20261104T203549Z-texas-final beside dev74-base; the Cases in fixtures/caption/cases/caption-test.jsonl"
 changes = [
   "fixtures/caption/cases/caption-test.jsonl: the 61 Texas Cases, region test",
   "fixtures/caption/cases/label-corrections.toml: hand corrections for 18 Texas Cases",
@@ -419,6 +419,42 @@ changes = [
   "fixtures/caption/cases/label-corrections.toml: Texas neg-10's wet pond added by hand",
   "baselines/default/batch.json: the new dev Baseline, 74 Cases x 3 Repeats",
   "tests/test_relabel.py: only water changes, corrections apply again, a Change Case's water stays unknown",
+]
+
+
+[[task]]
+id = "solar-absence"
+step = "case"
+title = "Declare the checked solar absence on every negative Case"
+area = "Data and Cases"
+tier = "Must"
+status = "done"
+start = "src/clayzer/cases.py declare_solar_absence"
+after = ["lookalike-negatives"]
+notes = "Done 2026-11-04. The Output Score (#82) treats a missing map record as unknown, so with no explicit absence a solar Claim on a negative scored as not verifiable: the first live Batch under it (20261104T232401766521Z-...-dev74-output1) reported 0 look-alikes fooled though 12 of 30 look-alike Captions claimed a solar array, and correctness rose to 0.79 only because those Claims dropped out. Every negative (30 dev, 10 of them look-alikes, and 20 Texas) now carries solar_array count 0, absence_verified, source uspvdb+manual: clayzer case neg refuses a USPVDB array within about 300 m or a polygon reaching the Chip, and every Chip was checked by eye. Wind absence and count_complete are left undeclared, so turbine and array counts stay lower bounds. That Batch replayed onto the new labels is the dev Baseline 20261105T011537Z-dev74-absence: greenhouses fooled the captioner in 9 of 12 Runs, reflective roofs 3 of 6, parking lots 0 of 12 (the same as under the old scorer); 15 solar Claims on negatives are false positives; correctness 0.77, coverage 0.75, fidelity 0.56, retrieval 0.73, 402 verified Claims per dollar. Only 6 negatives' scores moved."
+context = "Contradiction needs independent evidence under the Output Score: `count: 0` with `absence_verified: true` and a source (docs/output-score.md). The negatives were built to have no solar, but none said so, so neither the negatives nor the look-alikes could catch a hallucinated array."
+done_when = [
+  "Every committed negative declares its checked solar absence, and clayzer case neg adds it",
+  "Absence labels never count as presence (coverage, retrieval, embeddings, calibration, corroboration)",
+  "A dev Baseline on the new labels where a solar Claim on a negative is a false positive",
+]
+refs = [
+  "docs/output-score.md (Grounding)",
+  "fixtures/caption/README.md",
+]
+see_it = "The Cases page lists 'no solar array (checked: uspvdb+manual)' on each negative; the Batch report's Fooled by look-alikes row; `baselines/default/`."
+changes = [
+  "src/clayzer/cases.py: SOLAR_ABSENCE and declare_solar_absence, applied by build_negative",
+  "fixtures/caption/cases/caption-dev.jsonl: the label on 30 negatives, 10 of them look-alikes",
+  "fixtures/caption/cases/caption-test.jsonl: the label on 20 Texas negatives",
+  "src/clayzer/embeddings.py: skips count-0 labels, as retrieval already did",
+  "src/clayzer/calibrate.py: skips count-0 labels",
+  "src/clayzer/corroborate.py: skips count-0 labels",
+  "src/clayzer/batch.py: replay re-ranks with present labels only, regrades grounding_by_class, and refuses a Batch from another scorer",
+  "src/clayzer/output_score.py: grounding_by_class shared with replay",
+  "src/clayzer/ui/static/app.js: absence labels read 'no solar array (checked)'",
+  "tests/test_solar_absence.py: the label, its scoring, and every committed negative",
+  "tests/test_replay_updated_cases.py: the scorer guard, and absence leaving retrieval alone",
 ]
 
 [[task]]
@@ -853,8 +889,8 @@ step = "harness"
 title = "Run the agentic captioner on AgentCore, holding the LGND sign-in and reaching MCP tools"
 area = "Captioning"
 tier = "Could"
-status = "doing"
-notes = "Review remediation validated 2026-11-04: a hosted Run now contains a successful LGND readiness tool Step and a Nova Pro model Step, persisted outside scored Batches. The runtime role was denied access to the Cases canary. Traces checkpoint completed Steps; failures return locators; the ZIP uses a hashed lock and records provenance. Keep #23 open pending PR/CI and final review. See docs/deploy.md, AgentCore captioner."
+status = "done"
+notes = "Done 2026-11-04: PR #93 merged and #23 closed. Opus 5.5 found no merge blockers; 708 tests passed and CI was green. The clean Gateway Runtime v8 build completed LGND and model Steps, returned a readable stopped Trace on failure, and was denied access to the Cases canary. The remote Batch implementation and latest main were integrated. CDK portability validation is tracked separately in agentcore-cdk."
 see_it = "uv run --extra ui --extra tools python -m clayzer.agentcore invoke <runtime-arn> <chip-id>; docs/deploy.md, AgentCore captioner"
 changes = [
   "src/clayzer/agentcore/gateway_runtime.py: HTTP runtime adapter, Gateway JWT authentication, consent helpers, and S3 Trace persistence",
@@ -983,7 +1019,7 @@ status = "doing"
 closes = ["AWS-07", "AWS-11"]
 start = "infra/agentcore_app.py"
 after = ["agentcore-runtime-harness", "cdk"]
-notes = "Written and tested, not yet deployed (2026-11-04). infra/agentcore_app.py is its own CDK app, so the web app's `cdk deploy` is unchanged and infra/app.py (the `cdk` task) is untouched. It creates the Runtime, its image, a least-privilege role, and the workload identity; the 8 template tests pass, and the real `cdk synth` produces the expected resources. Found: CloudFormation does have AWS::BedrockAgentCore::OAuth2CredentialProvider, but the OAuth client behind it needs the provider's own callback address at registration, so it stays a step of `clayzer agentcore login`. Order matters: deploy first, then `login`, or `login` creates the workload identity and the deploy then collides with it. Waiting on: the account being bootstrapped for CDK (it is not; bootstrapping creates an S3 bucket, an ECR repo and IAM roles), then one real `cdk deploy`, a Batch on that Runtime, and `cdk destroy`; a teammate then repeats it in their own account."
+notes = "Validated in one participant account on 2026-11-04: CDK deploy, destroy and redeploy succeeded. The account was already bootstrapped. AgentCore auto-creates its log group; idempotent SDK configuration fixes the observed AlreadyExists failure and applies KMS encryption plus seven-day retention. Inbound authentication rejected an unauthenticated request and accepted a Cognito token. Matched local/remote Batches (two Fixed Cases and one Change Case; one Repeat each) completed all six Runs with identical Case/image/ontology/verifier hashes and no unverified Claims. Local correctness/coverage were 0.833/0.500; remote 0.917/0.417, a functional check, not statistical parity. The owner approved Transaction Search with 1% indexing; 27 span records reached the encrypted Runtime group. Teardown removed the Runtime, role and Runtime log group, preserving the separate Gateway. Recreating the workload identity requires fresh LGND consent even though its OAuth client survives. 712 tests passed, and CI includes an offline ARM64 container smoke check. Teammate-account repetition remains pending: no second profile was supplied; docs/cli.md contains the handoff."
 context = "Turn the scripted experiment into CDK so a teammate deploys it into their own account and `cdk destroy` removes it. CloudFormation has AWS::BedrockAgentCore::Runtime, Gateway, and GatewayTarget, and aws-cdk-lib has an aws_bedrockagentcore module. Two things CDK can't do: the browser approval of the LGND sign-in (one per account, after deploy), and possibly the OAuth client registration at LGND's sign-in server (check whether CloudFormation has a resource for the Identity OAuth client; if not, a small script step stays). Coordinate with the `cdk` task, which is in progress in infra/app.py."
 done_when = [
   "`cdk deploy` creates the AgentCore resources in one account and a teammate deploys the same app in theirs",

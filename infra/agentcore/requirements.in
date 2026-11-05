@@ -8,4 +8,4 @@ python-dotenv==1.2.4
 uv==0.12.22
 # AgentCore Observability: ADOT auto-instruments Bedrock and HTTP, and exports OTEL traces to
 # CloudWatch. 0.18.0+ is needed for unified telemetry (one log group per agent).
-aws-opentelemetry-distro==0.12.1
+aws-opentelemetry-distro==0.22.0

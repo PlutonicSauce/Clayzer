@@ -9,23 +9,35 @@
 # It holds only what a Run needs: the Harness code, the ontology, and boto3 plus the MCP client.
 # No Cases, Chips, Reference Labels, scorers, or web app go in (ADR-0006), and the Runtime's IAM
 # role can't reach the store either.
-ARG BASE_IMAGE=public.ecr.aws/docker/library/python:3.12-slim
-FROM --platform=linux/arm64 ${BASE_IMAGE}
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    UV_LINK_MODE=copy
-WORKDIR /app
-# Hash-pinned (see requirements.in). `uv` is here so MCP servers launched with uvx (RODA) work.
-COPY infra/agentcore/requirements.txt ./
+ARG BASE_IMAGE=public.ecr.aws/docker/library/python:3.12-slim@sha256:b18b261e1b4974b4f321451ad5251ded85abb22c2b8b262da527dda1d031ab30
+FROM --platform=linux/arm64 ${BASE_IMAGE} AS dependencies
+RUN python -m venv /opt/runtime
+ENV PATH="/opt/runtime/bin:$PATH"
+COPY infra/agentcore/requirements.txt /tmp/requirements.txt
 RUN --mount=type=secret,id=pip_index,required=false \
     --mount=type=secret,id=ca_bundle,required=false \
     if [ -f /run/secrets/pip_index ]; then export PIP_INDEX_URL="$(cat /run/secrets/pip_index)"; fi; \
     if [ -f /run/secrets/ca_bundle ]; then export PIP_CERT=/run/secrets/ca_bundle; fi; \
-    pip install --no-cache-dir --require-hashes -r requirements.txt
+    pip install --no-cache-dir --require-hashes -r /tmp/requirements.txt
+
+FROM --platform=linux/arm64 ${BASE_IMAGE}
+COPY --from=dependencies /opt/runtime /opt/runtime
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    UV_LINK_MODE=copy \
+    PATH="/opt/runtime/bin:$PATH"
+WORKDIR /app
+# Hash-pinned (see requirements.in). `uv` is here so MCP servers launched with uvx (RODA) work.
 # Just the modules the Harness imports. config.py finds ontology/ two levels above src/clayzer.
-COPY src/clayzer/*.py ./src/clayzer/
-COPY src/clayzer/agentcore ./src/clayzer/agentcore
-COPY ontology ./ontology
+COPY src/clayzer/__init__.py src/clayzer/harness.py src/clayzer/grid.py \
+     src/clayzer/trace.py src/clayzer/faults.py src/clayzer/tools.py \
+     src/clayzer/allowlist.py src/clayzer/mcp_auth.py src/clayzer/config.py \
+     src/clayzer/lgnd.py src/clayzer/verify.py src/clayzer/verifiers.py \
+     src/clayzer/ontology.py ./src/clayzer/
+COPY src/clayzer/agentcore/__init__.py src/clayzer/agentcore/contract.py \
+     src/clayzer/agentcore/identity.py src/clayzer/agentcore/runtime.py \
+     src/clayzer/agentcore/telemetry.py ./src/clayzer/agentcore/
+COPY ontology/objects.toml ontology/verifiers.toml ./ontology/
 ARG BUILD=unknown
 ENV PYTHONPATH=/app/src \
     CLAYZER_BUILD=${BUILD} \
