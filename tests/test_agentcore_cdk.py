@@ -82,7 +82,7 @@ def test_only_agentcore_in_this_account_can_assume_the_role(synthesised):
             "Principal": {"Service": "bedrock-agentcore.amazonaws.com"},
             "Condition": {
                 "StringEquals": {"aws:SourceAccount": "123456789012"},
-                "ArnLike": {"aws:SourceArn": "arn:aws:bedrock-agentcore:us-west-2:123456789012:*"},
+                "ArnLike": {"aws:SourceArn": "arn:aws:bedrock-agentcore:us-west-2:123456789012:runtime/clayzer_harness-*"},
             },
         })]
     }})  # fmt: skip
@@ -94,10 +94,20 @@ def test_the_role_cannot_reach_the_store_or_anything_broad(synthesised):
     # ADR-0006: the Runtime never touches the store, where Cases and Reference Labels live.
     assert not {a for a in actions if a.startswith("s3:")}
     assert not {a for a in actions if a.endswith("*")}  # no wildcard actions at all
-    # Only ecr:GetAuthorizationToken (which AWS requires) may apply to every resource.
+    # These APIs lack resource-level permissions. Metrics are additionally namespace-scoped.
+    unscoped = {
+        "ecr:GetAuthorizationToken",
+        "xray:PutTraceSegments",
+        "xray:PutTelemetryRecords",
+        "xray:GetSamplingRules",
+        "xray:GetSamplingTargets",
+        "cloudwatch:PutMetricData",
+    }
     for s in statements(template):
         if "*" in as_list(s["Resource"]):
-            assert as_list(s["Action"]) == ["ecr:GetAuthorizationToken"]
+            assert set(as_list(s["Action"])) <= unscoped
+        if "cloudwatch:PutMetricData" in as_list(s["Action"]):
+            assert s["Condition"] == {"StringEquals": {"cloudwatch:namespace": "bedrock-agentcore"}}
 
 
 def test_the_role_may_call_only_the_named_models_and_fetch_only_the_lgnd_token(synthesised):
@@ -125,6 +135,22 @@ def test_the_outputs_name_the_runtime_to_set(synthesised):
     outputs = template.to_json()["Outputs"]
     assert "CLAYZER_AGENTCORE_RUNTIME" in outputs["RuntimeArn"]["Description"]
     assert {"RuntimeArn", "RuntimeRoleArn", "Build"} <= set(outputs)
+
+
+def test_runtime_logs_are_encrypted_retained_and_owned_by_the_stack(synthesised):
+    template, _, _ = synthesised
+    template.has_resource_properties(
+        "AWS::Logs::LogGroup",
+        {
+            "RetentionInDays": 7,
+            "KmsKeyId": Match.any_value(),
+            "LogGroupName": Match.any_value(),
+        },
+    )
+    template.has_resource_properties("AWS::KMS::Key", {"EnableKeyRotation": True})
+    for resource in template.find_resources("AWS::Logs::LogGroup").values():
+        assert resource["DeletionPolicy"] == "Delete"
+    assert "RuntimeLogGroup" in template.to_json()["Outputs"]
 
 
 def test_options_change_the_names_and_models(tmp_path):

@@ -352,8 +352,11 @@ Identity instead of one person's machine, and the Harness runs where the model a
 #    bootstrapped account). The Runtime ARN is printed as the RuntimeArn output.
 uv sync --group infra
 cd infra
-npx aws-cdk@2 bootstrap                                  # once per account and region
-npx aws-cdk@2 --app "uv run --group infra python agentcore_app.py" deploy
+npm ci
+npx --no-install cdk bootstrap                          # only if not already bootstrapped
+npx --no-install cdk --app "uv run --group infra python agentcore_app.py" synth --strict
+npx --no-install cdk --app "uv run --group infra python agentcore_app.py" diff
+npx --no-install cdk --app "uv run --group infra python agentcore_app.py" deploy
 cd ..
 
 # 2. Keep the LGND sign-in in AgentCore Identity. Once per account; needs a browser.
@@ -361,8 +364,20 @@ uv run clayzer agentcore login lgnd
 
 # 3. Run a Batch on it.
 export CLAYZER_AGENTCORE_RUNTIME=<the RuntimeArn output>
+export CLAYZER_AGENTCORE_INBOUND_TOKEN_URL=<the InboundTokenUrl output>
+export CLAYZER_AGENTCORE_INBOUND_CLIENT_ID=<the InboundClientId output>
+export CLAYZER_AGENTCORE_INBOUND_SCOPE=<the InboundScope output>
+# Capture the credential into the environment; do not echo it or put it in a report.
+export CLAYZER_AGENTCORE_INBOUND_CLIENT_SECRET="$(aws cognito-idp describe-user-pool-client \
+  --user-pool-id <the InboundUserPoolId output> \
+  --client-id "$CLAYZER_AGENTCORE_INBOUND_CLIENT_ID" \
+  --query UserPoolClient.ClientSecret --output text)"
 uv run clayzer batch --harness agentcore --verify --repeats 3 --label agentcore
 ```
+
+CDK and the AWS CLI use the shell's AWS credentials/profile. The Clayzer CLI additionally
+loads `.env`; keep that file consistent with the deployment account. The inbound credential
+authenticates the Batch to the Runtime; the separate LGND consent authorizes tool access.
 
 `login` prints a link. Open it, sign in to LGND, and approve. The browser then goes to a
 `localhost:8765` address that won't load; that is expected. Paste the whole address from the
@@ -392,9 +407,25 @@ What to know:
 - **Cost of a failed Run.** A Bedrock error inside the Runtime comes back as the same error
   code, so the Batch treats it as a Sandbox Failure (excluded, and run again by `--resume`). A
   model that never submits a Caption is a Harness Fault, scored 0.
-- **Tear down.** `npx aws-cdk@2 --app "uv run --group infra python agentcore_app.py" destroy`
-  removes the Runtime, its role, and its workload identity. The OAuth client and approval from
-  `login` are kept in Identity; delete them in the AgentCore console.
+- **Runtime logs.** `RuntimeLogGroup` names the KMS-encrypted group, retained for seven days.
+  The ARM64 image uses a hashed telemetry dependency lock and contains Harness modules and
+  ontology configuration; Cases, Chips, scorers and the web app are excluded.
+  Spans use X-Ray through the account's existing destination. This stack sets
+  `UNIFIED_TRACES_DESTINATION_ENABLED=false`; it does not change account-wide Transaction
+  Search settings. The Batch's stored JSONL Trace remains the complete replay record.
+- **Tear down.** From `infra`, run
+  `npx --no-install cdk --app "uv run --group infra python agentcore_app.py" destroy ClayzerAgentCore`.
+  It removes the Runtime, role, workload identity, Cognito resources and Runtime log group,
+  and schedules the log-encryption key for deletion. The shared CDK bootstrap/ECR assets and
+  separate Gateway deployment remain. The OAuth provider and approval created by `login` are
+  outside the stack; retain them for redeployment, or delete only that provider after confirming
+  no remaining workload uses it.
+
+For a teammate's account, use a clean checkout of the same commit and that account's credentials.
+Deploy before running `login`, then run a small Batch including a Fixed and a Change Case.
+Record the commit, runtime build, Case/Chip hashes, scores, failed Runs, latency and cost alongside
+a matching local Batch. Verify the stack's teardown before calling account portability complete.
+One Repeat is a functional smoke check; it does not establish score equivalence.
 
 Options for the stack are passed as `-c name=value`; see the docstring of
 [`infra/agentcore_app.py`](../infra/agentcore_app.py). The token source is chosen by

@@ -34,6 +34,8 @@ from aws_cdk import aws_bedrockagentcore as agentcore
 from aws_cdk import aws_cognito as cognito
 from aws_cdk import aws_ecr_assets as ecr_assets
 from aws_cdk import aws_iam as iam
+from aws_cdk import aws_kms as kms
+from aws_cdk import aws_logs as logs
 from constructs import Construct
 
 REPO = Path(__file__).resolve().parents[1]
@@ -107,7 +109,7 @@ class AgentCoreStack(cdk.Stack):
                 "bedrock-agentcore.amazonaws.com",
                 conditions={
                     "StringEquals": {"aws:SourceAccount": self.account},
-                    "ArnLike": {"aws:SourceArn": f"{arn}:*"},
+                    "ArnLike": {"aws:SourceArn": f"{arn}:runtime/{RUNTIME_NAME}-*"},
                 },
             ),
         )  # fmt: skip
@@ -126,8 +128,30 @@ class AgentCoreStack(cdk.Stack):
             sid="Logs",
             actions=["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents",
                      "logs:DescribeLogStreams"],
-            resources=[f"arn:aws:logs:{self.region}:{self.account}:log-group:/aws/bedrock-agentcore/runtimes/*"],
+            resources=[f"arn:aws:logs:{self.region}:{self.account}:log-group:/aws/bedrock-agentcore/runtimes/{RUNTIME_NAME}-*"],
         ))  # fmt: skip
+        # These X-Ray APIs have no resource-level scope. Keep the account's existing
+        # destination; enabling Transaction Search is a separate account-wide decision.
+        role.add_to_policy(
+            iam.PolicyStatement(
+                sid="RuntimeTraces",
+                actions=[
+                    "xray:PutTraceSegments",
+                    "xray:PutTelemetryRecords",
+                    "xray:GetSamplingRules",
+                    "xray:GetSamplingTargets",
+                ],
+                resources=["*"],
+            )
+        )
+        role.add_to_policy(
+            iam.PolicyStatement(
+                sid="RuntimeMetrics",
+                actions=["cloudwatch:PutMetricData"],
+                resources=["*"],
+                conditions={"StringEquals": {"cloudwatch:namespace": "bedrock-agentcore"}},
+            )
+        )
         # Fetch the LGND token held in Identity: this workload, this OAuth client, nothing else.
         role.add_to_policy(iam.PolicyStatement(
             sid="LgndSignIn",
@@ -203,10 +227,47 @@ class AgentCoreStack(cdk.Stack):
                 "CLAYZER_AGENTCORE_PROVIDER": provider,
                 "CLAYZER_AGENTCORE_RETURN_URL": return_url,
                 "CLAYZER_BUILD": build,
+                "UNIFIED_TRACES_DESTINATION_ENABLED": "false",
             },
         )  # fmt: skip
         runtime.node.add_dependency(role)  # the role's policy must exist before the first Run
         runtime.node.add_dependency(identity)
+
+        # Runtime sessions start on invocation, after this encrypted group is provisioned.
+        # The shared CDK bootstrap and the separate Gateway deployment are not owned here.
+        log_prefix = (
+            f"arn:aws:logs:{self.region}:{self.account}:log-group:"
+            f"/aws/bedrock-agentcore/runtimes/{RUNTIME_NAME}-*"
+        )
+        log_key = kms.Key(
+            self,
+            "RuntimeLogKey",
+            enable_key_rotation=True,
+            removal_policy=cdk.RemovalPolicy.DESTROY,
+        )
+        log_key.add_to_resource_policy(
+            iam.PolicyStatement(
+                principals=[iam.ServicePrincipal(f"logs.{self.region}.amazonaws.com")],
+                actions=[
+                    "kms:Encrypt",
+                    "kms:Decrypt",
+                    "kms:ReEncrypt*",
+                    "kms:GenerateDataKey*",
+                    "kms:DescribeKey",
+                ],
+                resources=["*"],
+                conditions={"ArnLike": {"kms:EncryptionContext:aws:logs:arn": log_prefix}},
+            )
+        )
+        log_group = logs.LogGroup(
+            self,
+            "RuntimeLogs",
+            log_group_name=f"/aws/bedrock-agentcore/runtimes/{runtime.attr_agent_runtime_id}-DEFAULT",
+            encryption_key=log_key,
+            retention=logs.RetentionDays.ONE_WEEK,
+            removal_policy=cdk.RemovalPolicy.DESTROY,
+        )
+        cdk.CfnOutput(self, "RuntimeLogGroup", value=log_group.log_group_name)
 
         cdk.CfnOutput(self, "RuntimeArn", value=runtime.attr_agent_runtime_arn,
                       description="Set CLAYZER_AGENTCORE_RUNTIME to this")  # fmt: skip
@@ -218,6 +279,8 @@ class AgentCoreStack(cdk.Stack):
                       description="CLAYZER_AGENTCORE_INBOUND_TOKEN_URL")  # fmt: skip
         cdk.CfnOutput(self, "InboundClientId", value=client.user_pool_client_id,
                       description="CLAYZER_AGENTCORE_INBOUND_CLIENT_ID")  # fmt: skip
+        cdk.CfnOutput(self, "InboundUserPoolId", value=pool.user_pool_id,
+                      description="Use with describe-user-pool-client to retrieve the secret")  # fmt: skip
         cdk.CfnOutput(self, "InboundScope", value="clayzer-runtime/invoke",
                       description="CLAYZER_AGENTCORE_INBOUND_SCOPE")  # fmt: skip
         cdk.CfnOutput(self, "InboundClientSecretCommand", value=(

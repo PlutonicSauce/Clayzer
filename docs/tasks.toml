@@ -853,8 +853,8 @@ step = "harness"
 title = "Run the agentic captioner on AgentCore, holding the LGND sign-in and reaching MCP tools"
 area = "Captioning"
 tier = "Could"
-status = "doing"
-notes = "Review remediation validated 2026-11-04: a hosted Run now contains a successful LGND readiness tool Step and a Nova Pro model Step, persisted outside scored Batches. The runtime role was denied access to the Cases canary. Traces checkpoint completed Steps; failures return locators; the ZIP uses a hashed lock and records provenance. Keep #23 open pending PR/CI and final review. See docs/deploy.md, AgentCore captioner."
+status = "done"
+notes = "Done 2026-11-04: PR #93 merged and #23 closed. Opus 5.5 found no merge blockers; 708 tests passed and CI was green. The clean Gateway Runtime v8 build completed LGND and model Steps, returned a readable stopped Trace on failure, and was denied access to the Cases canary. The remote Batch implementation and latest main were integrated. CDK portability validation is tracked separately in agentcore-cdk."
 see_it = "uv run --extra ui --extra tools python -m clayzer.agentcore invoke <runtime-arn> <chip-id>; docs/deploy.md, AgentCore captioner"
 changes = [
   "src/clayzer/agentcore/gateway_runtime.py: HTTP runtime adapter, Gateway JWT authentication, consent helpers, and S3 Trace persistence",
