@@ -124,9 +124,11 @@ partway.
      AgentCore deploy, someone with that account's credentials runs `uv run clayzer agentcore
      login lgnd` once to approve LGND in a browser; later deploys keep that approval. A failed
      AgentCore deploy fails the job, but the web app is already live by then.
-   - variable `AGENTCORE_TRACES`: `true` only after the account owner enables CloudWatch
-     Transaction Search (it changes trace routing for the whole account and region). Default
-     `false`: Batches still keep their JSONL Traces.
+   - variable `AGENTCORE_TRACES`: `true` to export Runtime spans. It also deploys
+     `ClayzerTransactionSearch`, which turns on CloudWatch Transaction Search for the whole
+     account and region, so set it only once the account owner agrees. Default `false`: Batches
+     still keep their JSONL Traces. If the account already had Transaction Search on, adopt it
+     first with `cdk import` (docs/cli.md, "Running the Harness on AgentCore").
 3. **Run it once by hand** from a branch the environment allows, and check the job's URL.
 4. **Mark `github-ci` and `cdk` done** in [docs/tasks.toml](tasks.toml) once main deploys on its
    own.
