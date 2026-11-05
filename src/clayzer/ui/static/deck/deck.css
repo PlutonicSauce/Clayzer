@@ -133,9 +133,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .notes-head .late { color: #f0a58f; font-weight: 700; }
 .notes ul { margin: 10px 0 0; padding-left: 20px; }
 
-/* What a caption looks like: the Chip, its Caption and Claims, and the Answer Key's sources. */
-.ex { display: grid; grid-template-columns: 380px 1fr 1fr; gap: 40px; align-items: start; }
-.ex-title { margin-bottom: 26px; }
+/* The problem slide's Chip: the Caption's cell, and the public records drawn on the turbines. */
 .ex-chip { margin: 0; }
 .ex-frame { position: relative; width: 380px; height: 380px; border-radius: 10px; overflow: hidden; }
 .ex-frame img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -156,34 +154,6 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .ex-legend .dot.rec { background: #fffdfb; border: 2px solid var(--ink); }
 .ex-legend .dot.disputed { background: #f2c14e; border: 2px solid var(--ink); }
 .ex-legend .sq.claim { border: 3px solid #f2a93b; border-radius: 3px; background: rgba(138, 91, 14, .16); }
-.ex-col h3 { margin: 0 0 10px; font-size: 22px; letter-spacing: .04em; text-transform: uppercase;
-  color: var(--decision); }
-.ex-col h3 span { margin-left: 8px; font-size: 17px; letter-spacing: 0; text-transform: none;
-  color: var(--muted); font-weight: 400; }
-.ex-col h3 + * { margin-bottom: 20px; }
-.ex-col blockquote { margin: 0 0 26px; padding: 16px 20px; border-left: 5px solid var(--captions-line);
-  background: var(--captions); font-size: 19px; line-height: 1.4; }
-.ex-claims { width: 100%; border-collapse: collapse; font-size: 21px; }
-.ex-claims th { text-align: left; font-size: 16px; color: var(--muted); font-weight: 600;
-  padding: 0 10px 6px 0; }
-.ex-claims td { padding: 6px 10px 6px 0; border-top: 1px solid var(--line); }
-.ex-sources { list-style: none; margin: 0 0 26px; padding: 0; }
-.ex-sources li { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 10px 14px;
-  margin-bottom: 8px; border-radius: 8px; background: var(--evaluation); font-size: 19px; }
-.ex-sources li.bad { background: var(--captions); }
-.ex-sources b { grid-column: 1; }
-.ex-sources span { grid-column: 1; line-height: 1.35; }
-.ex-sources em { grid-column: 2; grid-row: 1 / 3; align-self: center; font-style: normal;
-  font-size: 15px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
-.ex-sources li.bad em, .ex-verdict .bad { color: var(--decision); }
-.ex-sources li.ok em, .ex-verdict .ok { color: var(--ok); }
-.ex-verdict { font-size: 20px; line-height: 1.45; }
-.ex-wrong { display: flex; flex-wrap: wrap; gap: 2px 22px; margin: 18px 0 0; padding-top: 14px; border-top: 1px solid var(--line); font-size: 18px;
-  line-height: 1.5; color: var(--muted); }
-.ex-wrong b { color: var(--ink); white-space: nowrap; }
-.ex-wrong span { white-space: nowrap; }
-.ex-wrong span::before { content: "· "; }
-.ex-wrong i { font-style: normal; font-weight: 600; color: var(--ink); }
 
 /* A slide that is one looping, muted video under its kicker. */
 .video-slide { align-items: center; }
@@ -215,3 +185,22 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 @media (prefers-reduced-motion: reduce) {
   .build, .problem .hook { transition: none; }
 }
+.ex-frame .records { opacity: 0; transition: opacity .5s ease; }
+.ex-frame .records.in { opacity: 1; }
+.ex-frame .claim.ok { fill: rgba(47, 107, 58, .14); stroke: #6fbf7e; }
+.ex-legend .sq.claim.ok { border-color: #2f6b3a; background: rgba(47, 107, 58, .16); }
+.problem .problem-grid { grid-template-columns: 790px 1fr; gap: 44px; }
+.problem .hook { display: grid; grid-template-columns: 400px 1fr; gap: 26px; align-items: start;
+  padding: 24px; }
+.problem .ex-frame { width: 400px; height: 400px; }
+.problem .ex-legend { flex-direction: column; gap: 2px; font-size: 15px; }
+.hook-side { display: flex; flex-direction: column; align-items: flex-start; }
+.problem .hook-stamp { position: static; margin-bottom: 18px; }
+.problem .hook .hook-label { margin: 0 0 8px; }
+.problem .hook blockquote { margin: 0 0 14px; font-size: 22px; }
+.hook-note { margin: 0; font-size: 19px; line-height: 1.4; color: #4a4240; }
+.problem .trust-item { padding: 14px 18px; grid-template-columns: 52px 1fr; gap: 14px; }
+.problem .trust-item b { font-size: 24px; }
+.problem .trust-item p { font-size: 18px; }
+.problem .trust-icon { width: 46px; height: 46px; }
+@media (prefers-reduced-motion: reduce) { .ex-frame .records { transition: none; } }
