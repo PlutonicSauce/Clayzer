@@ -63,6 +63,15 @@ def load_sources(path: Path = REPO / "docs" / "sources.toml") -> list[dict]:
     return tomllib.loads(path.read_text())["source"]
 
 
+def load_try(path: Path = REPO / "demo" / "try.toml") -> dict:
+    """The "Try the captioner" picks (demo/try.toml): a recorded Batch and the images in it a
+    visitor can feed to the Harness. Each image names a Run (case, repeat) and its Chip."""
+    if not path.exists():
+        return {"batch": None, "images": []}
+    cfg = tomllib.loads(path.read_text())
+    return {"batch": cfg.get("batch"), "images": cfg.get("image", [])}
+
+
 def load_requirements(path: Path = REPO / "docs" / "caption-design.md") -> dict[str, str]:
     """Requirement id -> its text, from the CAP, REQ, and AWS tables in caption-design.md §2."""
     if not path.exists():
@@ -505,6 +514,25 @@ def create_app(
         from clayzer.stories import INDEX, with_gates
 
         return with_gates(store, json.loads(store.get(INDEX))) if store.exists(INDEX) else []
+
+    @app.get("/api/try")
+    def try_picks():
+        """The "Try the captioner" images (demo/try.toml). Each pick names a recorded Run; the
+        browser replays its Trace (/api/batches/.../traces) and shows its Caption and scores
+        (/api/batches/.../runs/*.json). `allow_launch` lets the page also run the Harness live."""
+        cfg = load_try()
+        batch_id = cfg["batch"]
+        available = bool(batch_id and store.exists(f"batches/{_safe(batch_id)}/summary.json"))
+        picks = []
+        for img in cfg["images"]:
+            run = f"{img['case']}--r{img.get('repeat', 1)}"
+            recorded = available and store.exists(
+                f"batches/{_safe(batch_id)}/runs/{_safe(run)}.json"
+            )
+            picks.append({**img, "repeat": img.get("repeat", 1), "run": run,
+                          "recorded": recorded})  # fmt: skip
+        return {"batch": batch_id, "allow_launch": allow_launch,
+                "available": available, "images": picks}  # fmt: skip
 
     @app.get("/api/datasets")
     def datasets():

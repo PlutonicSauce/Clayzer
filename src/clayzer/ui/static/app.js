@@ -1469,6 +1469,7 @@ async function route() {
     if (page === "") await publicHome();
     else if (page === "journey" || page === "journey-run") await publicJourney(parts);
     else if (page === "how") { if (parts[1]) await howPage(parts[1]); else await publicHow(); }
+    else if (page === "try") await tryPage();
     else if (page === "about") await publicAbout();
     else if (page === "developer") publicDeveloper();
     else if (page === "overview") await overview();
