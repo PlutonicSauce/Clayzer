@@ -1,6 +1,6 @@
 # Clayzer: 4-minute pitch
 
-The spoken script for the 9-slide deck (`src/clayzer/ui/static/deck/slides.js`), one section per
+The spoken script for the 10-slide deck (`src/clayzer/ui/static/deck/slides.js`), one section per
 slide, with the deck's time budgets (they add up to 4:00). Each script is the slide's `spoken`
 text, the same words the A key reads aloud, so the presenter and the Listen button agree. The
 demo slide adds the Baseline's numbers, which the deck leaves to the live Overview.
@@ -12,13 +12,14 @@ Numbers come from the committed Baseline `20261105T011537Z-dev74-absence` (74 Ca
 |---|---|---|---|---|
 | 1 | Clayzer | | 0:10 | 0:10 |
 | 2 | The problem | Problem Statement | 0:35 | 0:45 |
-| 3 | Example search | Value Unlock | 0:28 | 1:13 |
-| 4 | How it works | Our Solution | 0:30 | 1:43 |
-| 5 | Our solution | Our Solution | 0:40 | 2:23 |
-| 6 | On AWS | Our Solution | 0:25 | 2:48 |
-| 7 | Live demo | Our Solution | 0:32 | 3:20 |
-| 8 | At Clay's scale | Scale | 0:20 | 3:40 |
-| 9 | What it means for Clay | | 0:20 | 4:00 |
+| 3 | Example search | Value Unlock | 0:22 | 1:07 |
+| 4 | How it works | Our Solution | 0:30 | 1:37 |
+| 5 | Our solution | Our Solution | 0:34 | 2:11 |
+| 6 | The ontology | Our Solution | 0:22 | 2:33 |
+| 7 | On AWS | Our Solution | 0:25 | 2:58 |
+| 8 | Live demo | Our Solution | 0:26 | 3:24 |
+| 9 | At Clay's scale | Scale | 0:20 | 3:44 |
+| 10 | Thank you | | 0:16 | 4:00 |
 
 T starts the deck's timer; the notes panel warns when a slide runs long.
 
@@ -53,7 +54,7 @@ Three presses.
 > So we never trust one source. We cross-check them: when they agree, the label is automatic,
 > and only when they conflict, like here, does a person look.
 
-## 3. Example search (0:45–1:13)
+## 3. Example search (0:45–1:07)
 
 **On screen:** the paddy-search video, played once; it holds on the end card. No presses. It
 searches for rice fields near Bangkok that became buildings since 2011, shows three
@@ -65,7 +66,7 @@ before-and-after pairs, and drops the third when the check finds fish ponds, not
 > check every caption. Then anyone can ask questions like this, about homes, harvests and jobs,
 > and trust the answers.
 
-## 4. How it works (1:13–1:43)
+## 4. How it works (1:07–1:37)
 
 **On screen:** the start-to-finish flow. Point at each numbered box as you say it.
 
@@ -75,7 +76,7 @@ before-and-after pairs, and drops the third when the check finds fish ponds, not
 > gate keeps a change only if it beats the baseline. Only pairs that pass go on to Clay, ready to
 > search.
 
-## 5. Our solution (1:43–2:23)
+## 5. Our solution (1:37–2:11)
 
 **On screen:** the same photo and caption, with five points beside it. One press per point as
 you say it, and a sixth that turns the caption green.
@@ -87,16 +88,31 @@ you say it, and a sixth that turns the caption green.
 > self-improvement loop keeps only the changes that beat the baseline. The result: a caption
 > that matches what is really there.
 
-## 6. On AWS (2:23–2:48)
+## 6. The ontology (2:11–2:33)
+
+**On screen:** a photo that pixelates into the ontology graph, then three numbered benefits. Two
+presses.
+
+*Press 1: the photo pixelates into the graph; each tag lands on its class.*
+
+> Our caption harness also reads an ontology: a semantic layer of what things are, what they sit
+> near, and what they are mistaken for.
+
+*Press 2: the three benefits, badged 1, 2, 3 on the graph.*
+
+> Without it, the captioner called greenhouses solar farms nine times in twelve. With it, it is
+> warned before it writes, and every claim uses words we can check.
+
+## 7. On AWS (2:33–2:58)
 
 **On screen:** the AWS architecture diagram. No presses.
 
-> All of it runs on AWS, from one deploy command. Bedrock writes, judges and searches the
-> captions, with Nova Pro, Claude Opus and Titan embeddings. Results live in S3, and the site
-> runs on Fargate behind CloudFront. The dashed boxes are next: Step Functions to fan out,
-> SageMaker for GPU cost, and AgentCore for the agentic captioner.
+> All of it runs on AWS, deployed with CDK. Bedrock writes, judges and searches the captions. The
+> agentic captioner runs on AgentCore, which holds its LGND sign-in and reaches two MCP servers:
+> LGND Geo to check imagery, and RODA for AWS open data. Results live in S3, and the site runs on
+> Fargate behind CloudFront. Next: Step Functions to fan out, and SageMaker for GPU cost.
 
-## 7. Live demo (2:48–3:20)
+## 8. Live demo (2:58–3:24)
 
 **On screen:** the live site, in four stops. Rehearse the clicks. Keep the recorded Batch open
 in another tab as the offline fallback.
@@ -111,7 +127,7 @@ in another tab as the offline fallback.
 4. **Compare**
    > And compare to baseline: the gate says better, worse, or inconclusive.
 
-## 8. At Clay's scale (3:20–3:40)
+## 9. At Clay's scale (3:24–3:44)
 
 **On screen:** the cost ladder. No presses.
 
@@ -123,22 +139,24 @@ in another tab as the offline fallback.
 > dollars, forty-six times cheaper. Checking matters too: a large model judging every caption
 > would cost over a million dollars, but our checks against open data need no model at all.
 
-## 9. What it means for Clay (3:40–4:00)
+## 10. Thank you (3:44–4:00)
 
-**On screen:** the closing slide.
+**On screen:** the closing slide, with links to the live site and the repository. Leave it up
+for questions.
 
-> Hand Clayzer a caption set and get a verdict: how much to trust, where it fails, what it costs
-> to fix. Our ask is Clay's real caption set and its rubric weights. And any slide here reads
-> itself aloud.
+> Thank you. You can see it live on our site, and read every line of the code on GitHub. Our ask
+> is Clay's real caption set and its rubric weights. And any slide here reads itself aloud.
 
 ---
 
 ## Rehearsal notes
 
-- At a calm 145 words a minute the whole script is about 600 words, 4:09, so it runs 9 seconds
-  over. Slide 8 is the problem: about 110 words, 46 seconds against a 20-second budget. Rehearse
-  it fast, or cut it to the first three sentences and the judge line. Slide 2 also runs about 6
-  seconds long. Slides 5 and 7 have about 6 and 8 seconds spare.
+- At a calm 145 words a minute the whole script is about 650 words, 4:30, so it runs about 30
+  seconds over. Slide 9 is most of it: about 110 words, 46 seconds against a 20-second budget.
+  Rehearse it fast, or cut it to the first three sentences and the judge line. Slide 2 runs
+  about 6 seconds long, slide 3 about 5 (65 words against 22 seconds; drop "No map layer, no GIS
+  skills" if you need it), and slide 7 about 2. Slide 8 has about 7 seconds spare, which the
+  clicks will use.
 - Verify-then-write is part of the approach, but the Baseline ran without it. If asked whether
   77% includes it, say no: the Baseline is the plain captioner. In the 4-image test, every object
   it named was really there, and correctness rose from 0.53 to 0.65.
@@ -147,6 +165,12 @@ in another tab as the offline fallback.
   `fixed-dev-uswtdb-3073564` in the demo and call it the same caption.
 - In the demo, open Run 3 of `fixed-dev-uswtdb-3025453`, the one that scored 1.00. Its three
   Runs average 0.80 correct, so don't call the site perfect.
+- The ontology's "nine times in twelve" is measured on the Baseline, which captioned without the
+  ontology's guidance. The effect with it isn't measured yet, so don't claim it fixed the
+  greenhouses. The guidance is a Batch option, off in the Baseline.
+- AgentCore is live, but the Baseline ran locally with no tools: don't tie its numbers to
+  AgentCore. X-Ray spans are built but opt-in, so don't say they're on.
+- The example search video runs 22 s, the slide's whole budget, and holds on its end card.
 - The example search is illustrative: our Cases today are US solar, wind and land cover. Don't
   imply we have run that search.
 - If asked why not just look at the latest image: that works when you know where to look. This
@@ -160,9 +184,9 @@ in another tab as the offline fallback.
   for the Batch you'll open.
 - Speak the numbers as words people can picture ("77% of the facts are correct"), not metric
   names (correctness, MRR).
-- Judging criteria each slide covers: the story is slides 4 and 6, a non-technical proof of
-  concept is slide 7, audio is slides 7 and 9 (Listen, and the A key), scale is slides 6 and 8,
-  and originality is slides 2 and 5.
+- Judging criteria each slide covers: the story is slides 4 and 7, a non-technical proof of
+  concept is slide 8, audio is slides 8 and 10 (Listen, and the A key), scale is slides 7 and 9,
+  and originality is slides 2, 5 and 6.
 
 ---
 
