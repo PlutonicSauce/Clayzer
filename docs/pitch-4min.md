@@ -68,13 +68,15 @@ before-and-after pairs, and drops the third when the check finds fish ponds, not
 
 ## 4. How it works (1:07–1:37)
 
-**On screen:** the start-to-finish flow. Point at each numbered box as you say it.
+**On screen:** one real aerial image and the four steps along the top. Four presses, one per step:
+the drafted Claims appear on the grid, three are struck (point at the south-west cell: a storage
+yard that looks like panels), the public records' cells light up, and the gate says FAIL.
 
-> Here is how it works, start to finish. An aerial image and public records go in. One: a model
-> writes the caption from the image alone. Two: each fact is checked against the imagery before
-> it is kept. Three: we score it against the public records, which the model never sees. Four: a
-> gate keeps a change only if it beats the baseline. Only pairs that pass go on to Clay, ready to
-> search.
+> Let's follow one real image. One: the model writes five claims from the image alone. Two: each
+> claim is checked against the imagery. That solar array is a storage yard, so it's gone before
+> the caption is written. Three: we score it against public records it never saw: right, but it
+> missed the road. Four: every change faces a gate. A vaguer prompt looked more correct, and
+> failed. Only pairs that pass go on to Clay.
 
 ## 5. Our solution (1:37–2:11)
 
