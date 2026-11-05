@@ -19,6 +19,10 @@ uv.lock
 data/
 runs/
 batches/
+# Except the demo pack (demo/stories.toml), which is laid out like a local store.
+!demo/pack/data/
+!demo/pack/batches/
+!demo/pack/batches/*/runs/
 
 # CDK output, and lookups that record the account ID.
 infra/cdk.out/

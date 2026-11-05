@@ -1,0 +1,13 @@
+{
+  "run_id": "fixed-dev-uspvdb-402150#2",
+  "markdown": "### What the Harness did\n- Called `llm caption` to describe the image, which identified solar arrays, bare ground, and uncertain circular objects.\n- Used `search_chip_lat_lon` to find the location data for multiple image chips.\n- Employed `reasoning_imagery_check` to verify the presence of solar arrays, bare ground, and water in the images.\n- Requested a fidelity check from `judge` to evaluate the caption.\n\n### Where it struggled\n- Step 6: Harness Fault. Unrecognized failure during `reasoning_imagery_check` for bare ground visibility.\n\n### Verdict\nThe Run produced a Caption, though one object remained uncertain due to a Harness Fault in step 6.",
+  "model": "us.amazon.nova-pro-v1:0",
+  "usage": {
+    "inputTokens": 2940,
+    "outputTokens": 152,
+    "totalTokens": 3092
+  },
+  "seconds": 1.87,
+  "created": "2026-11-04T12:53:50+00:00",
+  "trace_sha": "067569561b5d7279"
+}

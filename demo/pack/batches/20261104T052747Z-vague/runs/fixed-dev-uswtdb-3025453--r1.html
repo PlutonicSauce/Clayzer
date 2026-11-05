@@ -1,0 +1,265 @@
+<!doctype html><html lang='en'><head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>Run fixed-dev-uswtdb-3025453#1</title>
+<link rel='icon' href='/static/favicon.ico'>
+<style>
+:root {
+  --ink: #252323; --muted: #6b6461; --paper: #fffdfb; --line: #e4dbd6;
+  --captions: #f4dcd4; --captions-line: #e8beb2;
+  --evaluation: #dfe9df; --evaluation-line: #c9d7c9;
+  --platform: #dde7e9; --platform-line: #c9d6d8;
+  --hidden: #a1352b; --ok: #2f6b3a; --warn: #8a5b0e;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+header { padding: 20px 28px 4px; }
+h1 { margin: 0; font-size: 22px; }
+h2 { font-size: 18px; margin: 0 0 4px; }
+h3 { font-size: 13px; margin: 14px 0 4px; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--muted); }
+.sub { color: var(--muted); margin: 4px 0 0; }
+code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+main { padding: 8px 28px 40px; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; max-width: 100%; }
+td { overflow-wrap: anywhere; }
+nav { margin: 8px 0 16px; }
+a:focus-visible, summary:focus-visible { outline: 3px solid var(--warn); outline-offset: 3px; }
+aside[role=note] { background: #fbf4e6; border: 1px solid #e3cfa8; padding: 12px; margin: 12px 0; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px;
+  margin: 8px 0 24px; }
+.card { border: 1px solid var(--evaluation-line); background: var(--evaluation); border-radius: 8px;
+  padding: 10px 12px; }
+.card.platform { border-color: var(--platform-line); background: var(--platform); }
+.card .big { font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.card small { color: var(--muted); display: block; }
+.bar { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; margin: 0 0 12px;
+  color: var(--muted); }
+section.case { border-top: 1px solid var(--line); padding: 20px 0; display: grid;
+  grid-template-columns: 420px minmax(0, 1fr); gap: 24px; }
+@media (max-width: 900px) { section.case { grid-template-columns: 1fr; } }
+.chip svg { width: 100%; height: auto; border-radius: 6px; border: 1px solid var(--line);
+  display: block; }
+.chip .meta { color: var(--muted); font-size: 12.5px; margin-top: 6px; }
+blockquote { margin: 8px 0; padding: 8px 12px; background: var(--captions);
+  border-left: 3px solid var(--captions-line); border-radius: 4px; }
+table { border-collapse: collapse; width: 100%; margin: 6px 0; }
+th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line);
+  vertical-align: top; }
+th { font-size: 12.5px; color: var(--muted); font-weight: 600; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.badge { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 12px;
+  border: 1px solid; white-space: nowrap; }
+.b-ok { color: var(--ok); border-color: #b9d3bd; background: #eef6ef; }
+.b-bad { color: var(--hidden); border-color: #e6b8b1; background: #fbefed; }
+.b-warn { color: var(--warn); border-color: #e3cfa8; background: #fbf4e6; }
+.b-na { color: var(--muted); border-color: var(--line); background: #f7f3f1; }
+ul.issues { margin: 4px 0; padding-left: 18px; }
+.trace-summary { margin: 10px 0; padding: 10px 14px; border-radius: 8px; background: #faf6f3;
+  border: 1px solid var(--line); }
+.trace-summary .verdict { margin: 0 0 4px; font-weight: 650; }
+.trace-summary ol, .trace-summary ul { margin: 2px 0 6px; padding-left: 20px; font-size: 13.5px; }
+.trace-summary h3 { margin: 8px 0 2px; }
+.trace-summary.narrative p { margin: 4px 0; }
+.trace-summary .facts { margin-top: 8px; border: 0; padding: 0; }
+.trace-summary .facts .trace-summary { background: #fff; }
+details { border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; margin: 6px 0; }
+details > summary { cursor: pointer; }
+small { color: var(--muted); }
+.legend { display: flex; gap: 14px; font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px;
+  vertical-align: -2px; margin-right: 4px; }
+body.hide-claims .claims, body.hide-refs .refs, body.hide-grid .grid { display: none; }
+
+.steps { list-style: none; margin: 6px 0; padding: 0; }
+.steps > li { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; margin: 6px 0;
+  background: #fff; }
+.steps .head { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; }
+.steps .head b { font-size: 14.5px; }
+.steps .judge { opacity: .85; background: #faf7f5; }
+.steps pre { white-space: pre-wrap; word-break: break-word; max-height: 360px; overflow: auto;
+  background: #faf6f3; border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px;
+  font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.scores { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;
+  margin: 8px 0 14px; }
+.scores .card .big { font-size: 22px; }
+.status-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 6px 0 0; }
+section.block { margin: 22px 0; }
+</style></head><body>
+<header><h1>Run fixed-dev-uswtdb-3025453#1</h1>
+<p class='sub'>Batch 20261104T052747Z-vague · Repeat 1 · us.amazon.nova-pro-v1:0 · prompt <code>60d1c8998b1c</code></p>
+<p class='status-row'><span class='badge b-ok'>ok</span><b></b></p></header><main>
+<nav aria-label='Report navigation'><a href='../report.html'>← Batch report</a> · <a href='fixed-dev-uswtdb-3025453--r1.json'>Run JSON</a> · Recorded Trace unavailable</nav>
+
+<p class='sub'>AWS X-Ray unavailable: no recorded X-Ray export context</p>
+<div class='scores'><div class='card'><small>Grounding: right</small><div class='big'>1.00</div><small>of what was claimed checks out</small></div><div class='card'><small>Grounding: enough</small><div class='big'>0.50</div><small>of what the map shows was mentioned</small></div><div class='card'><small>Fidelity</small><div class='big'>0.30</div><small>model opinion</small></div><div class='card'><small>Workflow Score</small><div class='big'>—</div><small>how well the Harness worked, from its Trace</small></div></div>
+<section class='case'><div class='chip'>
+<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img"><title>Image with independent reference cells and Caption Claims</title><image href="/api/chips/ca-uswtdb-3025453-20220702.png" width="512" height="512"/><g class="grid" stroke="#fffdfb" stroke-opacity=".7" stroke-width="1.5" stroke-dasharray="6 5"><line x1="170.66666666666666" y1="0" x2="170.66666666666666" y2="512"/><line x1="0" y1="170.66666666666666" x2="512" y2="170.66666666666666"/><line x1="341.3333333333333" y1="0" x2="341.3333333333333" y2="512"/><line x1="0" y1="341.3333333333333" x2="512" y2="341.3333333333333"/></g><g class="refs"><rect x="174.66666666666666" y="4.0" width="162.66666666666666" height="162.66666666666666" fill="none" stroke="#2f6b3a" stroke-opacity=".8" stroke-width="2" stroke-dasharray="4 4"/><rect x="4.0" y="174.66666666666666" width="162.66666666666666" height="162.66666666666666" fill="none" stroke="#2f6b3a" stroke-opacity=".8" stroke-width="2" stroke-dasharray="4 4"/><rect x="174.66666666666666" y="174.66666666666666" width="162.66666666666666" height="162.66666666666666" fill="none" stroke="#2f6b3a" stroke-opacity=".8" stroke-width="2" stroke-dasharray="4 4"/><rect x="4.0" y="345.3333333333333" width="162.66666666666666" height="162.66666666666666" fill="none" stroke="#2f6b3a" stroke-opacity=".8" stroke-width="2" stroke-dasharray="4 4"/><rect x="178.66666666666669" y="317.3333333333333" width="154.66666666666666" height="16" rx="3" fill="#eef6ef" fill-opacity=".92"/><text x="256.0" y="329.3333333333333" text-anchor="middle" font-size="11" fill="#2f6b3a">2 × wind turbine</text><rect x="178.66666666666669" y="146.66666666666666" width="154.66666666666666" height="16" rx="3" fill="#eef6ef" fill-opacity=".92"/><text x="256.0" y="158.66666666666666" text-anchor="middle" font-size="11" fill="#2f6b3a">road</text></g><g class="claims"><rect x="178.66666666666669" y="180.66666666666669" width="154.66666666666666" height="17" rx="8" fill="#2f6b3a" fill-opacity=".9"/><text x="256.0" y="193.66666666666669" text-anchor="middle" font-size="11" fill="#fffdfb" font-weight="600">1 × road</text></g></svg>
+<div class='meta mono'>ca-uswtdb-3025453-20220702 · 2022-07-02 · naip-pc</div>
+</div><div>
+<h2>Caption</h2>
+<blockquote>A road is visible in the centre of a field with vegetation.</blockquote>
+<h3>Left uncertain</h3><ul class='issues'>
+<li>solar_array</li>
+<li>wind_turbine</li>
+<li>building</li>
+<li>water</li>
+<li>parking_lot</li>
+<li>greenhouse</li>
+<li>bare_ground</li>
+</ul>
+<h3>Grounding: Claims against the Reference Labels</h3>
+<table><tr><th>Claim</th><th>Verdict</th><th>Reference Label</th><th class="num">Position</th></tr><tr><td>1 × road at centre surface=unpaved</td><td><span class="badge b-ok">matched</span></td><td>road at north (covers north, west, centre, south_west)  · osm</td><td class="num"><span class="badge b-ok">1.00</span></td></tr><tr><td>—</td><td><span class='badge b-bad'>missed</span></td><td>wind turbine at centre · uswtdb</td><td></td></tr></table><p role='note'><strong>Correctness evaluates asserted facts; coverage is reference type recall. A score of 1.0 does not establish full caption quality. Count and position completeness was not recorded.</strong></p>
+<h3>Fidelity: the Judge's notes</h3><ul class='issues'>
+<li>Leaves out the most noticeable features: at least two wind turbines (centre and centre-left/west) with long shadows falling to the east.</li>
+<li>The road count is wrong: several unpaved roads and tracks cross the scene, not just one. They include a wide graded road curving from the top centre to the west and dirt tracks running north–south and east–west.</li>
+<li>Calling the scene a &#x27;field with vegetation&#x27; is vague and misleading. It is dry grassland or hillside with scattered shrubs and trees, not a cultivated field.</li>
+<li>The caption is too vague overall to be useful for training: it gives no land use (wind farm) and no detail on how the roads are laid out.</li>
+</ul>
+</div></section>
+<section class='block'><h2>Retrieval, GPU cost and preparation time</h2><p>Retrieval is measured over the Repeat's corpus. GPU seconds, count and type are unavailable on Bedrock. Case-building time includes imagery and reference queries; caption generation time is separate. Missing measurements are unavailable.</p><pre>{
+  &quot;retrieval&quot;: {
+    &quot;repeat&quot;: 1,
+    &quot;mrr&quot;: 0.5,
+    &quot;recall@1&quot;: 0.08333333333333333,
+    &quot;queries&quot;: [
+      {
+        &quot;query&quot;: &quot;find solar farms&quot;,
+        &quot;relevant&quot;: [
+          &quot;fixed-dev-uspvdb-400117&quot;,
+          &quot;fixed-dev-uspvdb-402150&quot;
+        ],
+        &quot;ranked&quot;: [
+          &quot;fixed-dev-uspvdb-400117&quot;,
+          &quot;fixed-dev-uspvdb-402150&quot;,
+          &quot;fixed-dev-neg-1&quot;,
+          &quot;fixed-dev-uswtdb-3025453&quot;
+        ],
+        &quot;reciprocal_rank&quot;: 1.0,
+        &quot;recall@1&quot;: 0.5
+      },
+      {
+        &quot;query&quot;: &quot;find wind turbines&quot;,
+        &quot;relevant&quot;: [
+          &quot;fixed-dev-uswtdb-3025453&quot;
+        ],
+        &quot;ranked&quot;: [
+          &quot;fixed-dev-neg-1&quot;,
+          &quot;fixed-dev-uswtdb-3025453&quot;,
+          &quot;fixed-dev-uspvdb-402150&quot;,
+          &quot;fixed-dev-uspvdb-400117&quot;
+        ],
+        &quot;reciprocal_rank&quot;: 0.5,
+        &quot;recall@1&quot;: 0.0
+      },
+      {
+        &quot;query&quot;: &quot;find railroads&quot;,
+        &quot;relevant&quot;: [
+          &quot;fixed-dev-neg-1&quot;
+        ],
+        &quot;ranked&quot;: [
+          &quot;fixed-dev-uswtdb-3025453&quot;,
+          &quot;fixed-dev-uspvdb-402150&quot;,
+          &quot;fixed-dev-uspvdb-400117&quot;,
+          &quot;fixed-dev-neg-1&quot;
+        ],
+        &quot;reciprocal_rank&quot;: 0.25,
+        &quot;recall@1&quot;: 0.0
+      },
+      {
+        &quot;query&quot;: &quot;find buildings&quot;,
+        &quot;relevant&quot;: [
+          &quot;fixed-dev-neg-1&quot;
+        ],
+        &quot;ranked&quot;: [
+          &quot;fixed-dev-uswtdb-3025453&quot;,
+          &quot;fixed-dev-neg-1&quot;,
+          &quot;fixed-dev-uspvdb-402150&quot;,
+          &quot;fixed-dev-uspvdb-400117&quot;
+        ],
+        &quot;reciprocal_rank&quot;: 0.5,
+        &quot;recall@1&quot;: 0.0
+      },
+      {
+        &quot;query&quot;: &quot;find parking lots&quot;,
+        &quot;relevant&quot;: [
+          &quot;fixed-dev-neg-1&quot;
+        ],
+        &quot;ranked&quot;: [
+          &quot;fixed-dev-uspvdb-402150&quot;,
+          &quot;fixed-dev-uspvdb-400117&quot;,
+          &quot;fixed-dev-uswtdb-3025453&quot;,
+          &quot;fixed-dev-neg-1&quot;
+        ],
+        &quot;reciprocal_rank&quot;: 0.25,
+        &quot;recall@1&quot;: 0.0
+      },
+      {
+        &quot;query&quot;: &quot;find water&quot;,
+        &quot;relevant&quot;: [
+          &quot;fixed-dev-neg-1&quot;
+        ],
+        &quot;ranked&quot;: [
+          &quot;fixed-dev-uswtdb-3025453&quot;,
+          &quot;fixed-dev-neg-1&quot;,
+          &quot;fixed-dev-uspvdb-400117&quot;,
+          &quot;fixed-dev-uspvdb-402150&quot;
+        ],
+        &quot;reciprocal_rank&quot;: 0.5,
+        &quot;recall@1&quot;: 0.0
+      }
+    ]
+  },
+  &quot;cost&quot;: {
+    &quot;provider&quot;: &quot;bedrock&quot;,
+    &quot;gpu_seconds&quot;: null,
+    &quot;gpu_count&quot;: null,
+    &quot;gpu_type&quot;: null,
+    &quot;gpu_status&quot;: &quot;unavailable&quot;,
+    &quot;method&quot;: null,
+    &quot;latency_seconds&quot;: 2.65,
+    &quot;tokens&quot;: 2286,
+    &quot;note&quot;: &quot;Latency and tokens are operational measurements, not GPU cost&quot;
+  },
+  &quot;label_preparation&quot;: {
+    &quot;reference_preparation&quot;: {
+      &quot;value&quot;: 44.4,
+      &quot;scope&quot;: &quot;case_build&quot;,
+      &quot;method&quot;: &quot;legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references&quot;,
+      &quot;units&quot;: &quot;seconds&quot;,
+      &quot;reference_only&quot;: false,
+      &quot;status&quot;: &quot;observed&quot;
+    },
+    &quot;caption_generation&quot;: {
+      &quot;value&quot;: 2.65,
+      &quot;units&quot;: &quot;seconds&quot;,
+      &quot;scope&quot;: &quot;caption_generation&quot;,
+      &quot;method&quot;: &quot;observed caption pipeline wall time; native includes tools, verification and rewrite&quot;,
+      &quot;status&quot;: &quot;observed&quot;
+    }
+  },
+  &quot;evidence_yield&quot;: {
+    &quot;unique_object_claims&quot;: 1,
+    &quot;checkable_object_claims&quot;: 1,
+    &quot;supported_object_claim_credit&quot;: 0.0,
+    &quot;supported_field_units&quot;: 1.0,
+    &quot;supported_claim_credit_per_dollar&quot;: null,
+    &quot;supported_claim_credit_per_gpu_second&quot;: null,
+    &quot;dollar_measurement&quot;: null,
+    &quot;cost_unavailable_reason&quot;: &quot;No verified USD observation with model, region, source, method and date&quot;,
+    &quot;definition&quot;: &quot;Object Claims deduplicated ignoring IDs; fully supported as stated, partial parent class credit retained. Field units count presence, exact position, attributes and one exact aggregate count/class. Relations excluded. Not a quality score.&quot;
+  }
+}</pre></section>
+<section class='block'><h2>How the Harness worked</h2><p class='sub'>No Workflow Score: this Run has no valid score, or no Trace.</p></section>
+<section class='block'><h2>What happened</h2>
+<p class='sub'>No summary for this Run.</p>
+</section>
+<section class='block'><h2>Steps</h2><p class='sub'>Every model call in order, from the Trace (none).</p>
+<p class='sub'>No Trace for this Run (it was run before Traces were recorded).</p>
+</section>
+</main><script>
+for (const box of document.querySelectorAll('input[data-hide]')) {
+  box.addEventListener('change', () =>
+    document.body.classList.toggle(box.dataset.hide, !box.checked));
+}
+</script></body></html>

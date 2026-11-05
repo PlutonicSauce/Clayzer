@@ -1,0 +1,158 @@
+{
+  "batch_id": "20261104T052042Z-base",
+  "cases": {
+    "fixed-dev-uswtdb-3025453": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.6851851851851851,
+        "spread": 0.13981174880131025
+      },
+      "workflow": {
+        "mean": null,
+        "spread": null
+      },
+      "coverage": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.5933333333333334,
+        "spread": 0.09018499505645791
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "count": 0.6666666666666666,
+        "position": 0.611111111111111,
+        "attributes": null,
+        "relations": 0.0
+      },
+      "unscored_share": 0.512962962962963
+    },
+    "fixed-dev-neg-1": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.6314814814814814,
+        "spread": 0.07863286572430422
+      },
+      "workflow": {
+        "mean": null,
+        "spread": null
+      },
+      "coverage": {
+        "mean": 0.4000000000000001,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.39999999999999997,
+        "spread": 0.08660254037844388
+      },
+      "components": {
+        "precision": 0.7555555555555555,
+        "recall": 0.4000000000000001,
+        "count": 0.5,
+        "position": 0.5,
+        "attributes": 1.0,
+        "relations": null
+      },
+      "unscored_share": 0.2722222222222222
+    },
+    "fixed-dev-uspvdb-400117": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.6944444444444445,
+        "spread": 0.3367876570272817
+      },
+      "workflow": {
+        "mean": null,
+        "spread": null
+      },
+      "coverage": {
+        "mean": 0.5,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.5433333333333333,
+        "spread": 0.12096831541082706
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 0.5,
+        "count": 0.6666666666666666,
+        "position": 0.7777777777777778,
+        "attributes": 0.0,
+        "relations": null
+      },
+      "unscored_share": 0.6793650793650793
+    },
+    "fixed-dev-uspvdb-402150": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.33749999999999997,
+        "spread": 0.06495190528383289
+      },
+      "workflow": {
+        "mean": null,
+        "spread": null
+      },
+      "coverage": {
+        "mean": 0.5,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.5833333333333334,
+        "spread": 0.14433756729740643
+      },
+      "components": {
+        "precision": 0.9333333333333332,
+        "recall": 0.5,
+        "count": 0.0,
+        "position": 0.4166666666666667,
+        "attributes": 0.0,
+        "relations": null
+      },
+      "unscored_share": 0.3333333333333333
+    }
+  },
+  "batch": {
+    "correctness": 0.5871527777777777,
+    "workflow": null,
+    "coverage": 0.6,
+    "fidelity": 0.53,
+    "retrieval_mrr": {
+      "mean": 0.8148148148148149,
+      "spread": 0.1418662356115237
+    },
+    "retrieval_recall_at_1": {
+      "mean": 0.638888888888889,
+      "spread": 0.19245008972987523
+    },
+    "unscored_share": 0.44947089947089947,
+    "label_prep_seconds": 177.1,
+    "label_prep_seconds_per_case": 44.275,
+    "seconds_per_caption": 3.966666666666667,
+    "tokens_per_caption": 2637.0,
+    "runs": {
+      "planned": 12,
+      "ok": 12,
+      "harness_faults": 0,
+      "sandbox_failures": 0
+    },
+    "step_faults": {
+      "harness": 0,
+      "environment": 0,
+      "sandbox": 0,
+      "soft": 0
+    }
+  },
+  "stopped": null,
+  "rescored": "2026-11-04T16:11:20+00:00"
+}

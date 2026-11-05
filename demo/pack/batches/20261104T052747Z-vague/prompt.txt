@@ -1,0 +1,3 @@
+This is an aerial image. Describe it in one short, general sentence and submit it with the
+submit_caption tool. List at most one object, and always give its position as centre.
+Allowed object types: {objects}. Grid cells: {grid}. Relations: {relations}.

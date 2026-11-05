@@ -2053,7 +2053,7 @@ step = "ship"
 title = "Caption demo Stories and the midday-freeze demo pack"
 area = "Demo and delivery"
 tier = "Must"
-status = "todo"
+status = "done"
 closes = ["REQ-09"]
 start = "caption-plan.md §7 Day 2"
 context = "Stories are recorded Runs, each picked to show one point, that replay with no network. Freeze a scored Batch into the demo pack at midday on Day 2. Candidates: a terse Caption failing coverage, the gate rejecting a change, a Trace with a recovered failure, a look-alike negative, an imported caption set's verdict."
@@ -2066,6 +2066,38 @@ refs = [
   "GLOSSARY.md (Story)",
   "docs/caption-plan.md §7 (Day 2)",
   "docs/caption-design.md §2.3 (REQ-09, REQ-13)",
+]
+notes = "Done 2026-11-04: 5 Stories in demo/stories.toml, packed into demo/pack (4.5 MB, committed) and shown on the app's Stories page. A greenhouse fools the captioner (lookalike-neg-101: a false positive; greenhouses fooled it in 9 of 12 Runs); correct is not complete (uspvdb-400564: correctness 1.0, coverage 0.5, the road left out); the gate rejects a vaguer prompt (correctness 0.59 to 0.96 but coverage, fidelity and retrieval fell: FAIL); verify-then-write drops an invented solar array (neg-1: LGND saw a storage yard); an LGND outage mid-Run keeps the Claim as unverified and the Run completes. The pack holds each Story's Batch files whole (the gate and Batch pages need them) but only the Story Runs' Traces, reports and Chips; every text file is redacted, Run reports link their Chip instead of inlining it, and Case folders keep the ODbL notice. No imported caption set yet: the store has none, so that candidate is left for when one is scored. The midday freeze is `clayzer stories pack` again on the chosen Batches."
+see_it = "`uv run clayzer ui --local-root demo/pack`, then Stories in the nav: each card opens its Run; the gate Story shows FAIL and links Compare. `tests/test_stories.py` serves the committed pack with the network cut."
+changes = [
+  "demo/stories.toml: the 5 Stories, each a Run with what it shows and a note",
+  "src/clayzer/stories.py: load_stories, pack (redacted, Story Runs only) and with_gates",
+  "src/clayzer/cli.py: clayzer stories pack",
+  "src/clayzer/ui/app.py: /api/stories, gate Stories gated offline",
+  "src/clayzer/ui/static/app.js: the Stories page",
+  "src/clayzer/ui/static/index.html: Stories in the nav",
+  ".gitignore: the demo pack's store folders are committed",
+  "tests/test_repo_readiness.py: hex digests and ids aren't account ids",
+  "tests/test_stories.py: the pack's contents and redaction, and every Story served offline",
+]
+
+
+[[task]]
+id = "fault-lgnd-unavailable"
+step = "capture"
+title = "Attribute an LGND outage to the environment, not the Harness"
+area = "Platform"
+tier = "Should"
+status = "todo"
+start = "src/clayzer/faults.py ENVIRONMENT_CODES"
+context = "ADR-0003 says an unavailable service is the environment's fault, but ENVIRONMENT_CODES lists only Bedrock's codes, so LGND's SERVICE_UNAVAILABLE falls to the unrecognized-failure default and counts against the Harness, lowering its Workflow Score (Batch 20261104T124711Z-verify-2, uspvdb-402150 Repeat 2; the lgnd-outage-kept-unverified Story). Recognize LGND's outage codes as environment faults. That changes the Workflow Score, so bump the scorer version and re-baseline (replay can't cross scorers)."
+done_when = [
+  "An LGND SERVICE_UNAVAILABLE Step is attributed to the environment, with a test from a recorded Trace",
+  "The scorer version bumped and the Baseline rebuilt",
+]
+refs = [
+  "docs/adr/0003-errors-are-attributed-to-harness-or-environment.md",
+  "src/clayzer/faults.py",
 ]
 
 [[task]]

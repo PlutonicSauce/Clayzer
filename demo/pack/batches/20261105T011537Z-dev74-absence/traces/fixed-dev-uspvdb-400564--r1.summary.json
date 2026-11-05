@@ -1,0 +1,23 @@
+{
+  "run_id": "fixed-dev-uspvdb-400564#1",
+  "status": "ok",
+  "verdict": "Captioned in 1.6 s: 1 Claim.",
+  "did": [
+    "Asked amazon.nova-pro-v1:0 to caption chips/ca-uspvdb-400564-20220702.png: it submitted a Caption with 1 Claim (1.6 s, 2,457 tokens)"
+  ],
+  "struggled": [
+    "Nothing notable."
+  ],
+  "evaluation": [
+    "The Judge (anthropic.claude-opus-5-5) rated the Caption 0.45 (5.3 s, 1,502 tokens)"
+  ],
+  "stats": {
+    "steps": 1,
+    "tool_calls": 0,
+    "retries": 0,
+    "harness_faults": 0,
+    "environment_faults": 0,
+    "seconds": 1.61,
+    "tokens": 2457
+  }
+}

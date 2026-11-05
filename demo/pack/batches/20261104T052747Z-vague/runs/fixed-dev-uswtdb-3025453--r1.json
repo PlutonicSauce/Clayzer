@@ -1,0 +1,252 @@
+{
+  "run_id": "fixed-dev-uswtdb-3025453#1",
+  "batch_id": "20261104T052747Z-vague",
+  "case_id": "fixed-dev-uswtdb-3025453",
+  "repeat": 1,
+  "status": "ok",
+  "error": null,
+  "scores": {
+    "grounding": {
+      "correctness": 1.0,
+      "coverage": 0.5,
+      "precision": 1.0,
+      "recall": 0.5,
+      "count": null,
+      "position": 1.0,
+      "attributes": null,
+      "relations": null,
+      "change": null,
+      "unscored_share": 0.0,
+      "denominators": null,
+      "evidence_policy": null,
+      "specificity": null
+    },
+    "grounding_detail": {
+      "rows": [
+        {
+          "claim": {
+            "id": "o1",
+            "object": "road",
+            "count": 1,
+            "position": "centre",
+            "attributes": {
+              "surface": "unpaved"
+            }
+          },
+          "verdict": "matched",
+          "ref_position": "north",
+          "position": 1.0
+        }
+      ],
+      "counts": {},
+      "missed": [
+        "wind_turbine"
+      ],
+      "unscored": [],
+      "relation_rows": [],
+      "relations_unscored": []
+    },
+    "fidelity": {
+      "score": 0.3,
+      "issues": [
+        "Leaves out the most noticeable features: at least two wind turbines (centre and centre-left/west) with long shadows falling to the east.",
+        "The road count is wrong: several unpaved roads and tracks cross the scene, not just one. They include a wide graded road curving from the top centre to the west and dirt tracks running north\u2013south and east\u2013west.",
+        "Calling the scene a 'field with vegetation' is vague and misleading. It is dry grassland or hillside with scattered shrubs and trees, not a cultivated field.",
+        "The caption is too vague overall to be useful for training: it gives no land use (wind farm) and no detail on how the roads are laid out."
+      ],
+      "kind": "model_opinion"
+    },
+    "retrieval": {
+      "repeat": 1,
+      "mrr": 0.5,
+      "recall@1": 0.08333333333333333,
+      "queries": [
+        {
+          "query": "find solar farms",
+          "relevant": [
+            "fixed-dev-uspvdb-400117",
+            "fixed-dev-uspvdb-402150"
+          ],
+          "ranked": [
+            "fixed-dev-uspvdb-400117",
+            "fixed-dev-uspvdb-402150",
+            "fixed-dev-neg-1",
+            "fixed-dev-uswtdb-3025453"
+          ],
+          "reciprocal_rank": 1.0,
+          "recall@1": 0.5
+        },
+        {
+          "query": "find wind turbines",
+          "relevant": [
+            "fixed-dev-uswtdb-3025453"
+          ],
+          "ranked": [
+            "fixed-dev-neg-1",
+            "fixed-dev-uswtdb-3025453",
+            "fixed-dev-uspvdb-402150",
+            "fixed-dev-uspvdb-400117"
+          ],
+          "reciprocal_rank": 0.5,
+          "recall@1": 0.0
+        },
+        {
+          "query": "find railroads",
+          "relevant": [
+            "fixed-dev-neg-1"
+          ],
+          "ranked": [
+            "fixed-dev-uswtdb-3025453",
+            "fixed-dev-uspvdb-402150",
+            "fixed-dev-uspvdb-400117",
+            "fixed-dev-neg-1"
+          ],
+          "reciprocal_rank": 0.25,
+          "recall@1": 0.0
+        },
+        {
+          "query": "find buildings",
+          "relevant": [
+            "fixed-dev-neg-1"
+          ],
+          "ranked": [
+            "fixed-dev-uswtdb-3025453",
+            "fixed-dev-neg-1",
+            "fixed-dev-uspvdb-402150",
+            "fixed-dev-uspvdb-400117"
+          ],
+          "reciprocal_rank": 0.5,
+          "recall@1": 0.0
+        },
+        {
+          "query": "find parking lots",
+          "relevant": [
+            "fixed-dev-neg-1"
+          ],
+          "ranked": [
+            "fixed-dev-uspvdb-402150",
+            "fixed-dev-uspvdb-400117",
+            "fixed-dev-uswtdb-3025453",
+            "fixed-dev-neg-1"
+          ],
+          "reciprocal_rank": 0.25,
+          "recall@1": 0.0
+        },
+        {
+          "query": "find water",
+          "relevant": [
+            "fixed-dev-neg-1"
+          ],
+          "ranked": [
+            "fixed-dev-uswtdb-3025453",
+            "fixed-dev-neg-1",
+            "fixed-dev-uspvdb-400117",
+            "fixed-dev-uspvdb-402150"
+          ],
+          "reciprocal_rank": 0.5,
+          "recall@1": 0.0
+        }
+      ]
+    },
+    "cost": {
+      "provider": "bedrock",
+      "gpu_seconds": null,
+      "gpu_count": null,
+      "gpu_type": null,
+      "gpu_status": "unavailable",
+      "method": null,
+      "latency_seconds": 2.65,
+      "tokens": 2286,
+      "note": "Latency and tokens are operational measurements, not GPU cost"
+    },
+    "label_preparation": {
+      "reference_preparation": {
+        "value": 44.4,
+        "scope": "case_build",
+        "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+        "units": "seconds",
+        "reference_only": false,
+        "status": "observed"
+      },
+      "caption_generation": {
+        "value": 2.65,
+        "units": "seconds",
+        "scope": "caption_generation",
+        "method": "observed caption pipeline wall time; native includes tools, verification and rewrite",
+        "status": "observed"
+      }
+    },
+    "evidence_yield": {
+      "unique_object_claims": 1,
+      "checkable_object_claims": 1,
+      "supported_object_claim_credit": 0.0,
+      "supported_field_units": 1.0,
+      "supported_claim_credit_per_dollar": null,
+      "supported_claim_credit_per_gpu_second": null,
+      "dollar_measurement": null,
+      "cost_unavailable_reason": "No verified USD observation with model, region, source, method and date",
+      "definition": "Object Claims deduplicated ignoring IDs; fully supported as stated, partial parent class credit retained. Field units count presence, exact position, attributes and one exact aggregate count/class. Relations excluded. Not a quality score."
+    }
+  },
+  "faults": null,
+  "workflow": null,
+  "seconds_to_caption": 2.65,
+  "caption_tokens": 2286,
+  "summary": null,
+  "narrative": null,
+  "caption": {
+    "run_id": "fixed-dev-uswtdb-3025453#1",
+    "case_id": "fixed-dev-uswtdb-3025453",
+    "repeat": 1,
+    "text": "A road is visible in the centre of a field with vegetation.",
+    "objects": [
+      {
+        "id": "o1",
+        "object": "road",
+        "count": 1,
+        "position": "centre",
+        "attributes": {
+          "surface": "unpaved"
+        }
+      }
+    ],
+    "relations": [],
+    "uncertain": [
+      "solar_array",
+      "wind_turbine",
+      "building",
+      "water",
+      "parking_lot",
+      "greenhouse",
+      "bare_ground"
+    ]
+  },
+  "chip": {
+    "id": "ca-uswtdb-3025453-20220702",
+    "uri": "chips/ca-uswtdb-3025453-20220702.png",
+    "date": "2022-07-02",
+    "bbox": [
+      -118.345396,
+      35.030087,
+      -118.341984,
+      35.032893
+    ],
+    "source": "naip-pc"
+  },
+  "trace": null,
+  "trace_navigation": {
+    "url": null,
+    "reason": "no recorded X-Ray export context",
+    "trace_id": null
+  },
+  "replay": null,
+  "metric_provenance": null,
+  "config": {
+    "caption_model": "us.amazon.nova-pro-v1:0",
+    "judge_model": "us.anthropic.claude-opus-5-5",
+    "self_graded": false,
+    "prompt_sha": "60d1c8998b1c",
+    "cases_sha": "2c807f06fd82",
+    "scorer_version": "grounding-4+workflow-1"
+  }
+}

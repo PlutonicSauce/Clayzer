@@ -46,6 +46,9 @@ def _scan_line(path, line: str) -> str:
     # A numeric substring of a verified-format package digest isn't an account id.
     # Keep scanning the rest of the line/file, including index URLs and credentials.
     line = re.sub(r"--hash=sha256:[a-f0-9]{64}\b", "", line)
+    # Nor is one inside a hex digest or id (a Chip's sha256, a Trace hash, an LGND place id):
+    # 16 or more hex characters with a letter among them. An account id is digits only.
+    line = re.sub(r"(?<![0-9A-Za-z])(?=[0-9a-f]*[a-f])[0-9a-f]{16,}(?![0-9A-Za-z])", "", line)
     relative = path.relative_to(REPO).parts
     if relative[:1] == ("tests",) or relative[:2] == ("infra", "tests"):
         # AWS's documented example account is used by isolated IAM/CDK unit fixtures.
@@ -62,6 +65,9 @@ def test_scan_exempts_only_hashes_and_the_test_fixture_account():
         "<example-account> 987654321098"
     )
     assert _scan_line(REPO / "src/example.py", "123456789012") == "123456789012"
+    assert _scan_line(REPO / "demo/x.json", '"sha": "48c564528069691f"') == '"sha": ""'
+    assert _scan_line(REPO / "demo/x.json", "id 1234567890123456 x") == "id 1234567890123456 x"
+    assert _scan_line(REPO / "demo/x.json", "123456789012 48c564528069691f") == "123456789012 "
 
 
 def test_the_repo_is_licensed_apache_2():
