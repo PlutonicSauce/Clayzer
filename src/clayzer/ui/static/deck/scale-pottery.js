@@ -48,12 +48,12 @@ const POT = "M574 280 L574 296 C 574 322, 492 344, 492 418 C 492 470, 530 498, 5
 export function PotteryScale({ step = 0 }) {
   const cost = LEVERS[step][3];
   return html`<svg class="pottery" viewBox="0 0 800 540" role="img"
-      aria-label=${`Same pot, less clay. A pot on a potter's wheel stands for Clay's 70 million chips captioned to the same quality bar. Beside it, clay bricks show the cost, one per ten thousand dollars: ${money(cost)} after ${LEVERS[step][1].replace(/^\+ /, "")}.`}>
+      aria-label=${`Same pot, less clay. A pot on a potter's wheel stands for Clay's 70 million chips captioned to the same quality bar. Beside it, clay bricks show the estimated cost to caption Clay's 70M chips, one brick per ten thousand dollars: ${money(cost)} after ${LEVERS[step][1].replace(/^\+ /, "")}.`}>
     <defs>
       <clipPath id="pot-inside"><path d=${POT} /></clipPath>
     </defs>
 
-    <text class="pot-label" x=${BX} y="58">CLAY YOU PAY FOR</text>
+    <text class="pot-label" x=${BX} y="58">ESTIMATED COST TO CAPTION CLAY'S 70M CHIPS</text>
     ${LEVERS.map((l, k) => html`<text class=${`pot-cost ${k === step ? "on" : ""}`} x=${BX} y="122">
       ${money(l[3])}</text>`)}
     <text class="pot-unit" x=${BX} y="148">one brick = $10K</text>
