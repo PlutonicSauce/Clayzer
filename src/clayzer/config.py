@@ -37,6 +37,9 @@ class Settings:
     baselines_dir: Path
     store_url: str | None
     naip_source: str
+    # The deployed site's URL, shown on the deck's closing slide wherever the deck is served.
+    # Set it in .env, never in the repo (REQ-13); unset, the slide shows the serving host.
+    public_url: str | None = None
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -51,6 +54,7 @@ class Settings:
             baselines_dir=Path(env("CLAYZER_BASELINES_DIR", REPO / "baselines")),
             store_url=env("CLAYZER_STORE") or None,
             naip_source=env("CLAYZER_NAIP_SOURCE", "pc"),
+            public_url=env("CLAYZER_PUBLIC_URL") or None,
         )
 
     def store(self):

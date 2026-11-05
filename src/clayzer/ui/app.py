@@ -185,6 +185,7 @@ def create_app(
             "caption_model": settings.caption_model,
             "judge_model": settings.judge_model,
             "embed_model": settings.embed_model,
+            "public_url": settings.public_url,
         }
 
     def showcase(batch_id: str, limit: int = 8) -> list[dict]:

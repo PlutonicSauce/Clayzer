@@ -502,6 +502,7 @@ Put these in `.env` at the repo root (gitignored), or export them.
 | `CLAYZER_OVERPASS_URL` | `https://overpass-api.de/api/interpreter` |
 | `CLAYZER_STORE` | unset: local `data/` and `batches/`. `s3://<bucket>/<prefix>` for S3 |
 | `CLAYZER_NAIP_SOURCE` | `pc` (Planetary Computer). `aws` reads `naip-visualization` (Requester-Pays, us-west-2) |
+| `CLAYZER_PUBLIC_URL` | unset: the deck's closing slide shows the host serving it. Set it in `.env` to the deployed site's URL to show that when presenting from a laptop; keep it out of the repo |
 | `CLAYZER_DATA_DIR`, `CLAYZER_BATCHES_DIR` | `data/`, `batches/` |
 | `CLAYZER_BASELINES_DIR` | `baselines/` (committed) |
 | `CLAYZER_AUTH_DIR` | `~/.clayzer/auth/` (MCP sign-ins) |
