@@ -6,7 +6,8 @@
 //
 // Costs are per 1,000 Captions and for Clay's ~70M training chips; docs/scale-napkin-math.md has
 // the sums. "assumed" levers are the next Batches to run: each is kept only if the regression
-// gate says quality holds, which is what the quality bar on the pot stands for.
+// gate says quality holds, which is what the quality bar on the pot stands for. The clay sits
+// above the bar; on each press it drops, the gate catches it at the bar, and it springs back.
 //
 // All motion is CSS, keyed off the step or looping (the drip, the wheel), with no hooks, so
 // tests/deck_smoke.mjs can render it. Reduced motion: no transitions, no loops.
@@ -68,11 +69,18 @@ export function PotteryScale({ step = 0 }) {
       <ellipse class="wheel-top" cx="600" cy="506" rx="150" ry="17" />
       <ellipse class="wheel-spin" cx="600" cy="506" rx="150" ry="17" />
     </g>
-    <rect class="pot-clay" x="480" y="358" width="240" height="160" clip-path="url(#pot-inside)" />
+    <g clip-path="url(#pot-inside)">
+      <rect key=${`clay-${step}`} class=${`pot-clay ${step ? "dip" : ""}`} x="480" y="334" width="240"
+        height="184" />
+    </g>
     <path class="pot" d=${POT} />
-    <line class="quality" x1="470" y1="358" x2="736" y2="358" />
-    <text class="quality-label" x="744" y="352">quality</text>
-    <text class="quality-label" x="744" y="372">bar</text>
+    <g key=${`gate-${step}`} class=${`gate ${step ? "hit" : ""}`}>
+      <line class="quality" x1="474" y1="372" x2="726" y2="372" />
+      <rect class="gate-post" x="466" y="356" width="9" height="32" rx="3" />
+      <rect class="gate-post" x="725" y="356" width="9" height="32" rx="3" />
+    </g>
+    <text class="quality-label" x="456" y="368" text-anchor="end">quality bar</text>
+    <text class="gate-label" x="456" y="390" text-anchor="end">the gate must hold it</text>
   </svg>`;
 }
 
