@@ -1,12 +1,14 @@
 """Replay (REQ-09): a recorded Batch rescored against updated Cases with no model or network."""
 
 import copy
+import json
 
 import boto3
 import pytest
 from test_loop import SOLAR, WIND, FakeBedrock
 
 from clayzer import batch as batches
+from clayzer.cases import SOLAR_ABSENCE
 from clayzer.config import Settings
 from clayzer.gate import accept_baseline, gate, load_baseline
 from clayzer.store import LocalStore
@@ -93,3 +95,26 @@ def test_replay_refuses_what_it_cant_rescore(recorded, monkeypatch):
     rail["reference_labels"].append({**rail["reference_labels"][0], "object": "railroad"})
     with pytest.raises(ValueError, match="can't replay retrieval"):
         batches.replay(bid, store, [rail, WIND], "x")  # nothing was ever ranked for railroads
+
+
+def test_replay_refuses_a_batch_from_another_scorer(recorded, monkeypatch):
+    store, _, bid = recorded
+    offline(monkeypatch)
+    key = f"batches/{bid}/batch.json"
+    cfg = json.loads(store.get(key))
+    store.put(key, json.dumps({**cfg, "scorer_version": "grounding-4+workflow-1"}).encode(), "")
+    with pytest.raises(ValueError, match="scored by grounding-4"):
+        batches.replay(bid, store, [SOLAR, WIND], "x")
+
+
+def test_an_absence_label_regrades_per_class_and_leaves_retrieval_alone(recorded, monkeypatch):
+    store, _, bid = recorded
+    offline(monkeypatch)
+    wind = copy.deepcopy(WIND)
+    wind["reference_labels"].append({**SOLAR_ABSENCE, "object": "railroad"})
+    rid = batches.replay(bid, store, [SOLAR, wind], "absent", reports=False)
+    a, b = batches.load(store, bid), batches.load(store, rid)
+    for r in (r for r in b["results"] if r["case_id"] == WIND["id"]):
+        assert "railroad" in r["grounding_by_class"]  # a class the labels now name
+    # Absence isn't presence: no query became relevant, so the rankings replay unchanged.
+    assert [row["mrr"] for row in b["retrieval"]] == [row["mrr"] for row in a["retrieval"]]

@@ -421,6 +421,42 @@ changes = [
   "tests/test_relabel.py: only water changes, corrections apply again, a Change Case's water stays unknown",
 ]
 
+
+[[task]]
+id = "solar-absence"
+step = "case"
+title = "Declare the checked solar absence on every negative Case"
+area = "Data and Cases"
+tier = "Must"
+status = "done"
+start = "src/clayzer/cases.py declare_solar_absence"
+after = ["lookalike-negatives"]
+notes = "Done 2026-11-04. The Output Score (#82) treats a missing map record as unknown, so with no explicit absence a solar Claim on a negative scored as not verifiable: the first live Batch under it (20261104T232401766521Z-...-dev74-output1) reported 0 look-alikes fooled though 12 of 30 look-alike Captions claimed a solar array, and correctness rose to 0.79 only because those Claims dropped out. Every negative (30 dev, 10 of them look-alikes, and 20 Texas) now carries solar_array count 0, absence_verified, source uspvdb+manual: clayzer case neg refuses a USPVDB array within about 300 m or a polygon reaching the Chip, and every Chip was checked by eye. Wind absence and count_complete are left undeclared, so turbine and array counts stay lower bounds. That Batch replayed onto the new labels is the dev Baseline 20261105T011537Z-dev74-absence: greenhouses fooled the captioner in 9 of 12 Runs, reflective roofs 3 of 6, parking lots 0 of 12 (the same as under the old scorer); 15 solar Claims on negatives are false positives; correctness 0.77, coverage 0.75, fidelity 0.56, retrieval 0.73, 402 verified Claims per dollar. Only 6 negatives' scores moved."
+context = "Contradiction needs independent evidence under the Output Score: `count: 0` with `absence_verified: true` and a source (docs/output-score.md). The negatives were built to have no solar, but none said so, so neither the negatives nor the look-alikes could catch a hallucinated array."
+done_when = [
+  "Every committed negative declares its checked solar absence, and clayzer case neg adds it",
+  "Absence labels never count as presence (coverage, retrieval, embeddings, calibration, corroboration)",
+  "A dev Baseline on the new labels where a solar Claim on a negative is a false positive",
+]
+refs = [
+  "docs/output-score.md (Grounding)",
+  "fixtures/caption/README.md",
+]
+see_it = "The Cases page lists 'no solar array (checked: uspvdb+manual)' on each negative; the Batch report's Fooled by look-alikes row; `baselines/default/`."
+changes = [
+  "src/clayzer/cases.py: SOLAR_ABSENCE and declare_solar_absence, applied by build_negative",
+  "fixtures/caption/cases/caption-dev.jsonl: the label on 30 negatives, 10 of them look-alikes",
+  "fixtures/caption/cases/caption-test.jsonl: the label on 20 Texas negatives",
+  "src/clayzer/embeddings.py: skips count-0 labels, as retrieval already did",
+  "src/clayzer/calibrate.py: skips count-0 labels",
+  "src/clayzer/corroborate.py: skips count-0 labels",
+  "src/clayzer/batch.py: replay re-ranks with present labels only, regrades grounding_by_class, and refuses a Batch from another scorer",
+  "src/clayzer/output_score.py: grounding_by_class shared with replay",
+  "src/clayzer/ui/static/app.js: absence labels read 'no solar array (checked)'",
+  "tests/test_solar_absence.py: the label, its scoring, and every committed negative",
+  "tests/test_replay_updated_cases.py: the scorer guard, and absence leaving retrieval alone",
+]
+
 [[task]]
 id = "run-report-speed"
 step = "report"

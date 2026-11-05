@@ -3,7 +3,7 @@
 from pathlib import Path
 
 from clayzer.batch import _lookalikes
-from clayzer.cases import parse_jsonl
+from clayzer.cases import SOLAR_ABSENCE, parse_jsonl
 
 ROOT = Path(__file__).parents[1] / "fixtures" / "caption"
 DEV = parse_jsonl((ROOT / "cases" / "caption-dev.jsonl").read_bytes())
@@ -27,10 +27,14 @@ def test_the_development_set_has_its_lookalikes():
 
 def test_none_has_a_solar_or_wind_label():
     for c in LOOKALIKES:
-        assert not {lb["object"] for lb in c["reference_labels"]} & {
-            "solar_array",
-            "wind_turbine",
-        }, c["id"]
+        present = {lb["object"] for lb in c["reference_labels"] if lb.get("count") != 0}
+        assert not present & {"solar_array", "wind_turbine"}, c["id"]
+
+
+def test_each_declares_its_checked_solar_absence():
+    for c in LOOKALIKES:
+        solar = [lb for lb in c["reference_labels"] if lb["object"] == "solar_array"]
+        assert solar == [SOLAR_ABSENCE], c["id"]
 
 
 def test_chip_names_are_unique_across_the_set():

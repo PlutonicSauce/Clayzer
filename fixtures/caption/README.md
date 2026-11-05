@@ -15,6 +15,14 @@ would agree with.
 Every Chip is at least 1 km from the others. Positives start from a USGS record and use a NAIP
 image taken after the site was built; negatives have no USGS site nearby.
 
+Every negative, look-alikes included, carries a `solar_array` label with `count: 0`,
+`absence_verified: true` and source `uspvdb+manual`: `clayzer case neg` refuses a point with a
+USPVDB array within about 300 m or a polygon reaching the Chip, and each Chip was checked by eye
+for the rooftop and carport panels USPVDB misses. Under the Output Score a missing map record is
+unknown, not absence (docs/output-score.md), so without this label a solar Claim on a negative
+would score as not verifiable instead of a false positive. Check a new negative by eye before
+committing it: `clayzer case neg` adds the label when it builds the Case.
+
 - `cases/caption-dev.jsonl`: one Case per line, with its Reference Labels. These include
   OpenStreetMap data, so the folder is under the ODbL ([NOTICE.md](cases/NOTICE.md)).
 - A Change Case (`kind = "change"`) has two Chips of one footprint, earlier first, and each

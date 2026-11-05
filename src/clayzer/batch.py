@@ -49,7 +49,7 @@ from clayzer.faults import HARNESS_CODES
 from clayzer.grounding import grounding
 from clayzer.harness import CHANGE_PROMPT
 from clayzer.judge import fidelity, self_judging
-from clayzer.output_score import VERSION, preparation, score_caption
+from clayzer.output_score import VERSION, grounding_by_class, preparation, score_caption
 from clayzer.retrieval import freeze_queries, retrieval
 from clayzer.summarize import SummarySink
 from clayzer.tools import servers_named
@@ -799,6 +799,8 @@ def _regrade(r: dict, cap: dict | None, labels: list[dict], trace: bytes | None)
 
     if r["status"] == OK and cap is not None:
         r["grounding"] = grounding(cap, labels)
+        if "grounding_by_class" in r:
+            r["grounding_by_class"] = grounding_by_class(cap, labels)
     elif r["status"] == HARNESS_FAULT:
         empty = {"text": "", "objects": [], "relations": [], "uncertain": []}
         r["grounding"] = {
@@ -852,7 +854,10 @@ def _rerank(rows: list[dict], cases: list[dict]) -> tuple[list[dict], list[str]]
     that had nothing relevant before was never ranked; it's returned as not replayable."""
     from clayzer.retrieval import QUERIES
 
-    labels = {c["id"]: {lb["object"] for lb in c["reference_labels"]} for c in cases}
+    labels = {
+        c["id"]: {lb["object"] for lb in c["reference_labels"] if lb.get("count") != 0}
+        for c in cases
+    }
     out, missing = [], set()
     for row in rows:
         k = next((key for key in row if key.startswith("recall@")), "recall@1")
@@ -896,6 +901,13 @@ def replay(batch_id: str, store, cases: list[dict], label: str = "", reports: bo
     from clayzer.trace import trace_key
 
     b = load(store, batch_id)
+    if b["config"].scorer_version != SCORER_VERSION:
+        # Replay regrades grounding only; a Batch from another scorer lacks the current one's
+        # other scores, so stamping it with this scorer version would misreport it.
+        raise ValueError(
+            f"{batch_id} was scored by {b['config'].scorer_version}, not {SCORER_VERSION}; "
+            "run a new Batch instead"
+        )
     old = {c["id"]: c for c in b["cases"]}
     new = {c["id"]: c for c in cases}
     if set(old) != set(new):

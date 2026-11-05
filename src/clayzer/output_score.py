@@ -98,6 +98,12 @@ def preparation(case: dict, seconds_to_caption=None) -> dict:
     }
 
 
+def grounding_by_class(cap, labels) -> dict:
+    """Grounding sliced to each class the Caption claims or the Reference Labels name."""
+    classes = {o["object"] for o in cap["objects"]} | {lb["object"] for lb in labels}
+    return {obj: grounding(cap, labels, class_id=obj) for obj in sorted(classes)}
+
+
 def score_caption(
     cap,
     case,
@@ -134,10 +140,7 @@ def score_caption(
             "judge_model": judge_model,
             "rubric_sha": sha(judge_prompt().encode()),
         }
-    per_class = {}
-    if g is not None:
-        for obj in sorted({o["object"] for o in cap["objects"]} | {lb["object"] for lb in labels}):
-            per_class[obj] = grounding(cap, labels, class_id=obj)
+    per_class = grounding_by_class(cap, labels) if g is not None else {}
     return {
         "version": VERSION,
         "grounding_by_class": per_class,
