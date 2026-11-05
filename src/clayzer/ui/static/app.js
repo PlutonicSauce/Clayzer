@@ -295,12 +295,14 @@ async function overview() {
     <section class="hero" aria-labelledby="hero-title">
       <div class="hero-body">
         <p class="hero-kicker">Clay Earth Dataset Foundry · caption track</p>
-        <h1 id="hero-title">Captions that teach Clay to read the Earth</h1>
-        <p class="hero-lede">Clay v2 learns from text as well as imagery. We write those captions for
-        aerial imagery, and prove each change makes them better: every change is a ${term("Batch")},
-        scored on Clay's five criteria, and kept only if the regression gate passes.</p>
+        <h1 id="hero-title">From black box to captions you can trust</h1>
+        <p class="hero-lede">Clay is making satellite and aerial imagery searchable in words. We write
+        captions for that imagery and check every fact against public records the captioner never
+        sees. Every change is a ${term("Batch")}, scored on Clay's five criteria, and kept only if the
+        regression gate passes.</p>
         <div class="hero-cta">
-          <a class="hero-btn primary" href="#/how">How it works</a>
+          <a class="hero-btn primary" href="/deck">See the 4-minute pitch</a>
+          <a class="hero-btn" href="#/how">How it works</a>
           <a class="hero-btn" href="#/tasks">Pick a task</a>
         </div>
       </div>

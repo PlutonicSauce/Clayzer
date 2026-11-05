@@ -124,15 +124,21 @@ const base = process.env.CLAYZER_UI_URL || "http://127.0.0.1:8788";
       "The latest development references include verified solar absence",
     );
     const absenceCard = () =>
-      page
-        .locator("#image-gallery .case-card")
-        .filter({
-          has: page.locator(
-            `a.gallery-image[href="#/cases/${absenceCase.id}"]`,
-          ),
-        });
+      page.locator("#image-gallery .case-card").filter({
+        has: page.locator(`a.gallery-image[href="#/cases/${absenceCase.id}"]`),
+      });
     await page.goto(base + "/#/cases");
     await absenceCard().locator(".gallery-references > summary").click();
+    assert.equal(
+      await absenceCard()
+        .locator(".gallery-references")
+        .evaluate((el) => el.open),
+      true,
+    );
+    assert.equal(
+      await absenceCard().locator(".gallery-references li").first().isVisible(),
+      true,
+    );
     assert.match(await absenceCard().innerText(), /No solar array \(checked:/);
     assert.ok(!(await absenceCard().innerText()).includes("0 × solar array"));
     await page.route("**/api/cases", (route) =>
@@ -153,6 +159,16 @@ const base = process.env.CLAYZER_UI_URL || "http://127.0.0.1:8788";
     await page.goto(base + "/#/about");
     await page.goto(base + "/#/cases");
     await absenceCard().locator(".gallery-references > summary").click();
+    assert.equal(
+      await absenceCard()
+        .locator(".gallery-references")
+        .evaluate((el) => el.open),
+      true,
+    );
+    assert.equal(
+      await absenceCard().locator(".gallery-references li").first().isVisible(),
+      true,
+    );
     assert.match(
       await absenceCard().innerText(),
       /Reference count: 0 solar array \(absence unverified;/,
@@ -169,6 +185,9 @@ const base = process.env.CLAYZER_UI_URL || "http://127.0.0.1:8788";
         .evaluate((el) => getComputedStyle(el).color),
       "rgb(255, 253, 251)",
     );
+    await page.goto(base + "/#/");
+    await page.locator('.earth-hero a[href="/deck"]').waitFor();
+    assert.equal(await page.locator('#nav > a[href="/deck"]').count(), 1);
     await page.goto(base + "/deck");
     await page.locator("#deck h1, #deck h2").first().waitFor();
     await page.waitForFunction(() => location.hash === "#1");

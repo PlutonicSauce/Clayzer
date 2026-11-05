@@ -83,7 +83,8 @@ Read-only remains the default. No held-out Texas tuning or model evaluation was 
 | `docs/ui/PUBLIC_REDESIGN.md`                                                           | This current handoff                                                                                                                                                                  |
 
 Final publication scope remains 20 files. This follow-up targets **main directly**, with
-`feat/public-redesign-main` refreshed through `9cd971e` (AgentCore CI, corrected absence references and reaccepted Baseline). PR #82 merged into main,
+`feat/public-redesign-main` refreshed through `0ecb386` (including corrected absence references, the reaccepted Baseline,
+Transaction Search infrastructure and updated Pitch Deck). PR #82 merged into main,
 but PR #94 merged into its feature branch; #94's frontend therefore did not reach production.
 This PR transfers that reviewed UI without duplicating scoring or teammate contributions.
 Merging main can trigger an automatic AWS deployment; no merge/deployment is part of this handoff.
@@ -97,7 +98,10 @@ Self-grading warnings from AgentCore remain visible in public Results as well as
 The latest gallery conflict preserves the public design while showing reference entries in a
 native disclosure: verified zero counts say “No … (checked: source)”; zero counts without verified
 absence say “Reference count: 0 … (absence unverified)”. Neither creates an object marker or
-changes the scoring definitions. Browser regressions cover both cases. All 11 Pitch
+changes the scoring definitions. Browser regressions cover both cases.
+The latest teammate Pitch Deck remains byte-identical to main. Its public navigation link and
+four-minute-pitch homepage CTA are retained alongside the existing imagery and story actions;
+its new nine-slide content and media are not part of the frontend contribution. All Pitch
 Deck files are byte-identical to current main; ongoing presentation edits must be refreshed
 before merge. No Case fixture, historical baseline, scorer, dependency, CI or infrastructure
 change belongs to the UI diff.
@@ -106,10 +110,10 @@ change belongs to the UI diff.
 
 Final integrated full suite: **719 passed, 1 skipped**, **85.60% coverage**, 40 upstream
 Shapely warnings, zero failures. The optional AgentCore telemetry module is skipped without the
-OpenTelemetry dependency in this local environment. Current CI infrastructure scope: **27 passed**,
+OpenTelemetry dependency in this local environment. Current CI infrastructure scope: **34 passed**,
 including CDK tests also present in the full suite. Counts are not added as unique tests.
-Ruff lint/format over the CI scope (`src tests`, 131 files), Vulture, 16 JavaScript syntax checks,
-eight-slide deck smoke, duplication (0.30% lines against the unchanged 3% gate) and Git whitespace
+Ruff lint/format over the CI scope (`src tests`, 131 files), Vulture, 18 JavaScript syntax checks,
+nine-slide deck smoke, duplication (0.30% lines against the unchanged 3% gate) and Git whitespace
 checks pass. The broader upstream scripts lint has an existing EXE001 executable-bit issue in
 `upload_to_s3.py`; it is outside CI's lint scope and was not changed in this frontend work.
 

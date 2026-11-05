@@ -8,7 +8,7 @@ changes the other.
 Deployment and inbound Cognito credential setup are documented in docs/cli.md, "Running the
 Harness on AgentCore". Install the pinned CLI with `npm ci` in infra, then invoke
 `npx --no-install cdk --app "uv run --group infra python agentcore_app.py"`.
-After an account owner enables CloudWatch Transaction Search, pass `-c traces=true` on every
+After CloudWatch Transaction Search is on (transaction_search_app.py), pass `-c traces=true` on every
 deploy/redeploy that should export spans. Without it, only the Batch's JSONL Trace is kept.
 LGND browser consent is separate from the Cognito credential the Batch uses to invoke. Consent
 is per workload identity; destroying/recreating that identity requires a new approval.

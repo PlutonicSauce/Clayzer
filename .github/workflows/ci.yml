@@ -107,6 +107,7 @@ jobs:
         run: |
           npx --yes aws-cdk@2 synth -q -c store=s3://example-bucket/caption -c cloudfront_prefix_list=pl-00000000
           npx --yes aws-cdk@2 --app "uv run --group infra python github_oidc.py" synth -q
+          npx --yes aws-cdk@2 --app "uv run --group infra python transaction_search_app.py" synth -q
 
   # Pushes to main and manual runs deploy into the account behind the `aws` environment.
   # Set up once: deploy infra/github_oidc.py, then give the environment the AWS_DEPLOY_ROLE_ARN
@@ -165,9 +166,19 @@ jobs:
       # The Harness Runtime (infra/agentcore_app.py) is a separate stack, deployed after the web
       # app so a Runtime failure never holds the site back. Opt in per account with the
       # environment variable AGENTCORE_DEPLOY=true once that account has Bedrock model access;
-      # set AGENTCORE_TRACES=true only after its owner enables CloudWatch Transaction Search.
+      # AGENTCORE_TRACES=true, once the account owner agrees, also deploys ClayzerTransactionSearch
+      # (infra/transaction_search_app.py): account-wide CloudWatch Transaction Search, which span
+      # export needs. If the account already had it on, adopt it once with `cdk import` (docs/cli.md).
       # The one-time LGND consent (`clayzer agentcore login lgnd`) stays a manual browser step;
       # routine deploys keep the workload identity, so they keep that consent.
+      - name: CDK deploy Transaction Search
+        if: vars.AGENTCORE_DEPLOY == 'true' && vars.AGENTCORE_TRACES == 'true'
+        working-directory: infra
+        env:
+          CDK_DEFAULT_REGION: ${{ vars.AWS_REGION }}
+        run: |
+          npx --yes aws-cdk@2 --app "uv run --group infra python transaction_search_app.py" \
+            deploy ClayzerTransactionSearch --require-approval never
       - name: CDK deploy the AgentCore Runtime
         id: agentcore
         if: vars.AGENTCORE_DEPLOY == 'true'
