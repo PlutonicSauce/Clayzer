@@ -284,3 +284,101 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .link-card b { font-size: 34px; letter-spacing: -.01em; word-break: break-all; }
 .link-card span:last-child { font-size: 21px; color: #4a4240; }
 .closing-links .big { max-width: none; }
+
+/* Ontology slide (ontology-slide.js): the photo and its tags, pixelating into the ontology graph
+   on press 1; the guidance the captioner is told on press 2. Timing, from press 1: photo off at
+   .22 s, 24-block pixels .2-.6 s, 12-block pixels from .55 s and scattering .85-2.1 s, tags
+   gliding .9-1.8 s, clusters in from 1.0 s, edges from 1.6 s. Delays apply only going forward,
+   so going back snaps to the photo, and arriving at a build shows its end state. */
+.onto-slide h2 { margin-bottom: 22px; }
+.onto-grid { display: grid; grid-template-columns: 960px 1fr; gap: 34px; align-items: start; }
+.onto-viz { width: 960px; height: 538px; overflow: visible; font-family: system-ui, sans-serif; }
+
+.onto-viz .photo { transition: none; }
+.onto-viz.graph .photo { opacity: 0; transition: opacity 0s .22s; }
+.onto-viz .px24 { opacity: 0; visibility: visible; }
+.onto-viz.graph .px24 { opacity: 1; visibility: hidden; transition: opacity 0s .2s, visibility 0s .6s; }
+.onto-viz .px12 { opacity: 0; }
+.onto-viz.graph .px12 { opacity: 1; transition: opacity 0s .55s; }
+.onto-viz .px12 rect { transform-box: fill-box; transform-origin: center; }
+.onto-viz.graph .px12 rect { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(.25);
+  transition: transform .65s ease-in calc(.85s + var(--d)), opacity .65s ease-in calc(.85s + var(--d)); }
+
+.onto-viz .photo-only { opacity: 1; }
+.onto-viz.graph .photo-only { opacity: 0; transition: opacity .2s; }
+.onto-viz .photo-near { stroke: #f2a93b; stroke-width: 4; stroke-dasharray: 9 6; }
+.onto-viz .leader { stroke: #fffdfb; stroke-width: 2.5; }
+.onto-viz .anchor { fill: #fffdfb; stroke: #252323; stroke-width: 3; }
+
+.onto-viz .cluster { opacity: 0; }
+.onto-viz.graph .cluster { opacity: 1; transition: opacity .6s 1s; }
+.onto-viz .cluster rect { fill: #fffdfb; stroke-width: 2; }
+.onto-viz .cluster text { font-size: 17px; font-weight: 700; letter-spacing: .04em; }
+
+.onto-viz .edge { opacity: 0; }
+.onto-viz.graph .edge { opacity: 1; transition: opacity .5s 1.6s; }
+.onto-viz .edge path { fill: none; stroke-width: 2.5; }
+.onto-viz .edge text { font-size: 16px; font-weight: 600; paint-order: stroke; stroke: #fffdfb;
+  stroke-width: 5px; stroke-linejoin: round; }
+.onto-viz .edge.isa path { stroke: #6b6461; }
+.onto-viz .edge.isa text { fill: #4a4240; }
+.onto-viz .edge.near path { stroke: #b06a4f; stroke-dasharray: 7 5; }
+.onto-viz .edge.near text { fill: #b06a4f; }
+.onto-viz .edge.alike path { stroke: #9a4a35; stroke-dasharray: 2 6; stroke-linecap: round; stroke-width: 3.5; }
+.onto-viz .edge.alike text { fill: #9a4a35; }
+.onto-viz.told .edge:not(.hi) { opacity: .25; transition: opacity .4s; }
+.onto-viz.told .edge.hi path { stroke-width: 4.5; }
+
+.onto-viz .onto-node { transition: none; }
+.onto-viz.graph .onto-node { transition: transform .9s cubic-bezier(.6, 0, .2, 1) .9s; }
+.onto-viz .onto-node rect { stroke-width: 2.5; }
+.onto-viz .onto-node text { font-size: 21px; font-weight: 700; fill: #252323; }
+.onto-viz .elsewhere-nodes { opacity: 0; }
+.onto-viz.graph .elsewhere-nodes { opacity: 1; transition: opacity .6s 1.2s; }
+.onto-viz .onto-node.elsewhere rect { stroke-dasharray: 6 4; fill-opacity: .55; }
+.onto-viz .onto-node.elsewhere text { fill: #6b6461; }
+
+/* The ontology card arrives with the graph, not with the press. */
+.onto-card.after-graph.build.in { transition-delay: 1.3s; }
+.onto-side { display: flex; flex-direction: column; gap: 14px; }
+.onto-card { padding: 16px 20px; border-radius: 14px; background: var(--data);
+  border: 1px solid var(--data-line); }
+.onto-card b { display: block; margin-bottom: 6px; font-size: 22px; }
+.onto-card p { margin: 0; font-size: 18px; line-height: 1.4; color: #4a4240; }
+.onto-card.told { background: var(--captions); border-color: var(--captions-line); }
+.onto-card .onto-quote { margin-top: 8px; padding-left: 12px; border-left: 3px solid var(--decision);
+  font-size: 16px; font-style: italic; }
+.onto-key { margin: 10px 0 0; padding: 0; list-style: none; font-size: 17px; color: #4a4240; }
+.onto-key li { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+.onto-key i { display: inline-block; width: 38px; height: 0; border-top: 3px solid #6b6461; }
+.onto-key i.near { border-top: 3px dashed #b06a4f; }
+.onto-key i.alike { border-top: 4px dotted #9a4a35; }
+
+/* Last build: the photo card folds away to make room; numbered badges join the graph to the
+   three benefits on the slide. */
+.onto-card { max-height: 520px; transition: opacity .45s ease, transform .45s ease, max-height .4s ease,
+  padding .4s ease, margin .4s ease; }
+.onto-card.gone { max-height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; margin-bottom: -14px;
+  overflow: hidden; border-width: 0; }
+.onto-card .onto-problem { margin-bottom: 10px; padding: 8px 12px; border-radius: 8px;
+  background: rgba(154, 74, 53, .1); color: var(--ink); }
+.onto-card .onto-problem b { display: inline; margin: 0; font-size: inherit; color: var(--decision); }
+.onto-benefits { margin: 8px 0 10px; padding: 0; list-style: none; }
+.onto-benefits li { display: grid; grid-template-columns: 30px 1fr; gap: 10px; align-items: start;
+  margin-bottom: 8px; }
+.onto-benefits span { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%;
+  background: var(--decision); color: #fffdfb; font-size: 16px; font-weight: 800; }
+.onto-benefits p { font-size: 17px; line-height: 1.35; }
+.onto-benefits b { display: inline; margin: 0; font-size: inherit; color: var(--ink); }
+.onto-card .onto-why { padding-top: 10px; border-top: 1px solid var(--captions-line); font-size: 16px;
+  font-style: italic; }
+.onto-card p.folded { display: none; }
+.onto-viz .badges { opacity: 0; }
+.onto-viz.told .badges { opacity: 1; transition: opacity .4s .3s; }
+.onto-viz .badge circle { fill: var(--decision); stroke: #fffdfb; stroke-width: 3; }
+.onto-viz .badge text { fill: #fffdfb; font-size: 20px; font-weight: 800; }
+
+@media (prefers-reduced-motion: reduce) {
+  .onto-viz *, .onto-viz.graph * { transition: none !important; }
+  .onto-card { transition: none; }
+}

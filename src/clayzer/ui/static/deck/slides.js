@@ -10,17 +10,17 @@ import { html } from "./html.js";
 import { ArchitectureDiagram } from "./diagram.js";
 import { CaptionChip } from "./caption-chip.js";
 import { SolutionFlow } from "./value-flow.js";
+import { OntologyViz } from "./ontology-slide.js";
 
 const Kicker = ({ children }) => html`<p class="kicker">${children}</p>`;
 
 function Title() {
   return html`<div class="title-slide">
-    <${Kicker}>Clay Earth Dataset Foundry · Caption track<//>
+    <${Kicker}>Clay Earth Dataset Foundry · Caption track · 2026 NOV 5<//>
     <h1>Clayzer</h1>
     <p class="pron"><span>/ˈkleɪ.zər/</span> <i>noun</i> · from glaze, the finish a potter fires
       onto clay</p>
     <p class="lede">A solution for producing captions you can trust, at scale.</p>
-    <p class="team">Team Clayzer · Clay Earth Dataset Foundry hackathon · November 4th, 2026</p>
   </div>`;
 }
 
@@ -125,15 +125,61 @@ function Architecture() {
   </div>`;
 }
 
-// The AWS deployment, from diagram.js (infra/app.py, plus what caption-design.md §3.4 plans next).
+// The ontology the caption harness reads (ontology/objects.toml), shown on one photo: its objects
+// and their "near" links, the photo pixelating into the ontology graph, then the guidance the
+// captioner is given and why it helps (ontology-slide.js). The guidance quoted is
+// ontology.prompt_context's real output for the photo's classes; 9 of 12 is the Baseline's
+// look-alike count (summary.json `lookalikes`), captioned without the guidance.
+function Ontology({ step = 0 }) {
+  return html`<div class="onto-slide">
+    <${Kicker}>Our solution · the ontology<//>
+    <h2>From pixels to what the harness understands</h2>
+    <div class="onto-grid">
+      <${OntologyViz} step=${step} />
+      <div class="onto-side">
+        <div class=${`onto-card ${step >= 2 ? "gone" : ""}`}>
+          <b>1 · The photo</b>
+          <p>A greenhouse beside buildings and a road, with farm fields and two ponds.</p>
+        </div>
+        <div class=${`onto-card after-graph build ${step >= 1 ? "in" : ""}`}>
+          <b>2 · The ontology</b>
+          <p class=${step >= 2 ? "folded" : ""}>17 classes in 5 families, in one file the harness
+            reads.</p>
+          <ul class="onto-key">
+            <li><i class="isa"></i>is a kind of</li>
+            <li><i class="near"></i>is typically found near</li>
+            <li><i class="alike"></i>is easily mistaken for</li>
+          </ul>
+        </div>
+        <div class=${`onto-card told build ${step >= 2 ? "in" : ""}`}>
+          <b>3 · Why it helps the caption</b>
+          <p class="onto-problem">Without it: greenhouses called solar farms in <b>9 of 12</b> runs.</p>
+          <p>Before it writes, the harness is told to:</p>
+          <ol class="onto-benefits">
+            <li><span>1</span><p><b>Tell look-alikes apart:</b> greenhouse vs solar array.</p></li>
+            <li><span>2</span><p><b>Look for what sits together:</b> greenhouse near road, said only
+              if seen.</p></li>
+            <li><span>3</span><p><b>Use words we can check:</b> 11 classes, each mapped to public
+              records.</p></li>
+          </ol>
+          <p class="onto-why">A semantic layer: knowledge the pixels can't give, never this photo's
+            answer.</p>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// The AWS deployment, from diagram.js (infra/app.py and infra/agentcore_app.py, the MCP servers in
+// src/clayzer/tools.py, plus what caption-design.md §3.4 plans next).
 function Aws() {
   return html`<div class="arch-slide">
     <${Kicker}>On AWS · the services we use<//>
-    <h2>One deploy command, all managed services</h2>
+    <h2>All managed services, deployed with CDK</h2>
     <${ArchitectureDiagram} />
     <div class="legend">
       <span><i class="live"></i> Deployed: this deck is served by it</span>
-      <span><i class="planned"></i> Planned next</span>
+      <span><i class="planned"></i> Planned next, or opt-in</span>
       <span>A role per service; the web app can only read its own part of the store</span>
     </div>
   </div>`;
@@ -238,9 +284,9 @@ function Next() {
   </div>`;
 }
 
-// Nine slides, exactly 4:00, in four sections: the problem; the value it unlocks (search in words,
-// animated); our solution (how it works start to finish, how we earn trust, the AWS services, the
-// live demo); the cost at Clay's scale; then the close.
+// Ten slides, exactly 4:00, in four sections: the problem; the value it unlocks (search in words,
+// animated); our solution (how it works start to finish, how we earn trust, the ontology, the AWS
+// services, the live demo); the cost at Clay's scale; then the close.
 // The deck's sections, in order, for the breadcrumb at the top of each slide (deck.js). A slide's
 // `section` names one; the title and closing slides have none.
 export const SECTIONS = ["Problem Statement", "Value Unlock", "Our Solution", "Scale"];
@@ -252,19 +298,22 @@ export const SLIDES = [
   { title: "The problem", section: "Problem Statement", seconds: 35, component: Problem, steps: 3,
     spoken: "New caption, who dis? That is how captions on Clay's imagery work today. Here is a real one: the model saw only this photo and said eighteen wind turbines, mostly in the centre. The public records put the turbines all around the centre, not in it. But the records disagree too: the government database counts seventeen, OpenStreetMap counts eighteen, because they put this turbine two metres apart, either side of the edge. So we never trust one source. We cross-check them: when they agree, the label is automatic, and only when they conflict, like here, does a person look.",
     notes: ["Open with the label as a joke: \"New caption, who dis? That's how Clay's imagery works today: a caption shows up and nobody knows if it's legit.\"", "Press 1: the 17 turbines both records agree on. The caption is wrong: they're all around the centre.", "Press 2: the gold turbine. USGS puts it just outside the top edge, OpenStreetMap just inside, 2 m apart: 17 or 18.", "Press 3: we stay out of hand-labelling unless sources conflict or confidence is too low. This conflict was flagged automatically (wind agreed on 25 of 26 Cases); a person checked the photo and confirmed 18.", "If asked: the cross-check is built for solar and wind; a confidence threshold for labels is the plan, not built yet.", "The 3 × 3 grid is ours: the model sees the plain photo, and the prompt makes it name each object's place as one of 9 cells."] },
-  { title: "Example search", section: "Value Unlock", seconds: 28, component: ExampleSearch,
+  { title: "Example search", section: "Value Unlock", seconds: 22, component: ExampleSearch,
     spoken: "Why does this matter? Trusted captions make satellite imagery searchable in plain words. Ask about the economic impact of flooding in Bangkok and access to aid, and you get the images whose checked captions match: flooded streets, a market under water, a relief site, and the route to reach it. Search results are only as good as the captions behind them.",
     notes: ["Let the video play; it loops every 16 s.", "The line to land: search results are only as good as the captions behind them.", "Illustrative, not real results: our Cases today are US solar, wind and land cover. Don't imply we have run this search."] },
   { title: "How it works", section: "Our Solution", seconds: 30, component: Architecture,
     spoken: "Here is how it works, start to finish. An aerial image and public records go in. One: a model writes the caption from the image alone. Two: each fact is checked against the imagery before it is kept. Three: we score it against the public records, which the model never sees. Four: a gate keeps a change only if it beats the baseline. Only pairs that pass go on to Clay, ready to search.",
     notes: ["Follow the numbers: 1 write, 2 verify, 3 score against hidden records, 4 gate.", "Point at the bottom row: answer keys for free, wrong captions caught before anyone searches, search in words.", "The dashed loop back from Clay is planned, not built: say 'next'."] },
-  { title: "Our solution", section: "Our Solution", seconds: 40, component: Trust, steps: 6,
+  { title: "Our solution", section: "Our Solution", seconds: 34, component: Trust, steps: 6,
     spoken: "Here is how we make captions you can trust. We verify, then write: each fact is checked against the imagery before the caption is written. The answer keys are public records, cross-checked by code, that the captioner never sees. One shared vocabulary of objects and their look-alikes. We tune on one region and test on another it never saw. And a self-improvement loop keeps only the changes that beat the baseline. The result: a caption that matches what is really there.",
     notes: ["Press → for each point as you say it (5 presses); the 6th turns the caption green.", "Verify-then-write: in the 4-image test, every object it named was really there, and correctness rose 0.53 → 0.65. Don't claim it's in the baseline: the gate kept it out because coverage dropped.", "Say 'tune', not 'train': we tune the captioner's prompt and checks.", "Labels are automatic; a person only looks where the two records disagree."] },
+  { title: "The ontology", section: "Our Solution", seconds: 22, component: Ontology, steps: 2,
+    spoken: "Our caption harness also reads an ontology: a semantic layer of what things are, what they sit near, and what they are mistaken for. Without it, the captioner called greenhouses solar farms nine times in twelve. With it, it is warned before it writes, and every claim uses words we can check.",
+    notes: ["Press 1: the photo pixelates into the ontology graph; each tag lands on its class.", "Press 2: why it helps. The badges 1, 2, 3 on the graph match the three benefits. The quoted lines are the real output of ontology.prompt_context for these classes.", "9 of 12 is measured: the Baseline, captioned without the guidance. The effect with it isn't measured yet: it's the next Batch the gate tests. Don't claim it fixed the greenhouses.", "Don't claim it's in the baseline: the guidance is a Batch option (ontology_context), off in the Baseline. Always on: the captioner may only name the ontology's 11 classes."] },
   { title: "On AWS", section: "Our Solution", seconds: 25, component: Aws,
-    spoken: "All of it runs on AWS, from one deploy command. Bedrock writes, judges and searches the captions, with Nova Pro, Claude Opus and Titan embeddings. Results live in S3, and the site runs on Fargate behind CloudFront. The dashed boxes are next: Step Functions to fan out, SageMaker for GPU cost, and AgentCore for the agentic captioner.",
-    notes: ["Solid boxes are running now: this deck comes from that Fargate task.", "One cdk deploy per account; nothing crosses accounts.", "Dashed boxes are next; lead into the scale slide: what it costs."] },
-  { title: "Live demo", section: "Our Solution", seconds: 32, component: Demo,
+    spoken: "All of it runs on AWS, deployed with CDK. Bedrock writes, judges and searches the captions. The agentic captioner runs on AgentCore, which holds its LGND sign-in and reaches two MCP servers: LGND Geo to check imagery, and RODA for AWS open data. Results live in S3, and the site runs on Fargate behind CloudFront. Next: Step Functions to fan out, and SageMaker for GPU cost.",
+    notes: ["Solid boxes are running now: this deck comes from that Fargate task.", "AgentCore is live: validated in us-west-2 on 2026-11-04, a verified Batch on 3 dev Cases with the LGND token from Identity. The Baseline ran locally with no tools, so don't tie its numbers to AgentCore.", "MCP servers are allowlisted: none may read an answer key (ADR-0006). RODA is pinned to 0.1.7; LGND is remote, so each Batch records the version it reports.", "Two CDK stacks per account, the web app and AgentCore; nothing crosses accounts. X-Ray spans are built but opt-in, because Transaction Search is account-wide: don't say they're on.", "Dashed boxes are next; lead into the scale slide: what it costs."] },
+  { title: "Live demo", section: "Our Solution", seconds: 26, component: Demo,
     spoken: "Now the site. The overview shows the current baseline. A caption, with each claim marked supported or not, right on the image. The report, five criteria side by side, which can read itself aloud. And compare to baseline: the gate says better, worse, or inconclusive.",
     notes: ["Overview → a Caption on its grid → report and Listen → Compare.", "Keep the recorded Batch open as the offline fallback."] },
   { title: "At Clay's scale", section: "Scale", seconds: 20, component: Scale,
@@ -272,7 +321,7 @@ export const SLIDES = [
     notes: ["Clay itself is a ~5% sample; the archives are 100× bigger, so cost per Caption decides what gets captioned.",
       "Batch is a published 50%; the green 'assumed' rows are hypotheses our gate can test, which is the point.",
       "Land the judge line: scoring with a big model costs more than captioning, and our grounding is free."] },
-  { title: "Thank you", seconds: 20, component: Next,
+  { title: "Thank you", seconds: 16, component: Next,
     spoken: "Thank you. You can see it live on our site, and read every line of the code on GitHub. Our ask is Clay's real caption set and its rubric weights. And any slide here reads itself aloud.",
     notes: ["Point at the two links; leave this slide up for questions.", "Close on the ask: Clay's real caption set and its rubric weights.", "Mention Listen (A) as the accessibility point."] },
 ];

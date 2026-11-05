@@ -1,5 +1,8 @@
-// The AWS deployment, as built by infra/app.py plus what docs/caption-design.md §3.4 plans next.
-// Solid = deployed now; dashed = planned (AWS-04, -05, -09, -11). Keep it in step with both.
+// The AWS deployment: the web app (infra/app.py) and the Harness on AgentCore
+// (infra/agentcore_app.py), with the MCP servers the Harness may call (src/clayzer/tools.py), plus
+// what docs/caption-design.md §3.4 plans next. Solid = deployed now; dashed = planned or opt-in
+// (SageMaker AWS-04, Step Functions AWS-05, spans via Transaction Search). Keep it in step with all
+// three.
 
 import { html } from "./html.js";
 
@@ -14,40 +17,58 @@ const KINDS = {
   external: { fill: "#fffdfb", stroke: "#cebeb5" },
 };
 
+// Boxes that hold other boxes: AgentCore's three parts, and the allowlisted MCP servers.
+const GROUPS = [
+  { x: 232, y: 380, w: 612, h: 140, title: "Amazon Bedrock AgentCore", stroke: "#e8beb2", fill: "#fbefea" },
+  { x: 1186, y: 380, w: 204, h: 236, title: "MCP servers", stroke: "#cebeb5", fill: "#fffdfb" },
+];
+
 // x, y, w, h in the 1400 × 640 viewBox.
 const NODES = [
-  { id: "browser", x: 10, y: 98, w: 182, h: 84, kind: "external", title: "Judges' browser", sub: ["HTTPS"] },
+  { id: "browser", x: 10, y: 80, w: 182, h: 96, kind: "external", title: "Judges' browser", sub: ["HTTPS"] },
 
-  { id: "cdn", x: 236, y: 98, w: 170, h: 84, kind: "platform", title: "CloudFront", sub: ["HTTPS URL, no caching"] },
-  { id: "alb", x: 446, y: 98, w: 170, h: 84, kind: "platform", title: "Load balancer", sub: ["accepts CloudFront only"] },
-  { id: "web", x: 656, y: 88, w: 210, h: 104, kind: "platform", title: "ECS Fargate", sub: ["Clayzer web app", "1 ARM64 task · read-only"] },
-  { id: "s3", x: 926, y: 88, w: 170, h: 300, kind: "data", title: "S3 store", sub: ["Chips, Cases,", "Captions, Traces,", "scores, reports,", "Batches", "", "encrypted,", "public access", "blocked"] },
+  { id: "cdn", x: 236, y: 80, w: 170, h: 96, kind: "platform", title: "CloudFront", sub: ["HTTPS, no caching"] },
+  { id: "alb", x: 436, y: 80, w: 170, h: 96, kind: "platform", title: "Load balancer", sub: ["CloudFront only"] },
+  { id: "web", x: 636, y: 80, w: 200, h: 96, kind: "platform", title: "ECS Fargate", sub: ["Clayzer web app", "1 ARM64 task · read-only"] },
+  { id: "s3", x: 900, y: 80, w: 200, h: 270, kind: "data", title: "S3 store", sub: ["Chips, Cases,", "Captions, Traces,", "scores, reports,", "Batches", "", "encrypted,", "public access", "blocked"] },
 
-  { id: "bedrock", x: 236, y: 284, w: 380, h: 104, kind: "captions", title: "Amazon Bedrock", sub: ["Nova Pro writes Captions · Opus 5.5 judges", "Titan Text Embeddings v2 for retrieval"] },
-  { id: "pipe", x: 656, y: 284, w: 210, h: 104, kind: "evaluation", title: "Caption pipeline", sub: ["clayzer CLI: Cases →", "Captions → scores → report"] },
+  { id: "bedrock", x: 236, y: 228, w: 370, h: 104, kind: "captions", title: "Amazon Bedrock", sub: ["Nova Pro writes Captions · Opus 5.5 judges", "Titan Text Embeddings v2 for retrieval"] },
+  { id: "pipe", x: 636, y: 228, w: 200, h: 104, kind: "evaluation", title: "Caption pipeline", sub: ["clayzer batch:", "caption → score → report"] },
 
-  { id: "sm", x: 236, y: 470, w: 170, h: 104, kind: "captions", planned: true, title: "SageMaker", sub: ["open VLM on one GPU", "GPU-seconds for cost"] },
-  { id: "sfn", x: 446, y: 470, w: 170, h: 104, kind: "evaluation", planned: true, title: "Step Functions", sub: ["runs the pipeline,", "fan-out over Chips"] },
-  { id: "otel", x: 656, y: 470, w: 210, h: 104, kind: "platform", planned: true, title: "ADOT", sub: ["→ X-Ray and CloudWatch:", "Traces, faults, cost metrics"] },
-  { id: "agent", x: 926, y: 470, w: 170, h: 104, kind: "captions", planned: true, title: "AgentCore", sub: ["agentic captioner,", "holds LGND sign-in"] },
+  { id: "identity", x: 248, y: 416, w: 180, h: 90, kind: "captions", title: "Identity", sub: ["holds the LGND", "sign-in (OAuth)"] },
+  { id: "gateway", x: 444, y: 416, w: 180, h: 90, kind: "captions", title: "Gateway", sub: ["MCP behind a", "Cognito sign-in"] },
+  { id: "runtime", x: 640, y: 416, w: 190, h: 90, kind: "captions", title: "Runtime", sub: ["the agentic Harness:", "draft → verify → write"] },
 
-  { id: "naip", x: 1206, y: 284, w: 176, h: 104, kind: "external", title: "NAIP on AWS", sub: ["0.6 m aerial imagery", "Requester-Pays"] },
-  { id: "lgnd", x: 1206, y: 470, w: 176, h: 104, kind: "external", planned: true, title: "LGND Geo MCP", sub: ["imagery claim checks"] },
+  { id: "sm", x: 236, y: 548, w: 190, h: 64, kind: "captions", planned: true, title: "SageMaker", sub: ["open VLM, GPU-seconds"] },
+  { id: "sfn", x: 440, y: 548, w: 190, h: 64, kind: "evaluation", planned: true, title: "Step Functions", sub: ["fan out over Chips"] },
+  { id: "otel", x: 644, y: 548, w: 190, h: 64, kind: "platform", planned: true, title: "X-Ray spans", sub: ["opt-in, account-wide"] },
+
+  { id: "naip", x: 1206, y: 228, w: 176, h: 104, kind: "external", title: "NAIP on AWS", sub: ["0.6 m aerial imagery", "Requester-Pays"] },
+  { id: "lgnd", x: 1200, y: 416, w: 176, h: 86, kind: "external", title: "LGND Geo", sub: ["search, classify,", "check imagery"] },
+  { id: "roda", x: 1200, y: 516, w: 176, h: 86, kind: "external", title: "RODA", sub: ["AWS Open Data", "catalog · pinned"] },
 ];
 
 // [from, to, label, planned]. Points are picked by hand so lines stay straight.
 const EDGES = [
-  [[192, 140], [236, 140], ""],
-  [[406, 140], [446, 140], ""],
-  [[616, 140], [656, 140], ""],
-  [[866, 140], [926, 140], "reads"],
-  [[656, 336], [616, 336], ""],
-  [[866, 336], [926, 336], "writes"],
-  [[1206, 336], [1096, 336], "Chips"],
-  [[531, 470], [700, 388], "", true],
-  [[761, 388], [761, 470], "", true],
-  [[1096, 522], [1206, 522], "", true],
+  [[192, 128], [236, 128], ""],
+  [[406, 128], [436, 128], ""],
+  [[606, 128], [636, 128], ""],
+  [[836, 128], [900, 128], "reads"],
+  [[636, 280], [606, 280], ""],
+  [[836, 280], [900, 280], "writes"],
+  [[1206, 280], [1100, 280], "Chips"],
+  [[735, 332], [735, 416], ""],
+  [[830, 460], [1186, 460], "MCP tools"],
 ];
+
+function Group({ g }) {
+  return html`<g>
+    <rect x=${g.x} y=${g.y} width=${g.w} height=${g.h} rx="14" fill=${g.fill} stroke=${g.stroke}
+      stroke-width="2" />
+    <text x=${g.x + 16} y=${g.y + 24} font-size="15" font-weight="700" letter-spacing="1"
+      fill=${MUTED}>${g.title.toUpperCase()}</text>
+  </g>`;
+}
 
 function Node({ n }) {
   const lines = n.sub.length;
@@ -126,7 +147,7 @@ export function StoryArchitecture() {
 
 export function ArchitectureDiagram() {
   return html`<svg class="arch" viewBox="0 0 1400 640" role="img"
-      aria-label="AWS deployment: browser to CloudFront, load balancer, and a Fargate task that reads the S3 store; the caption pipeline calls Bedrock and writes to S3; SageMaker, Step Functions, ADOT, and AgentCore are planned.">
+      aria-label="AWS deployment: browser to CloudFront, load balancer, and a Fargate task that reads the S3 store. The caption pipeline calls Bedrock, writes to S3, and sends Runs to the Harness on Bedrock AgentCore, whose Identity holds the LGND sign-in and whose Runtime calls two MCP servers, LGND Geo and RODA. SageMaker, Step Functions, and X-Ray spans are planned or opt-in.">
     <defs>
       ${[["arrow", MUTED], ["arrow-planned", PLANNED]].map(([id, color]) => html`<marker id=${id}
         viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
@@ -134,8 +155,9 @@ export function ArchitectureDiagram() {
       </marker>`)}
     </defs>
     <rect x="206" y="20" width="920" height="600" rx="18" fill="#fbf8f6" stroke="#cebeb5" stroke-width="2" />
-    <text x="230" y="56" font-size="19" font-weight="600" fill=${MUTED}>One AWS account · us-west-2 · created by one cdk deploy</text>
-    <text x="1110" y="452" text-anchor="end" font-size="15" font-weight="700" letter-spacing="1.2" fill=${MUTED}>PLANNED</text>
+    <text x="230" y="56" font-size="19" font-weight="600" fill=${MUTED}>One AWS account · us-west-2 · two CDK stacks: the web app and AgentCore</text>
+    <text x="1100" y="586" text-anchor="end" font-size="15" font-weight="700" letter-spacing="1.2" fill=${MUTED}>NEXT</text>
+    ${GROUPS.map((g) => html`<${Group} g=${g} />`)}
     ${NODES.map((n) => html`<${Node} n=${n} />`)}
     ${EDGES.map((e) => html`<${Edge} e=${e} />`)}
   </svg>`;
