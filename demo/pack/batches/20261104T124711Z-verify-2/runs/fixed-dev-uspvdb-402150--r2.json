@@ -1,0 +1,350 @@
+{
+  "run_id": "fixed-dev-uspvdb-402150#2",
+  "batch_id": "20261104T124711Z-verify-2",
+  "case_id": "fixed-dev-uspvdb-402150",
+  "repeat": 2,
+  "status": "ok",
+  "error": null,
+  "scores": {
+    "grounding": {
+      "correctness": 0.45833333333333337,
+      "coverage": 0.6666666666666666,
+      "precision": 1.0,
+      "recall": 0.6666666666666666,
+      "count": 0.0,
+      "position": 0.8333333333333334,
+      "attributes": 0.0,
+      "relations": null,
+      "change": null,
+      "unscored_share": 0.4,
+      "denominators": null,
+      "evidence_policy": null,
+      "specificity": null
+    },
+    "grounding_detail": {
+      "rows": [
+        {
+          "claim": {
+            "id": "o1",
+            "object": "solar_array",
+            "count": 1,
+            "position": "west",
+            "attributes": {
+              "size": "large"
+            }
+          },
+          "verdict": "matched",
+          "ref_position": "west",
+          "position": 1.0,
+          "attributes": {
+            "size": 0.0
+          }
+        },
+        {
+          "claim": {
+            "id": "o2",
+            "object": "solar_array",
+            "count": 1,
+            "position": "centre",
+            "attributes": {
+              "size": "large"
+            }
+          },
+          "verdict": "matched",
+          "ref_position": "west",
+          "position": 0.5,
+          "attributes": {
+            "size": 0.0
+          }
+        },
+        {
+          "claim": {
+            "id": "o5",
+            "object": "water",
+            "count": 2,
+            "position": "south_east"
+          },
+          "verdict": "matched",
+          "ref_position": "south_east",
+          "position": 1.0
+        }
+      ],
+      "counts": {
+        "solar_array": {
+          "claimed": 2,
+          "reference": 1
+        }
+      },
+      "missed": [
+        "road"
+      ],
+      "unscored": [
+        "bare_ground",
+        "bare_ground"
+      ],
+      "relation_rows": [],
+      "relations_unscored": []
+    },
+    "fidelity": {
+      "score": 0.6,
+      "issues": [
+        "The caption calls the two circular objects 'uncertain in nature' without identifying them. They look like water-filled circular tanks or clarifiers, as at a water or wastewater treatment facility.",
+        "The circular objects are given as south-east, but the upper one sits in the east cell (middle row). Only the lower one is in the south-east.",
+        "The caption leaves out the paved road running north\u2013south along the east side.",
+        "The caption leaves out the reservoir or pond basin with a green edge in the north-east corner.",
+        "The caption leaves out the internal dirt access roads that divide the solar array into blocks.",
+        "The solar array also covers the north and south-west of the image, which the caption does not mention. 'Center and west' understates its extent."
+      ],
+      "kind": "model_opinion"
+    },
+    "retrieval": {
+      "repeat": 2,
+      "mrr": 0.8888888888888888,
+      "recall@1": 0.6666666666666666,
+      "queries": [
+        {
+          "query": "find solar farms",
+          "relevant": [
+            "fixed-dev-uspvdb-400117",
+            "fixed-dev-uspvdb-402150"
+          ],
+          "ranked": [
+            "fixed-dev-uspvdb-400117",
+            "fixed-dev-uspvdb-402150",
+            "fixed-dev-uswtdb-3025453",
+            "fixed-dev-neg-1"
+          ],
+          "reciprocal_rank": 1.0,
+          "recall@1": 0.5
+        },
+        {
+          "query": "find wind turbines",
+          "relevant": [
+            "fixed-dev-uswtdb-3025453"
+          ],
+          "ranked": [
+            "fixed-dev-uswtdb-3025453",
+            "fixed-dev-uspvdb-400117",
+            "fixed-dev-uspvdb-402150",
+            "fixed-dev-neg-1"
+          ],
+          "reciprocal_rank": 1.0,
+          "recall@1": 1.0
+        },
+        {
+          "query": "find railroads",
+          "relevant": [
+            "fixed-dev-neg-1"
+          ],
+          "ranked": [
+            "fixed-dev-uswtdb-3025453",
+            "fixed-dev-uspvdb-400117",
+            "fixed-dev-neg-1",
+            "fixed-dev-uspvdb-402150"
+          ],
+          "reciprocal_rank": 0.3333333333333333,
+          "recall@1": 0.0
+        },
+        {
+          "query": "find buildings",
+          "relevant": [
+            "fixed-dev-neg-1"
+          ],
+          "ranked": [
+            "fixed-dev-neg-1",
+            "fixed-dev-uspvdb-400117",
+            "fixed-dev-uspvdb-402150",
+            "fixed-dev-uswtdb-3025453"
+          ],
+          "reciprocal_rank": 1.0,
+          "recall@1": 1.0
+        },
+        {
+          "query": "find parking lots",
+          "relevant": [
+            "fixed-dev-neg-1"
+          ],
+          "ranked": [
+            "fixed-dev-neg-1",
+            "fixed-dev-uspvdb-400117",
+            "fixed-dev-uspvdb-402150",
+            "fixed-dev-uswtdb-3025453"
+          ],
+          "reciprocal_rank": 1.0,
+          "recall@1": 1.0
+        },
+        {
+          "query": "find water",
+          "relevant": [
+            "fixed-dev-neg-1",
+            "fixed-dev-uspvdb-402150"
+          ],
+          "ranked": [
+            "fixed-dev-neg-1",
+            "fixed-dev-uswtdb-3025453",
+            "fixed-dev-uspvdb-402150",
+            "fixed-dev-uspvdb-400117"
+          ],
+          "reciprocal_rank": 1.0,
+          "recall@1": 0.5
+        }
+      ]
+    },
+    "cost": {
+      "provider": "bedrock",
+      "gpu_seconds": null,
+      "gpu_count": null,
+      "gpu_type": null,
+      "gpu_status": "unavailable",
+      "method": null,
+      "latency_seconds": 3.29,
+      "tokens": 2566,
+      "note": "Latency and tokens are operational measurements, not GPU cost"
+    },
+    "label_preparation": {
+      "reference_preparation": {
+        "value": 50.9,
+        "scope": "case_build",
+        "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+        "units": "seconds",
+        "reference_only": false,
+        "status": "observed"
+      },
+      "caption_generation": {
+        "value": 3.29,
+        "units": "seconds",
+        "scope": "caption_generation",
+        "method": "observed caption pipeline wall time; native includes tools, verification and rewrite",
+        "status": "observed"
+      }
+    },
+    "evidence_yield": {
+      "unique_object_claims": 3,
+      "checkable_object_claims": 3,
+      "supported_object_claim_credit": 0.0,
+      "supported_field_units": 2.0,
+      "supported_claim_credit_per_dollar": null,
+      "supported_claim_credit_per_gpu_second": null,
+      "dollar_measurement": null,
+      "cost_unavailable_reason": "No verified USD observation with model, region, source, method and date",
+      "definition": "Object Claims deduplicated ignoring IDs; fully supported as stated, partial parent class credit retained. Field units count presence, exact position, attributes and one exact aggregate count/class. Relations excluded. Not a quality score."
+    }
+  },
+  "faults": {
+    "harness": 1,
+    "environment": 0,
+    "sandbox": 0,
+    "soft": 0
+  },
+  "workflow": {
+    "score": 0.9765,
+    "components": {
+      "completion": {
+        "score": 1.0,
+        "reason": "submitted a Caption"
+      },
+      "tool_plan": {
+        "score": 1.0,
+        "reason": "all checks passed"
+      },
+      "tool_success": {
+        "score": 0.9,
+        "reason": "9 ok, 1 Harness Faults"
+      },
+      "recovery": {
+        "score": 1.0,
+        "reason": "1 of 1 Harness Faults followed by a successful call to the same tool"
+      },
+      "efficiency": {
+        "score": null,
+        "reason": "single-call Harness: no turn budget"
+      },
+      "cost": {
+        "score": null,
+        "reason": "no token budget (set CLAYZER_TOKEN_BUDGET)"
+      }
+    },
+    "environment_faults": 0
+  },
+  "seconds_to_caption": 3.29,
+  "caption_tokens": 2566,
+  "summary": null,
+  "narrative": null,
+  "caption": {
+    "run_id": "fixed-dev-uspvdb-402150#2",
+    "case_id": "fixed-dev-uspvdb-402150",
+    "repeat": 2,
+    "text": "The image shows a large solar array in the center and west, with bare ground in the east and south. There are two circular objects in the south-east that are uncertain in nature.",
+    "objects": [
+      {
+        "id": "o1",
+        "object": "solar_array",
+        "count": 1,
+        "position": "west",
+        "attributes": {
+          "size": "large"
+        }
+      },
+      {
+        "id": "o2",
+        "object": "solar_array",
+        "count": 1,
+        "position": "centre",
+        "attributes": {
+          "size": "large"
+        }
+      },
+      {
+        "id": "o3",
+        "object": "bare_ground",
+        "count": 1,
+        "position": "east"
+      },
+      {
+        "id": "o4",
+        "object": "bare_ground",
+        "count": 1,
+        "position": "south"
+      },
+      {
+        "id": "o5",
+        "object": "water",
+        "count": 2,
+        "position": "south_east"
+      }
+    ],
+    "relations": [],
+    "uncertain": [
+      "The circular objects in the south-east might be water storage tanks or other structures."
+    ]
+  },
+  "chip": {
+    "id": "ca-uspvdb-402150-20220607",
+    "uri": "chips/ca-uspvdb-402150-20220607.png",
+    "date": "2022-06-07",
+    "bbox": [
+      -118.979411,
+      35.325656,
+      -118.975965,
+      35.32848
+    ],
+    "source": "naip-aws"
+  },
+  "trace": "batches/20261104T124711Z-verify-2/traces/fixed-dev-uspvdb-402150--r2.jsonl",
+  "trace_navigation": {
+    "url": null,
+    "reason": "no recorded X-Ray export context",
+    "trace_id": null
+  },
+  "replay": null,
+  "metric_provenance": null,
+  "config": {
+    "caption_model": "us.amazon.nova-pro-v1:0",
+    "judge_model": "us.anthropic.claude-opus-5-5",
+    "self_graded": false,
+    "prompt_sha": "d1ffc8393867",
+    "cases_sha": "c07bc78cba59",
+    "scorer_version": "grounding-3+workflow-1"
+  },
+  "trace_status": "ok"
+}

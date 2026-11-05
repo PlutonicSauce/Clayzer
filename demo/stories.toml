@@ -1,0 +1,66 @@
+# The demo Stories: recorded Runs, each picked to show one point about the evaluation (GLOSSARY.md).
+# `clayzer stories pack` copies them from the store into demo/pack/, redacted, and
+# `clayzer ui --local-root demo/pack` shows them on the Stories page with no network.
+#
+# Each Story is one Run (batch, case, repeat). A gate Story also names the Batch it's gated
+# against (`baseline`); the page gates the two recorded Batches again, offline.
+
+[[story]]
+id = "greenhouse-fooled"
+title = "A greenhouse fools the captioner, and the score catches it"
+batch = "20261105T011537Z-dev74-absence"
+case = "fixed-dev-lookalike-neg-101"
+repeat = 1
+shows = "Look-alike negatives: a Caption that calls greenhouse rows a solar array is a false positive, not a free pass."
+note = """Greenhouse rows in Kern County, found with LGND Geo's search and checked by eye: no panels. \
+Nova Pro called them a large solar array in all 3 Repeats; across the 4 greenhouse Cases it was fooled in \
+9 of 12 Runs. The Case declares its checked solar absence, so the solar Claim is a false positive, while \
+its road is matched."""
+
+[[story]]
+id = "correct-but-incomplete"
+title = "Correct is not complete"
+batch = "20261105T011537Z-dev74-absence"
+case = "fixed-dev-uspvdb-400564"
+repeat = 1
+shows = "Correctness and coverage are separate, so a Caption that says less can't score as if it said everything."
+note = """"A large solar array is located in the center of the image, with no other discernible objects \
+or features nearby." Everything it claims is right (correctness 1.0), but it leaves out the road OSM \
+maps through the Chip, so coverage is 0.5."""
+
+[[story]]
+id = "gate-rejects-vague-prompt"
+title = "A vaguer prompt looks more correct, and the gate rejects it"
+batch = "20261104T052747Z-vague"
+baseline = "20261104T052042Z-base"
+case = "fixed-dev-uswtdb-3025453"
+repeat = 1
+shows = "The regression gate: a change is kept only if no score drops by more than the Baseline's own spread."
+note = """A prompt asking for one short, general sentence raised correctness from 0.59 to 0.96 over 4 Cases \
+x 3 Repeats, because a Caption that claims little is rarely wrong. The gate failed it: coverage fell on 2 \
+Cases, fidelity on 1, and retrieval MRR from 0.81 to 0.67. This Run says only "A road is visible in the \
+centre of a field with vegetation." and never mentions the wind turbines."""
+
+[[story]]
+id = "verify-drops-invented-solar"
+title = "Verify, then write: an invented solar array is checked and dropped"
+batch = "20261104T124711Z-verify-2"
+case = "fixed-dev-neg-1"
+repeat = 1
+shows = "Verify-then-write: each drafted Claim is checked against LGND Geo's imagery at its grid cell before the Caption is written."
+note = """On a negative Chip the draft claimed a solar array in the south-west cell. LGND's imagery check \
+answered "a storage yard with various materials and equipment instead of a solar array", so the final \
+Caption leaves it out, along with a rooftop the draft called a parking lot and bare ground it called \
+vegetation."""
+
+[[story]]
+id = "lgnd-outage-kept-unverified"
+title = "An outage mid-Run: the Claim is kept as unverified, and the Run completes"
+batch = "20261104T124711Z-verify-2"
+case = "fixed-dev-uspvdb-402150"
+repeat = 2
+shows = "Failures are recorded and attributed in the Trace, and a check that couldn't run doesn't delete a Claim."
+note = """One of five imagery checks failed: LGND's reasoning service was unavailable. That Claim (bare \
+ground, east) stayed in the Caption marked unverified, the other four were confirmed, and the Judge \
+scored the Run as usual. The Trace records the failed Step; it is attributed to the Harness, the \
+default for a failure code ADR-0003 doesn't list (task fault-lgnd-unavailable)."""

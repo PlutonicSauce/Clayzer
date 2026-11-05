@@ -1,0 +1,632 @@
+<!doctype html><html lang='en'><head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>Run fixed-dev-neg-1#1</title>
+<link rel='icon' href='/static/favicon.ico'>
+<style>
+:root {
+  --ink: #252323; --muted: #6b6461; --paper: #fffdfb; --line: #e4dbd6;
+  --captions: #f4dcd4; --captions-line: #e8beb2;
+  --evaluation: #dfe9df; --evaluation-line: #c9d7c9;
+  --platform: #dde7e9; --platform-line: #c9d6d8;
+  --hidden: #a1352b; --ok: #2f6b3a; --warn: #8a5b0e;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+header { padding: 20px 28px 4px; }
+h1 { margin: 0; font-size: 22px; }
+h2 { font-size: 18px; margin: 0 0 4px; }
+h3 { font-size: 13px; margin: 14px 0 4px; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--muted); }
+.sub { color: var(--muted); margin: 4px 0 0; }
+code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+main { padding: 8px 28px 40px; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; max-width: 100%; }
+td { overflow-wrap: anywhere; }
+nav { margin: 8px 0 16px; }
+a:focus-visible, summary:focus-visible { outline: 3px solid var(--warn); outline-offset: 3px; }
+aside[role=note] { background: #fbf4e6; border: 1px solid #e3cfa8; padding: 12px; margin: 12px 0; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px;
+  margin: 8px 0 24px; }
+.card { border: 1px solid var(--evaluation-line); background: var(--evaluation); border-radius: 8px;
+  padding: 10px 12px; }
+.card.platform { border-color: var(--platform-line); background: var(--platform); }
+.card .big { font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.card small { color: var(--muted); display: block; }
+.bar { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; margin: 0 0 12px;
+  color: var(--muted); }
+section.case { border-top: 1px solid var(--line); padding: 20px 0; display: grid;
+  grid-template-columns: 420px minmax(0, 1fr); gap: 24px; }
+@media (max-width: 900px) { section.case { grid-template-columns: 1fr; } }
+.chip svg { width: 100%; height: auto; border-radius: 6px; border: 1px solid var(--line);
+  display: block; }
+.chip .meta { color: var(--muted); font-size: 12.5px; margin-top: 6px; }
+blockquote { margin: 8px 0; padding: 8px 12px; background: var(--captions);
+  border-left: 3px solid var(--captions-line); border-radius: 4px; }
+table { border-collapse: collapse; width: 100%; margin: 6px 0; }
+th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line);
+  vertical-align: top; }
+th { font-size: 12.5px; color: var(--muted); font-weight: 600; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.badge { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 12px;
+  border: 1px solid; white-space: nowrap; }
+.b-ok { color: var(--ok); border-color: #b9d3bd; background: #eef6ef; }
+.b-bad { color: var(--hidden); border-color: #e6b8b1; background: #fbefed; }
+.b-warn { color: var(--warn); border-color: #e3cfa8; background: #fbf4e6; }
+.b-na { color: var(--muted); border-color: var(--line); background: #f7f3f1; }
+ul.issues { margin: 4px 0; padding-left: 18px; }
+.trace-summary { margin: 10px 0; padding: 10px 14px; border-radius: 8px; background: #faf6f3;
+  border: 1px solid var(--line); }
+.trace-summary .verdict { margin: 0 0 4px; font-weight: 650; }
+.trace-summary ol, .trace-summary ul { margin: 2px 0 6px; padding-left: 20px; font-size: 13.5px; }
+.trace-summary h3 { margin: 8px 0 2px; }
+.trace-summary.narrative p { margin: 4px 0; }
+.trace-summary .facts { margin-top: 8px; border: 0; padding: 0; }
+.trace-summary .facts .trace-summary { background: #fff; }
+details { border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; margin: 6px 0; }
+details > summary { cursor: pointer; }
+small { color: var(--muted); }
+.legend { display: flex; gap: 14px; font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px;
+  vertical-align: -2px; margin-right: 4px; }
+body.hide-claims .claims, body.hide-refs .refs, body.hide-grid .grid { display: none; }
+
+.steps { list-style: none; margin: 6px 0; padding: 0; }
+.steps > li { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; margin: 6px 0;
+  background: #fff; }
+.steps .head { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; }
+.steps .head b { font-size: 14.5px; }
+.steps .judge { opacity: .85; background: #faf7f5; }
+.steps pre { white-space: pre-wrap; word-break: break-word; max-height: 360px; overflow: auto;
+  background: #faf6f3; border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px;
+  font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.scores { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;
+  margin: 8px 0 14px; }
+.scores .card .big { font-size: 22px; }
+.status-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 6px 0 0; }
+section.block { margin: 22px 0; }
+</style></head><body>
+<header><h1>Run fixed-dev-neg-1#1</h1>
+<p class='sub'>Batch 20261104T124711Z-verify-2 · Repeat 1 · us.amazon.nova-pro-v1:0 · prompt <code>d1ffc8393867</code></p>
+<p class='status-row'><span class='badge b-ok'>ok</span><b></b></p></header><main>
+<nav aria-label='Report navigation'><a href='../report.html'>← Batch report</a> · <a href='fixed-dev-neg-1--r1.json'>Run JSON</a> · <a href='../traces/fixed-dev-neg-1--r1.jsonl'>Recorded Trace</a></nav>
+
+<p class='sub'>AWS X-Ray unavailable: no recorded X-Ray export context</p>
+<div class='scores'><div class='card'><small>Grounding: right</small><div class='big'>1.00</div><small>of what was claimed checks out</small></div><div class='card'><small>Grounding: enough</small><div class='big'>0.20</div><small>of what the map shows was mentioned</small></div><div class='card'><small>Fidelity</small><div class='big'>0.65</div><small>model opinion</small></div><div class='card'><small>Workflow Score</small><div class='big'>1.00</div><small>how well the Harness worked, from its Trace</small></div></div>
+<section class='case'><div class='chip'>
+<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img"><title>Image with independent reference cells and Caption Claims</title><image href="/api/chips/ca-neg-1-20220607.png" width="512" height="512"/><g class="grid" stroke="#fffdfb" stroke-opacity=".7" stroke-width="1.5" stroke-dasharray="6 5"><line x1="170.66666666666666" y1="0" x2="170.66666666666666" y2="512"/><line x1="0" y1="170.66666666666666" x2="512" y2="170.66666666666666"/><line x1="341.3333333333333" y1="0" x2="341.3333333333333" y2="512"/><line x1="0" y1="341.3333333333333" x2="512" y2="341.3333333333333"/></g><g class="refs"><rect x="4.0" y="4.0" width="162.66666666666666" height="162.66666666666666" fill="none" stroke="#2f6b3a" stroke-opacity=".8" stroke-width="2" stroke-dasharray="4 4"/><rect x="174.66666666666666" y="4.0" width="162.66666666666666" height="162.66666666666666" fill="none" stroke="#2f6b3a" stroke-opacity=".8" stroke-width="2" stroke-dasharray="4 4"/><rect x="345.3333333333333" y="4.0" width="162.66666666666666" height="162.66666666666666" fill="none" stroke="#2f6b3a" stroke-opacity=".8" stroke-width="2" stroke-dasharray="4 4"/><rect x="4.0" y="345.3333333333333" width="162.66666666666666" height="162.66666666666666" fill="none" stroke="#2f6b3a" stroke-opacity=".8" stroke-width="2" stroke-dasharray="4 4"/><rect x="174.66666666666666" y="345.3333333333333" width="162.66666666666666" height="162.66666666666666" fill="none" stroke="#2f6b3a" stroke-opacity=".8" stroke-width="2" stroke-dasharray="4 4"/><rect x="349.3333333333333" y="146.66666666666666" width="154.66666666666666" height="16" rx="3" fill="#eef6ef" fill-opacity=".92"/><text x="426.66666666666663" y="158.66666666666666" text-anchor="middle" font-size="11" fill="#2f6b3a">1 × building</text><rect x="8.0" y="146.66666666666666" width="154.66666666666666" height="16" rx="3" fill="#eef6ef" fill-opacity=".92"/><text x="85.33333333333333" y="158.66666666666666" text-anchor="middle" font-size="11" fill="#2f6b3a">1 × parking lot</text><rect x="178.66666666666669" y="487.99999999999994" width="154.66666666666666" height="16" rx="3" fill="#eef6ef" fill-opacity=".92"/><text x="256.0" y="499.99999999999994" text-anchor="middle" font-size="11" fill="#2f6b3a">railroad</text><rect x="8.0" y="128.66666666666666" width="154.66666666666666" height="16" rx="3" fill="#eef6ef" fill-opacity=".92"/><text x="85.33333333333333" y="140.66666666666666" text-anchor="middle" font-size="11" fill="#2f6b3a">road</text><rect x="178.66666666666669" y="469.99999999999994" width="154.66666666666666" height="16" rx="3" fill="#eef6ef" fill-opacity=".92"/><text x="256.0" y="481.99999999999994" text-anchor="middle" font-size="11" fill="#2f6b3a">water</text></g><g class="claims"><rect x="178.66666666666669" y="10.0" width="154.66666666666666" height="17" rx="8" fill="#2f6b3a" fill-opacity=".9"/><text x="256.0" y="23.0" text-anchor="middle" font-size="11" fill="#fffdfb" font-weight="600">1 × building</text></g></svg>
+<div class='meta mono'>ca-neg-1-20220607 · 2022-06-07 · naip-pc</div>
+</div><div>
+<h2>Caption</h2>
+<blockquote>An aerial image shows a large building in the north and a large, mostly bare ground area in the centre.</blockquote>
+<h3>Left uncertain</h3><ul class='issues'>
+<li>2 × parking lot at north</li>
+<li>1 × solar array at south_west</li>
+<li>1 × vegetation at centre</li>
+</ul>
+<h3>Grounding: Claims against the Reference Labels</h3>
+<table><tr><th>Claim</th><th>Verdict</th><th>Reference Label</th><th class="num">Position</th></tr><tr><td>1 × building at north</td><td><span class="badge b-ok">matched</span></td><td>1 × building at north_east (covers north_west, north, north_east)  · osm</td><td class="num"><span class="badge b-ok">1.00</span></td></tr><tr><td>—</td><td><span class='badge b-bad'>missed</span></td><td>parking lot at north_west · osm</td><td></td></tr><tr><td>—</td><td><span class='badge b-bad'>missed</span></td><td>railroad at south · osm</td><td></td></tr><tr><td>—</td><td><span class='badge b-bad'>missed</span></td><td>road at north_west · osm</td><td></td></tr><tr><td>—</td><td><span class='badge b-bad'>missed</span></td><td>water at south · osm</td><td></td></tr><tr><td>bare ground</td><td><span class='badge b-na'>unscored</span></td><td>no Answer Key covers this type</td><td></td></tr></table><p role='note'><strong>Correctness evaluates asserted facts; coverage is reference type recall. A score of 1.0 does not establish full caption quality. Count and position completeness was not recorded.</strong></p><p class="sub">Counts: building: 1 claimed, 1 in the Answer Key</p>
+<h3>Fidelity: the Judge's notes</h3><ul class='issues'>
+<li>Leaves out the paved parking lots: a striped lot in the northwest beside the building, a large paved yard to its south, and another lot along the southern edge.</li>
+<li>Leaves out the rectangular graded basin in the south-centre, which looks like a retention or detention pond.</li>
+<li>Leaves out the dirt access roads and tracks crossing the bare ground in the east.</li>
+<li>The caption is accurate but vague. It doesn&#x27;t say the building looks like a large warehouse or distribution centre, and it only partly shows at the northern edge, reaching into the northeast.</li>
+</ul>
+</div></section>
+<section class='block'><h2>Retrieval, GPU cost and preparation time</h2><p>Retrieval is measured over the Repeat's corpus. GPU seconds, count and type are unavailable on Bedrock. Case-building time includes imagery and reference queries; caption generation time is separate. Missing measurements are unavailable.</p><pre>{
+  &quot;retrieval&quot;: {
+    &quot;repeat&quot;: 1,
+    &quot;mrr&quot;: 0.6805555555555555,
+    &quot;recall@1&quot;: 0.3333333333333333,
+    &quot;queries&quot;: [
+      {
+        &quot;query&quot;: &quot;find solar farms&quot;,
+        &quot;relevant&quot;: [
+          &quot;fixed-dev-uspvdb-400117&quot;,
+          &quot;fixed-dev-uspvdb-402150&quot;
+        ],
+        &quot;ranked&quot;: [
+          &quot;fixed-dev-uspvdb-400117&quot;,
+          &quot;fixed-dev-uspvdb-402150&quot;,
+          &quot;fixed-dev-uswtdb-3025453&quot;,
+          &quot;fixed-dev-neg-1&quot;
+        ],
+        &quot;reciprocal_rank&quot;: 1.0,
+        &quot;recall@1&quot;: 0.5
+      },
+      {
+        &quot;query&quot;: &quot;find wind turbines&quot;,
+        &quot;relevant&quot;: [
+          &quot;fixed-dev-uswtdb-3025453&quot;
+        ],
+        &quot;ranked&quot;: [
+          &quot;fixed-dev-uswtdb-3025453&quot;,
+          &quot;fixed-dev-uspvdb-402150&quot;,
+          &quot;fixed-dev-uspvdb-400117&quot;,
+          &quot;fixed-dev-neg-1&quot;
+        ],
+        &quot;reciprocal_rank&quot;: 1.0,
+        &quot;recall@1&quot;: 1.0
+      },
+      {
+        &quot;query&quot;: &quot;find railroads&quot;,
+        &quot;relevant&quot;: [
+          &quot;fixed-dev-neg-1&quot;
+        ],
+        &quot;ranked&quot;: [
+          &quot;fixed-dev-uswtdb-3025453&quot;,
+          &quot;fixed-dev-uspvdb-402150&quot;,
+          &quot;fixed-dev-uspvdb-400117&quot;,
+          &quot;fixed-dev-neg-1&quot;
+        ],
+        &quot;reciprocal_rank&quot;: 0.25,
+        &quot;recall@1&quot;: 0.0
+      },
+      {
+        &quot;query&quot;: &quot;find buildings&quot;,
+        &quot;relevant&quot;: [
+          &quot;fixed-dev-neg-1&quot;
+        ],
+        &quot;ranked&quot;: [
+          &quot;fixed-dev-uspvdb-402150&quot;,
+          &quot;fixed-dev-neg-1&quot;,
+          &quot;fixed-dev-uspvdb-400117&quot;,
+          &quot;fixed-dev-uswtdb-3025453&quot;
+        ],
+        &quot;reciprocal_rank&quot;: 0.5,
+        &quot;recall@1&quot;: 0.0
+      },
+      {
+        &quot;query&quot;: &quot;find parking lots&quot;,
+        &quot;relevant&quot;: [
+          &quot;fixed-dev-neg-1&quot;
+        ],
+        &quot;ranked&quot;: [
+          &quot;fixed-dev-uspvdb-402150&quot;,
+          &quot;fixed-dev-uspvdb-400117&quot;,
+          &quot;fixed-dev-neg-1&quot;,
+          &quot;fixed-dev-uswtdb-3025453&quot;
+        ],
+        &quot;reciprocal_rank&quot;: 0.3333333333333333,
+        &quot;recall@1&quot;: 0.0
+      },
+      {
+        &quot;query&quot;: &quot;find water&quot;,
+        &quot;relevant&quot;: [
+          &quot;fixed-dev-neg-1&quot;,
+          &quot;fixed-dev-uspvdb-402150&quot;
+        ],
+        &quot;ranked&quot;: [
+          &quot;fixed-dev-uspvdb-402150&quot;,
+          &quot;fixed-dev-uswtdb-3025453&quot;,
+          &quot;fixed-dev-neg-1&quot;,
+          &quot;fixed-dev-uspvdb-400117&quot;
+        ],
+        &quot;reciprocal_rank&quot;: 1.0,
+        &quot;recall@1&quot;: 0.5
+      }
+    ]
+  },
+  &quot;cost&quot;: {
+    &quot;provider&quot;: &quot;bedrock&quot;,
+    &quot;gpu_seconds&quot;: null,
+    &quot;gpu_count&quot;: null,
+    &quot;gpu_type&quot;: null,
+    &quot;gpu_status&quot;: &quot;unavailable&quot;,
+    &quot;method&quot;: null,
+    &quot;latency_seconds&quot;: 3.98,
+    &quot;tokens&quot;: 3665,
+    &quot;note&quot;: &quot;Latency and tokens are operational measurements, not GPU cost&quot;
+  },
+  &quot;label_preparation&quot;: {
+    &quot;reference_preparation&quot;: {
+      &quot;value&quot;: 35.6,
+      &quot;scope&quot;: &quot;case_build&quot;,
+      &quot;method&quot;: &quot;legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references&quot;,
+      &quot;units&quot;: &quot;seconds&quot;,
+      &quot;reference_only&quot;: false,
+      &quot;status&quot;: &quot;observed&quot;
+    },
+    &quot;caption_generation&quot;: {
+      &quot;value&quot;: 3.98,
+      &quot;units&quot;: &quot;seconds&quot;,
+      &quot;scope&quot;: &quot;caption_generation&quot;,
+      &quot;method&quot;: &quot;observed caption pipeline wall time; native includes tools, verification and rewrite&quot;,
+      &quot;status&quot;: &quot;observed&quot;
+    }
+  },
+  &quot;evidence_yield&quot;: {
+    &quot;unique_object_claims&quot;: 1,
+    &quot;checkable_object_claims&quot;: 1,
+    &quot;supported_object_claim_credit&quot;: 0.0,
+    &quot;supported_field_units&quot;: 2.0,
+    &quot;supported_claim_credit_per_dollar&quot;: null,
+    &quot;supported_claim_credit_per_gpu_second&quot;: null,
+    &quot;dollar_measurement&quot;: null,
+    &quot;cost_unavailable_reason&quot;: &quot;No verified USD observation with model, region, source, method and date&quot;,
+    &quot;definition&quot;: &quot;Object Claims deduplicated ignoring IDs; fully supported as stated, partial parent class credit retained. Field units count presence, exact position, attributes and one exact aggregate count/class. Relations excluded. Not a quality score.&quot;
+  }
+}</pre></section>
+<section class='block'><h2>How the Harness worked</h2><p class='sub'>The Workflow Score, 1.00, is the weighted mean of the parts that apply, from the Trace alone. A part that doesn't apply is left out.</p><table><tr><th>Part</th><th class='num'>Score</th><th>Why</th></tr><tr><td>completion</td><td class='num'>1.00</td><td>submitted a Caption</td></tr><tr><td>tool plan</td><td class='num'>1.00</td><td>all checks passed</td></tr><tr><td>tool success</td><td class='num'>1.00</td><td>8 ok, 0 Harness Faults</td></tr><tr><td>recovery</td><td class='num'>—</td><td>no Harness Faults to recover from</td></tr><tr><td>efficiency</td><td class='num'>—</td><td>single-call Harness: no turn budget</td></tr><tr><td>cost</td><td class='num'>—</td><td>no token budget (set CLAYZER_TOKEN_BUDGET)</td></tr></table></section>
+<section class='block'><h2>What happened</h2>
+<p class='sub'>No summary for this Run.</p>
+</section>
+<section class='block'><h2>Steps</h2><p class='sub'>Every model call in order, from the Trace (batches/20261104T124711Z-verify-2/traces/fixed-dev-neg-1--r1.jsonl).</p>
+<ol class='steps'><li class=''><div class='head'><b>0. llm · caption</b><span class='sub'>us.amazon.nova-pro-v1:0 · 4.0 s · 3,665 tokens · Bedrock 2703 ms</span></div><details><summary>Prompt</summary><pre>This is an aerial image (NAIP, 0.6 m per pixel, about 300 m across, north is up).
+Write a caption for it as training text for an Earth observation model, then submit it with
+the submit_caption tool.
+
+- text: 1 to 3 sentences describing what is on the ground, where, how many, and how things
+  sit relative to each other. Plain and specific; no speculation.
+- objects: every object type you assert, with a count and a position. Position is one cell
+  of a 3x3 grid over the image: north_west, north, north_east, west, centre, east, south_west, south, south_east. Use the cell holding most of the object.
+  Allowed object types: solar_array, wind_turbine, road, railroad, building, water, field, parking_lot, greenhouse, vegetation, bare_ground.
+  Attributes, only where visible: solar_array size (small, medium, large);
+  road surface (paved, unpaved).
+- relations: how objects sit relative to each other, from: north_of, south_of, east_of, west_of, adjacent_to, between, inside.
+- uncertain: anything you think may be there but would not assert.
+</pre></details><details><summary>Response</summary><pre>{
+  &quot;content&quot;: [
+    {
+      &quot;toolUse&quot;: {
+        &quot;toolUseId&quot;: &quot;tooluse_FUEv5LMyBz7qUMeU9lKVk8&quot;,
+        &quot;name&quot;: &quot;submit_caption&quot;,
+        &quot;input&quot;: {
+          &quot;objects&quot;: [
+            {
+              &quot;id&quot;: &quot;o1&quot;,
+              &quot;object&quot;: &quot;building&quot;,
+              &quot;count&quot;: 1,
+              &quot;position&quot;: &quot;north&quot;
+            },
+            {
+              &quot;id&quot;: &quot;o2&quot;,
+              &quot;object&quot;: &quot;parking_lot&quot;,
+              &quot;count&quot;: 2,
+              &quot;position&quot;: &quot;north&quot;
+            },
+            {
+              &quot;id&quot;: &quot;o3&quot;,
+              &quot;object&quot;: &quot;solar_array&quot;,
+              &quot;count&quot;: 1,
+              &quot;position&quot;: &quot;south_west&quot;,
+              &quot;attributes&quot;: {
+                &quot;size&quot;: &quot;medium&quot;
+              }
+            },
+            {
+              &quot;id&quot;: &quot;o4&quot;,
+              &quot;object&quot;: &quot;bare_ground&quot;,
+              &quot;count&quot;: 1,
+              &quot;position&quot;: &quot;centre&quot;
+            },
+            {
+              &quot;id&quot;: &quot;o5&quot;,
+              &quot;object&quot;: &quot;vegetation&quot;,
+              &quot;count&quot;: 1,
+              &quot;position&quot;: &quot;centre&quot;
+            }
+          ],
+          &quot;text&quot;: &quot;An aerial image shows a large, mostly bare ground area with scattered vegetation. To the north, there are two parking lots with a total of 12 parking spaces, adjacent to a large building. In the south-west, there is a small, medium-sized solar array.&quot;,
+          &quot;relations&quot;: [
+            {
+              &quot;subject&quot;: &quot;parking_lot&quot;,
+              &quot;relation&quot;: &quot;adjacent_to&quot;,
+              &quot;object&quot;: &quot;building&quot;
+            }
+          ],
+          &quot;uncertain&quot;: []
+        }
+      }
+    }
+  ],
+  &quot;stop_reason&quot;: &quot;tool_use&quot;
+}</pre></details><details><summary>Everything recorded</summary><pre>{
+  &quot;input&quot;: {
+    &quot;prompt&quot;: &quot;This is an aerial image (NAIP, 0.6 m per pixel, about 300 m across, north is up).\nWrite a caption for it as training text for an Earth observation model, then submit it with\nthe submit_caption tool.\n\n- text: 1 to 3 sentences describing what is on the ground, where, how many, and how things\n  sit relative to each other. Plain and specific; no speculation.\n- objects: every object type you assert, with a count and a position. Position is one cell\n  of a 3x3 grid over the image: north_west, north, north_east, west, centre, east, south_west, south, south_east. Use the cell holding most of the object.\n  Allowed object types: solar_array, wind_turbine, road, railroad, building, water, field, parking_lot, greenhouse, vegetation, bare_ground.\n  Attributes, only where visible: solar_array size (small, medium, large);\n  road surface (paved, unpaved).\n- relations: how objects sit relative to each other, from: north_of, south_of, east_of, west_of, adjacent_to, between, inside.\n- uncertain: anything you think may be there but would not assert.\n&quot;,
+    &quot;image&quot;: {
+      &quot;key&quot;: &quot;chips/ca-neg-1-20220607.png&quot;,
+      &quot;sha256&quot;: &quot;887bd642557ac82e&quot;,
+      &quot;bytes&quot;: 328980
+    },
+    &quot;tools&quot;: [
+      &quot;submit_caption&quot;
+    ],
+    &quot;tool_choice&quot;: &quot;submit_caption&quot;,
+    &quot;max_tokens&quot;: 1500
+  },
+  &quot;attributes&quot;: {
+    &quot;model_id&quot;: &quot;us.amazon.nova-pro-v1:0&quot;,
+    &quot;usage&quot;: {
+      &quot;inputTokens&quot;: 3317,
+      &quot;outputTokens&quot;: 348,
+      &quot;totalTokens&quot;: 3665
+    },
+    &quot;provider_latency_ms&quot;: 2703,
+    &quot;http_status&quot;: 200,
+    &quot;request_id&quot;: &quot;83c02c72-1d5c-4590-9fb4-54af935aee23&quot;,
+    &quot;retries&quot;: 0,
+    &quot;failed_attempts&quot;: [],
+    &quot;cost&quot;: {
+      &quot;input_tokens&quot;: 2332,
+      &quot;output_tokens&quot;: 250,
+      &quot;gpu_seconds&quot;: null
+    },
+    &quot;expects_tool&quot;: &quot;submit_caption&quot;,
+    &quot;latency_ms&quot;: 3984.3
+  }
+}</pre></details></li><li class=''><div class='head'><b>1. tool · search_chip_lat_lon</b><span class='sub'>3.4 s</span></div><details><summary>Response</summary><pre>&quot;{\&quot;node\&quot;:\&quot;naip/obs:184299500\&quot;,\&quot;chip_id\&quot;:\&quot;chip_f48ab3021a9f7deefd44c97dc157ff50\&quot;,\&quot;place\&quot;:\&quot;029bc8e77fa9a42c25cb63412b4f8b20\&quot;,\&quot;observed\&quot;:\&quot;2022-06-07\&quot;,\&quot;lat\&quot;:35.4515,\&quot;lon\&quot;:-119.2,\&quot;bbox\&quot;:[-119.20072928306769,35.4509522098455,-119.19896488854906,35.452389507725485],\&quot;build_id\&quot;:\&quot;ddf31db12a06df55#g5\&quot;}&quot;</pre></details><details><summary>Everything recorded</summary><pre>{
+  &quot;input&quot;: {
+    &quot;index&quot;: &quot;naip&quot;,
+    &quot;lat&quot;: 35.450943,
+    &quot;lon&quot;: -119.2
+  },
+  &quot;attributes&quot;: {
+    &quot;role&quot;: &quot;verify&quot;,
+    &quot;claim&quot;: &quot;o1&quot;,
+    &quot;server&quot;: &quot;lgnd&quot;,
+    &quot;is_error&quot;: false,
+    &quot;error_code&quot;: null,
+    &quot;latency_ms&quot;: 3410.5
+  }
+}</pre></details></li><li class=''><div class='head'><b>2. tool · reasoning_imagery_check</b><span class='sub'>1.9 s</span></div><details><summary>Response</summary><pre>&quot;{\&quot;verdict\&quot;:\&quot;supported\&quot;,\&quot;supported_at\&quot;:[\&quot;naip/obs:184299500\&quot;],\&quot;places\&quot;:[{\&quot;node\&quot;:\&quot;naip/obs:184299500\&quot;,\&quot;answer\&quot;:\&quot;yes\&quot;,\&quot;reason\&quot;:\&quot;The image clearly shows the roof of a large building.\&quot;}]}&quot;</pre></details><details><summary>Everything recorded</summary><pre>{
+  &quot;input&quot;: {
+    &quot;claim&quot;: &quot;A building is visible here.&quot;,
+    &quot;kind&quot;: &quot;place&quot;,
+    &quot;nodes&quot;: [
+      &quot;naip/obs:184299500&quot;
+    ]
+  },
+  &quot;attributes&quot;: {
+    &quot;role&quot;: &quot;verify&quot;,
+    &quot;claim&quot;: &quot;o1&quot;,
+    &quot;server&quot;: &quot;lgnd&quot;,
+    &quot;is_error&quot;: false,
+    &quot;error_code&quot;: null,
+    &quot;latency_ms&quot;: 1911.0
+  }
+}</pre></details></li><li class=''><div class='head'><b>3. tool · reasoning_imagery_check</b><span class='sub'>1.8 s</span></div><details><summary>Response</summary><pre>&quot;{\&quot;verdict\&quot;:\&quot;not supported\&quot;,\&quot;supported_at\&quot;:[],\&quot;places\&quot;:[{\&quot;node\&quot;:\&quot;naip/obs:184299500\&quot;,\&quot;answer\&quot;:\&quot;no\&quot;,\&quot;reason\&quot;:\&quot;The image shows a white rooftop instead of a parking lot.\&quot;}]}&quot;</pre></details><details><summary>Everything recorded</summary><pre>{
+  &quot;input&quot;: {
+    &quot;claim&quot;: &quot;A parking lot is visible here.&quot;,
+    &quot;kind&quot;: &quot;place&quot;,
+    &quot;nodes&quot;: [
+      &quot;naip/obs:184299500&quot;
+    ]
+  },
+  &quot;attributes&quot;: {
+    &quot;role&quot;: &quot;verify&quot;,
+    &quot;claim&quot;: &quot;o2&quot;,
+    &quot;server&quot;: &quot;lgnd&quot;,
+    &quot;is_error&quot;: false,
+    &quot;error_code&quot;: null,
+    &quot;latency_ms&quot;: 1845.4
+  }
+}</pre></details></li><li class=''><div class='head'><b>4. tool · search_chip_lat_lon</b><span class='sub'>2.1 s</span></div><details><summary>Response</summary><pre>&quot;{\&quot;node\&quot;:\&quot;naip/obs:301302178\&quot;,\&quot;chip_id\&quot;:\&quot;chip_f61793cfee1d3aab6b0ac37c325e7cff\&quot;,\&quot;place\&quot;:\&quot;e87ffdf735587c5fd6ecec799b2bf896\&quot;,\&quot;observed\&quot;:\&quot;2022-06-07\&quot;,\&quot;lat\&quot;:35.4487,\&quot;lon\&quot;:-119.2012,\&quot;bbox\&quot;:[-119.20193292590287,35.44807761408552,-119.20016859191443,35.44951491196551],\&quot;build_id\&quot;:\&quot;ddf31db12a06df55#g5\&quot;}&quot;</pre></details><details><summary>Everything recorded</summary><pre>{
+  &quot;input&quot;: {
+    &quot;index&quot;: &quot;naip&quot;,
+    &quot;lat&quot;: 35.449057,
+    &quot;lon&quot;: -119.201153
+  },
+  &quot;attributes&quot;: {
+    &quot;role&quot;: &quot;verify&quot;,
+    &quot;claim&quot;: &quot;o3&quot;,
+    &quot;server&quot;: &quot;lgnd&quot;,
+    &quot;is_error&quot;: false,
+    &quot;error_code&quot;: null,
+    &quot;latency_ms&quot;: 2105.4
+  }
+}</pre></details></li><li class=''><div class='head'><b>5. tool · reasoning_imagery_check</b><span class='sub'>2.2 s</span></div><details><summary>Response</summary><pre>&quot;{\&quot;verdict\&quot;:\&quot;not supported\&quot;,\&quot;supported_at\&quot;:[],\&quot;places\&quot;:[{\&quot;node\&quot;:\&quot;naip/obs:301302178\&quot;,\&quot;answer\&quot;:\&quot;no\&quot;,\&quot;reason\&quot;:\&quot;The image shows a storage yard with various materials and equipment instead of a solar array.\&quot;}]}&quot;</pre></details><details><summary>Everything recorded</summary><pre>{
+  &quot;input&quot;: {
+    &quot;claim&quot;: &quot;A solar array is visible here.&quot;,
+    &quot;kind&quot;: &quot;place&quot;,
+    &quot;nodes&quot;: [
+      &quot;naip/obs:301302178&quot;
+    ]
+  },
+  &quot;attributes&quot;: {
+    &quot;role&quot;: &quot;verify&quot;,
+    &quot;claim&quot;: &quot;o3&quot;,
+    &quot;server&quot;: &quot;lgnd&quot;,
+    &quot;is_error&quot;: false,
+    &quot;error_code&quot;: null,
+    &quot;latency_ms&quot;: 2188.4
+  }
+}</pre></details></li><li class=''><div class='head'><b>6. tool · search_chip_lat_lon</b><span class='sub'>2.1 s</span></div><details><summary>Response</summary><pre>&quot;{\&quot;node\&quot;:\&quot;naip/obs:355534777\&quot;,\&quot;chip_id\&quot;:\&quot;chip_d60833b58d9eaba6cc63234d591d0e44\&quot;,\&quot;place\&quot;:\&quot;bbe334f9628d41c9c4c160697746500f\&quot;,\&quot;observed\&quot;:\&quot;2022-06-07\&quot;,\&quot;lat\&quot;:35.4501,\&quot;lon\&quot;:-119.2,\&quot;bbox\&quot;:[-119.20074103480215,35.44951491196551,-119.19897666622558,35.4509522098455],\&quot;build_id\&quot;:\&quot;ddf31db12a06df55#g5\&quot;}&quot;</pre></details><details><summary>Everything recorded</summary><pre>{
+  &quot;input&quot;: {
+    &quot;index&quot;: &quot;naip&quot;,
+    &quot;lat&quot;: 35.45,
+    &quot;lon&quot;: -119.2
+  },
+  &quot;attributes&quot;: {
+    &quot;role&quot;: &quot;verify&quot;,
+    &quot;claim&quot;: &quot;o4&quot;,
+    &quot;server&quot;: &quot;lgnd&quot;,
+    &quot;is_error&quot;: false,
+    &quot;error_code&quot;: null,
+    &quot;latency_ms&quot;: 2133.9
+  }
+}</pre></details></li><li class=''><div class='head'><b>7. tool · reasoning_imagery_check</b><span class='sub'>2.3 s</span></div><details><summary>Response</summary><pre>&quot;{\&quot;verdict\&quot;:\&quot;supported\&quot;,\&quot;supported_at\&quot;:[\&quot;naip/obs:355534777\&quot;],\&quot;places\&quot;:[{\&quot;node\&quot;:\&quot;naip/obs:355534777\&quot;,\&quot;answer\&quot;:\&quot;yes\&quot;,\&quot;reason\&quot;:\&quot;The image clearly shows an area of bare ground.\&quot;}]}&quot;</pre></details><details><summary>Everything recorded</summary><pre>{
+  &quot;input&quot;: {
+    &quot;claim&quot;: &quot;A bare ground is visible here.&quot;,
+    &quot;kind&quot;: &quot;place&quot;,
+    &quot;nodes&quot;: [
+      &quot;naip/obs:355534777&quot;
+    ]
+  },
+  &quot;attributes&quot;: {
+    &quot;role&quot;: &quot;verify&quot;,
+    &quot;claim&quot;: &quot;o4&quot;,
+    &quot;server&quot;: &quot;lgnd&quot;,
+    &quot;is_error&quot;: false,
+    &quot;error_code&quot;: null,
+    &quot;latency_ms&quot;: 2281.7
+  }
+}</pre></details></li><li class=''><div class='head'><b>8. tool · reasoning_imagery_check</b><span class='sub'>1.8 s</span></div><details><summary>Response</summary><pre>&quot;{\&quot;verdict\&quot;:\&quot;not supported\&quot;,\&quot;supported_at\&quot;:[],\&quot;places\&quot;:[{\&quot;node\&quot;:\&quot;naip/obs:355534777\&quot;,\&quot;answer\&quot;:\&quot;no\&quot;,\&quot;reason\&quot;:\&quot;The image shows bare ground and a paved area instead of vegetation.\&quot;}]}&quot;</pre></details><details><summary>Everything recorded</summary><pre>{
+  &quot;input&quot;: {
+    &quot;claim&quot;: &quot;A vegetation is visible here.&quot;,
+    &quot;kind&quot;: &quot;place&quot;,
+    &quot;nodes&quot;: [
+      &quot;naip/obs:355534777&quot;
+    ]
+  },
+  &quot;attributes&quot;: {
+    &quot;role&quot;: &quot;verify&quot;,
+    &quot;claim&quot;: &quot;o5&quot;,
+    &quot;server&quot;: &quot;lgnd&quot;,
+    &quot;is_error&quot;: false,
+    &quot;error_code&quot;: null,
+    &quot;latency_ms&quot;: 1831.0
+  }
+}</pre></details></li><li class=''><div class='head'><b>9. llm · rewrite</b><span class='sub'>us.amazon.nova-pro-v1:0 · 1.2 s · 1,083 tokens · Bedrock 1023 ms</span></div><details><summary>Prompt</summary><pre>Below is a draft caption of an aerial image (NAIP, 0.6 m per pixel, about 300 m across, north
+up), and the Claims that survived a check against imagery. Some drafted Claims weren&#x27;t
+confirmed and are gone. Rewrite the caption text so it states only the confirmed Claims: their
+objects, counts, positions, and relations. Don&#x27;t mention anything that isn&#x27;t in them. 1 to 3
+plain sentences. Submit it with the submit_caption tool, listing the confirmed Claims as they
+are.
+
+Draft text: An aerial image shows a large, mostly bare ground area with scattered vegetation. To the north, there are two parking lots with a total of 12 parking spaces, adjacent to a large building. In the south-west, there is a small, medium-sized solar array.
+
+Confirmed Claims: {&quot;objects&quot;: [{&quot;id&quot;: &quot;o1&quot;, &quot;object&quot;: &quot;building&quot;, &quot;count&quot;: 1, &quot;position&quot;: &quot;north&quot;}, {&quot;id&quot;: &quot;o4&quot;, &quot;object&quot;: &quot;bare_ground&quot;, &quot;count&quot;: 1, &quot;position&quot;: &quot;centre&quot;}], &quot;relations&quot;: []}
+</pre></details><details><summary>Response</summary><pre>{
+  &quot;content&quot;: [
+    {
+      &quot;toolUse&quot;: {
+        &quot;toolUseId&quot;: &quot;tooluse_20saVKtGjsVf1QfrBpeZJY&quot;,
+        &quot;name&quot;: &quot;submit_caption&quot;,
+        &quot;input&quot;: {
+          &quot;objects&quot;: [
+            {
+              &quot;id&quot;: &quot;o1&quot;,
+              &quot;object&quot;: &quot;building&quot;,
+              &quot;count&quot;: 1,
+              &quot;position&quot;: &quot;north&quot;
+            },
+            {
+              &quot;id&quot;: &quot;o4&quot;,
+              &quot;object&quot;: &quot;bare_ground&quot;,
+              &quot;count&quot;: 1,
+              &quot;position&quot;: &quot;centre&quot;
+            }
+          ],
+          &quot;text&quot;: &quot;An aerial image shows a large building in the north and a large, mostly bare ground area in the centre.&quot;,
+          &quot;relations&quot;: [],
+          &quot;uncertain&quot;: []
+        }
+      }
+    }
+  ],
+  &quot;stop_reason&quot;: &quot;tool_use&quot;
+}</pre></details><details><summary>Everything recorded</summary><pre>{
+  &quot;input&quot;: {
+    &quot;prompt&quot;: &quot;Below is a draft caption of an aerial image (NAIP, 0.6 m per pixel, about 300 m across, north\nup), and the Claims that survived a check against imagery. Some drafted Claims weren&#x27;t\nconfirmed and are gone. Rewrite the caption text so it states only the confirmed Claims: their\nobjects, counts, positions, and relations. Don&#x27;t mention anything that isn&#x27;t in them. 1 to 3\nplain sentences. Submit it with the submit_caption tool, listing the confirmed Claims as they\nare.\n\nDraft text: An aerial image shows a large, mostly bare ground area with scattered vegetation. To the north, there are two parking lots with a total of 12 parking spaces, adjacent to a large building. In the south-west, there is a small, medium-sized solar array.\n\nConfirmed Claims: {\&quot;objects\&quot;: [{\&quot;id\&quot;: \&quot;o1\&quot;, \&quot;object\&quot;: \&quot;building\&quot;, \&quot;count\&quot;: 1, \&quot;position\&quot;: \&quot;north\&quot;}, {\&quot;id\&quot;: \&quot;o4\&quot;, \&quot;object\&quot;: \&quot;bare_ground\&quot;, \&quot;count\&quot;: 1, \&quot;position\&quot;: \&quot;centre\&quot;}], \&quot;relations\&quot;: []}\n&quot;,
+    &quot;tools&quot;: [
+      &quot;submit_caption&quot;
+    ],
+    &quot;tool_choice&quot;: &quot;submit_caption&quot;,
+    &quot;max_tokens&quot;: 800
+  },
+  &quot;attributes&quot;: {
+    &quot;model_id&quot;: &quot;us.amazon.nova-pro-v1:0&quot;,
+    &quot;usage&quot;: {
+      &quot;inputTokens&quot;: 985,
+      &quot;outputTokens&quot;: 98,
+      &quot;totalTokens&quot;: 1083
+    },
+    &quot;provider_latency_ms&quot;: 1023,
+    &quot;http_status&quot;: 200,
+    &quot;request_id&quot;: &quot;e58b8d28-0f11-434e-941b-2acc775bc536&quot;,
+    &quot;retries&quot;: 0,
+    &quot;failed_attempts&quot;: [],
+    &quot;cost&quot;: {
+      &quot;input_tokens&quot;: 985,
+      &quot;output_tokens&quot;: 98,
+      &quot;gpu_seconds&quot;: null
+    },
+    &quot;expects_tool&quot;: &quot;submit_caption&quot;,
+    &quot;latency_ms&quot;: 1192.9
+  }
+}</pre></details></li><li class='judge'><div class='head'><b>10. judge · fidelity</b><span class='sub'>us.anthropic.claude-opus-5-5 · 6.1 s · 1,463 tokens · Bedrock 5128 ms</span><span class='badge b-na'>evaluation, not the Harness</span></div><details><summary>Prompt</summary><pre>You are judging a caption written for an aerial image (NAIP, 0.6 m per pixel, about 300 m
+across, north up). The caption will be used as training text for an Earth observation model.
+
+Caption text:
+An aerial image shows a large building in the north and a large, mostly bare ground area in the centre.
+
+Structured claims (positions are cells of a 3x3 grid over the image):
+{&quot;objects&quot;: [{&quot;id&quot;: &quot;o1&quot;, &quot;object&quot;: &quot;building&quot;, &quot;count&quot;: 1, &quot;position&quot;: &quot;north&quot;}, {&quot;id&quot;: &quot;o4&quot;, &quot;object&quot;: &quot;bare_ground&quot;, &quot;count&quot;: 1, &quot;position&quot;: &quot;centre&quot;}], &quot;relations&quot;: []}
+
+Rate how accurately the caption represents the image overall, from 0 to 1:
+1.0 accurate and specific; 0.75 accurate with minor errors or omissions; 0.5 partly accurate
+or vague; 0.25 mostly inaccurate; 0.0 wrong or unrelated.
+List each concrete error or important omission. Submit with the submit_verdict tool.
+</pre></details><details><summary>Response</summary><pre>{
+  &quot;content&quot;: [
+    {
+      &quot;reasoningContent&quot;: {
+        &quot;reasoningText&quot;: {
+          &quot;text&quot;: &quot;&quot;,
+          &quot;signature&quot;: &quot;CAQS7gUKEggTEAEYAjgBQgh0aGlua2luZxIM4dW1GgwImf0J41nBGgzuaPd3HTNY2QP9PrciMO1MNGSAJC/F+N73jOTxBMD52+6LKdh8UIBsBhYCE/tIKmQq8CHJodwCh1uh5E1rPyqJBaeRg6lNpLTXl9t8/Ecy1Wiy+NGsuzGgmMEtYSwFDtQXvNWOIUnddWiKuJXOk39g2/aGwpthr6T+VC4HYO0BseyzJlxZxVbD7YNWYd4TnDux7w4qQ2Q4z/qHxrgaVaRIH+qjPQ6fb5InPMEzCJyF+huEpL3MurcZ6ap6Ld4Prd0vnHXnWcXzsTQ4v4BoJrrM1kSrFeha1dbjm9MOd3TkwkPV+bxkBtAzR+xEjdgW4emGzktTIaE+Kn07OYZYAzk3KBja7saRwlGLomlTIgsmKe6QAOQtN9/MEwtge6gRerUYUPz3OC+pyrKSPAn0EBIuBLhhbNbQEyK3vBdQ4eHTO0UGvOJiiPoSKeaC/skNt7ij0Xir/eralgvPRDI4vRqOMJXyGqGZ15Hu6TexZLymE7g/VELASaYiL9VV3s9pIx66W2REd7bh38jv92rycDPv4BiF5dBquHgXjIB/qyUsr+8LSLsEkwdB/pz0P0Hvopnl2E7g5br0lGn4BPq+ewM63WVDfIenEjqcXTBa+ZlwVizfGgyB65ICtJyfvwc6xl6rVUAGIijT5Os3D6DTkxfk9XCUqVvu9MeT8j04aHI4OOq7ds12Y3r/4RkGemjc1Ft4dnc4uJzLzCP67wKL0R0HCHbUAFiPZJ5bFkb3d0HAefpNAQaJSnZFZvotZhN+mfktrIFG9OKBqqKm/RNY7NHaMl+C0SI9vB0An1l/WUo3B/06OtFbxOpIr8UhLwmj9tcxdot7vY9RGBugGkMDzpKACIVIbEkZXNsdALUHnbk0LoOnlpKj5Gt09pHhTD7pUPHXI4BQYpfYyK0X020rTYYoukVjuq/h07xaDPCBFzn0kM31Un7rADMi5rMYAQ==&quot;
+        }
+      }
+    },
+    {
+      &quot;toolUse&quot;: {
+        &quot;toolUseId&quot;: &quot;tooluse_suDT7AOoNZfbeH10dzCakx&quot;,
+        &quot;name&quot;: &quot;submit_verdict&quot;,
+        &quot;input&quot;: {
+          &quot;score&quot;: 0.65,
+          &quot;issues&quot;: [
+            &quot;Leaves out the paved parking lots: a striped lot in the northwest beside the building, a large paved yard to its south, and another lot along the southern edge.&quot;,
+            &quot;Leaves out the rectangular graded basin in the south-centre, which looks like a retention or detention pond.&quot;,
+            &quot;Leaves out the dirt access roads and tracks crossing the bare ground in the east.&quot;,
+            &quot;The caption is accurate but vague. It doesn&#x27;t say the building looks like a large warehouse or distribution centre, and it only partly shows at the northern edge, reaching into the northeast.&quot;
+          ]
+        },
+        &quot;type&quot;: &quot;tool_use&quot;
+      }
+    }
+  ],
+  &quot;stop_reason&quot;: &quot;tool_use&quot;
+}</pre></details><details><summary>Everything recorded</summary><pre>{
+  &quot;input&quot;: {
+    &quot;prompt&quot;: &quot;You are judging a caption written for an aerial image (NAIP, 0.6 m per pixel, about 300 m\nacross, north up). The caption will be used as training text for an Earth observation model.\n\nCaption text:\nAn aerial image shows a large building in the north and a large, mostly bare ground area in the centre.\n\nStructured claims (positions are cells of a 3x3 grid over the image):\n{\&quot;objects\&quot;: [{\&quot;id\&quot;: \&quot;o1\&quot;, \&quot;object\&quot;: \&quot;building\&quot;, \&quot;count\&quot;: 1, \&quot;position\&quot;: \&quot;north\&quot;}, {\&quot;id\&quot;: \&quot;o4\&quot;, \&quot;object\&quot;: \&quot;bare_ground\&quot;, \&quot;count\&quot;: 1, \&quot;position\&quot;: \&quot;centre\&quot;}], \&quot;relations\&quot;: []}\n\nRate how accurately the caption represents the image overall, from 0 to 1:\n1.0 accurate and specific; 0.75 accurate with minor errors or omissions; 0.5 partly accurate\nor vague; 0.25 mostly inaccurate; 0.0 wrong or unrelated.\nList each concrete error or important omission. Submit with the submit_verdict tool.\n&quot;,
+    &quot;image&quot;: {
+      &quot;key&quot;: &quot;chips/ca-neg-1-20220607.png&quot;,
+      &quot;sha256&quot;: &quot;887bd642557ac82e&quot;,
+      &quot;bytes&quot;: 328980
+    },
+    &quot;tools&quot;: [
+      &quot;submit_verdict&quot;
+    ],
+    &quot;max_tokens&quot;: 1000
+  },
+  &quot;attributes&quot;: {
+    &quot;model_id&quot;: &quot;us.anthropic.claude-opus-5-5&quot;,
+    &quot;usage&quot;: {
+      &quot;inputTokens&quot;: 1100,
+      &quot;outputTokens&quot;: 363,
+      &quot;totalTokens&quot;: 1463,
+      &quot;cacheReadInputTokens&quot;: 0,
+      &quot;cacheWriteInputTokens&quot;: 0
+    },
+    &quot;provider_latency_ms&quot;: 5128,
+    &quot;http_status&quot;: 200,
+    &quot;request_id&quot;: &quot;3bf19b8f-be74-4e26-8266-1e373fba31b6&quot;,
+    &quot;retries&quot;: 0,
+    &quot;failed_attempts&quot;: [],
+    &quot;cost&quot;: {
+      &quot;input_tokens&quot;: 1100,
+      &quot;output_tokens&quot;: 363,
+      &quot;gpu_seconds&quot;: null
+    },
+    &quot;expects_tool&quot;: &quot;submit_verdict&quot;,
+    &quot;role&quot;: &quot;scoring&quot;,
+    &quot;latency_ms&quot;: 6059.6
+  }
+}</pre></details></li></ol>
+</section>
+</main><script>
+for (const box of document.querySelectorAll('input[data-hide]')) {
+  box.addEventListener('change', () =>
+    document.body.classList.toggle(box.dataset.hide, !box.checked));
+}
+</script></body></html>

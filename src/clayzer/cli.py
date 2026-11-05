@@ -10,6 +10,7 @@ clayzer batch --resume <batch-id>           finish a Batch (expired credentials,
 clayzer batches                             list Batches
 clayzer report <batch-id>                   rebuild a Batch's report.md and report.html
 clayzer replay <batch-id> [--cases KEY]     rescore a recorded Batch against updated Cases, offline
+clayzer stories pack [--out DIR]            copy demo/stories.toml's Runs into the demo pack, redacted
 clayzer rescore <batch-id>                  score stored Captions again with the current scorer
 clayzer trace <batch-id> <case-id> [-r N]   show one Run's summary and Trace, Step by Step
 clayzer summarize <batch-id>                rebuild every Run's summary from its Trace, offline
@@ -254,6 +255,11 @@ def main(argv: list[str] | None = None) -> int:
 
     rs = sub.add_parser("rescore", help="score a Batch's stored Captions again, no model calls")
     rs.add_argument("batch_id")
+
+    st = sub.add_parser("stories", help="the demo Stories (demo/stories.toml)")
+    st_sub = st.add_subparsers(dest="action", required=True)
+    st_pack = st_sub.add_parser("pack", help="copy each Story's Run into the demo pack, redacted")
+    st_pack.add_argument("--out", type=Path, help="pack folder (default demo/pack)")
 
     replay = sub.add_parser(
         "replay", help="rebuild a local recorded Batch into a fresh directory; no network"
@@ -531,6 +537,13 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  stored in {store.url(key)}")
         return 0
 
+    if a.cmd == "stories":
+        from clayzer import stories
+
+        out = stories.pack(store, stories.load_stories(), a.out or stories.PACK)
+        print(f"packed {len(stories.load_stories())} Stories into {out}")
+        print(f"  view them offline: uv run clayzer ui --local-root {out}")
+        return 0
     if a.cmd == "push":
         if isinstance(store, LocalStore) and a.src.resolve() == settings.data_dir.resolve():
             print("the store is this local folder; set CLAYZER_STORE=s3://...", file=sys.stderr)

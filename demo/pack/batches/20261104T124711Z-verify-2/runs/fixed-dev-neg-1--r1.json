@@ -1,0 +1,294 @@
+{
+  "run_id": "fixed-dev-neg-1#1",
+  "batch_id": "20261104T124711Z-verify-2",
+  "case_id": "fixed-dev-neg-1",
+  "repeat": 1,
+  "status": "ok",
+  "error": null,
+  "scores": {
+    "grounding": {
+      "correctness": 1.0,
+      "coverage": 0.2,
+      "precision": 1.0,
+      "recall": 0.2,
+      "count": 1.0,
+      "position": 1.0,
+      "attributes": null,
+      "relations": null,
+      "change": null,
+      "unscored_share": 0.5,
+      "denominators": null,
+      "evidence_policy": null,
+      "specificity": null
+    },
+    "grounding_detail": {
+      "rows": [
+        {
+          "claim": {
+            "id": "o1",
+            "object": "building",
+            "count": 1,
+            "position": "north"
+          },
+          "verdict": "matched",
+          "ref_position": "north_east",
+          "position": 1.0
+        }
+      ],
+      "counts": {
+        "building": {
+          "claimed": 1,
+          "reference": 1
+        }
+      },
+      "missed": [
+        "parking_lot",
+        "railroad",
+        "road",
+        "water"
+      ],
+      "unscored": [
+        "bare_ground"
+      ],
+      "relation_rows": [],
+      "relations_unscored": []
+    },
+    "fidelity": {
+      "score": 0.65,
+      "issues": [
+        "Leaves out the paved parking lots: a striped lot in the northwest beside the building, a large paved yard to its south, and another lot along the southern edge.",
+        "Leaves out the rectangular graded basin in the south-centre, which looks like a retention or detention pond.",
+        "Leaves out the dirt access roads and tracks crossing the bare ground in the east.",
+        "The caption is accurate but vague. It doesn't say the building looks like a large warehouse or distribution centre, and it only partly shows at the northern edge, reaching into the northeast."
+      ],
+      "kind": "model_opinion"
+    },
+    "retrieval": {
+      "repeat": 1,
+      "mrr": 0.6805555555555555,
+      "recall@1": 0.3333333333333333,
+      "queries": [
+        {
+          "query": "find solar farms",
+          "relevant": [
+            "fixed-dev-uspvdb-400117",
+            "fixed-dev-uspvdb-402150"
+          ],
+          "ranked": [
+            "fixed-dev-uspvdb-400117",
+            "fixed-dev-uspvdb-402150",
+            "fixed-dev-uswtdb-3025453",
+            "fixed-dev-neg-1"
+          ],
+          "reciprocal_rank": 1.0,
+          "recall@1": 0.5
+        },
+        {
+          "query": "find wind turbines",
+          "relevant": [
+            "fixed-dev-uswtdb-3025453"
+          ],
+          "ranked": [
+            "fixed-dev-uswtdb-3025453",
+            "fixed-dev-uspvdb-402150",
+            "fixed-dev-uspvdb-400117",
+            "fixed-dev-neg-1"
+          ],
+          "reciprocal_rank": 1.0,
+          "recall@1": 1.0
+        },
+        {
+          "query": "find railroads",
+          "relevant": [
+            "fixed-dev-neg-1"
+          ],
+          "ranked": [
+            "fixed-dev-uswtdb-3025453",
+            "fixed-dev-uspvdb-402150",
+            "fixed-dev-uspvdb-400117",
+            "fixed-dev-neg-1"
+          ],
+          "reciprocal_rank": 0.25,
+          "recall@1": 0.0
+        },
+        {
+          "query": "find buildings",
+          "relevant": [
+            "fixed-dev-neg-1"
+          ],
+          "ranked": [
+            "fixed-dev-uspvdb-402150",
+            "fixed-dev-neg-1",
+            "fixed-dev-uspvdb-400117",
+            "fixed-dev-uswtdb-3025453"
+          ],
+          "reciprocal_rank": 0.5,
+          "recall@1": 0.0
+        },
+        {
+          "query": "find parking lots",
+          "relevant": [
+            "fixed-dev-neg-1"
+          ],
+          "ranked": [
+            "fixed-dev-uspvdb-402150",
+            "fixed-dev-uspvdb-400117",
+            "fixed-dev-neg-1",
+            "fixed-dev-uswtdb-3025453"
+          ],
+          "reciprocal_rank": 0.3333333333333333,
+          "recall@1": 0.0
+        },
+        {
+          "query": "find water",
+          "relevant": [
+            "fixed-dev-neg-1",
+            "fixed-dev-uspvdb-402150"
+          ],
+          "ranked": [
+            "fixed-dev-uspvdb-402150",
+            "fixed-dev-uswtdb-3025453",
+            "fixed-dev-neg-1",
+            "fixed-dev-uspvdb-400117"
+          ],
+          "reciprocal_rank": 1.0,
+          "recall@1": 0.5
+        }
+      ]
+    },
+    "cost": {
+      "provider": "bedrock",
+      "gpu_seconds": null,
+      "gpu_count": null,
+      "gpu_type": null,
+      "gpu_status": "unavailable",
+      "method": null,
+      "latency_seconds": 3.98,
+      "tokens": 3665,
+      "note": "Latency and tokens are operational measurements, not GPU cost"
+    },
+    "label_preparation": {
+      "reference_preparation": {
+        "value": 35.6,
+        "scope": "case_build",
+        "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+        "units": "seconds",
+        "reference_only": false,
+        "status": "observed"
+      },
+      "caption_generation": {
+        "value": 3.98,
+        "units": "seconds",
+        "scope": "caption_generation",
+        "method": "observed caption pipeline wall time; native includes tools, verification and rewrite",
+        "status": "observed"
+      }
+    },
+    "evidence_yield": {
+      "unique_object_claims": 1,
+      "checkable_object_claims": 1,
+      "supported_object_claim_credit": 0.0,
+      "supported_field_units": 2.0,
+      "supported_claim_credit_per_dollar": null,
+      "supported_claim_credit_per_gpu_second": null,
+      "dollar_measurement": null,
+      "cost_unavailable_reason": "No verified USD observation with model, region, source, method and date",
+      "definition": "Object Claims deduplicated ignoring IDs; fully supported as stated, partial parent class credit retained. Field units count presence, exact position, attributes and one exact aggregate count/class. Relations excluded. Not a quality score."
+    }
+  },
+  "faults": {
+    "harness": 0,
+    "environment": 0,
+    "sandbox": 0,
+    "soft": 0
+  },
+  "workflow": {
+    "score": 1.0,
+    "components": {
+      "completion": {
+        "score": 1.0,
+        "reason": "submitted a Caption"
+      },
+      "tool_plan": {
+        "score": 1.0,
+        "reason": "all checks passed"
+      },
+      "tool_success": {
+        "score": 1.0,
+        "reason": "8 ok, 0 Harness Faults"
+      },
+      "recovery": {
+        "score": null,
+        "reason": "no Harness Faults to recover from"
+      },
+      "efficiency": {
+        "score": null,
+        "reason": "single-call Harness: no turn budget"
+      },
+      "cost": {
+        "score": null,
+        "reason": "no token budget (set CLAYZER_TOKEN_BUDGET)"
+      }
+    },
+    "environment_faults": 0
+  },
+  "seconds_to_caption": 3.98,
+  "caption_tokens": 3665,
+  "summary": null,
+  "narrative": null,
+  "caption": {
+    "run_id": "fixed-dev-neg-1#1",
+    "case_id": "fixed-dev-neg-1",
+    "repeat": 1,
+    "text": "An aerial image shows a large building in the north and a large, mostly bare ground area in the centre.",
+    "objects": [
+      {
+        "id": "o1",
+        "object": "building",
+        "count": 1,
+        "position": "north"
+      },
+      {
+        "id": "o4",
+        "object": "bare_ground",
+        "count": 1,
+        "position": "centre"
+      }
+    ],
+    "relations": [],
+    "uncertain": [
+      "2 \u00d7 parking lot at north",
+      "1 \u00d7 solar array at south_west",
+      "1 \u00d7 vegetation at centre"
+    ]
+  },
+  "chip": {
+    "id": "ca-neg-1-20220607",
+    "uri": "chips/ca-neg-1-20220607.png",
+    "date": "2022-06-07",
+    "bbox": [
+      -119.201729,
+      35.448585,
+      -119.198271,
+      35.451415
+    ],
+    "source": "naip-pc"
+  },
+  "trace": "batches/20261104T124711Z-verify-2/traces/fixed-dev-neg-1--r1.jsonl",
+  "trace_navigation": {
+    "url": null,
+    "reason": "no recorded X-Ray export context",
+    "trace_id": null
+  },
+  "replay": null,
+  "metric_provenance": null,
+  "config": {
+    "caption_model": "us.amazon.nova-pro-v1:0",
+    "judge_model": "us.anthropic.claude-opus-5-5",
+    "self_graded": false,
+    "prompt_sha": "d1ffc8393867",
+    "cases_sha": "c07bc78cba59",
+    "scorer_version": "grounding-3+workflow-1"
+  },
+  "trace_status": "ok"
+}

@@ -1,0 +1,32 @@
+{
+  "run_id": "fixed-dev-neg-1#1",
+  "status": "ok",
+  "verdict": "Captioned in 22.9 s: 5 Claims.",
+  "did": [
+    "Asked amazon.nova-pro-v1:0 to caption chips/ca-neg-1-20220607.png: it submitted a Caption with 5 Claims (4.0 s, 3,665 tokens)",
+    "Called the tool search_chip_lat_lon(index=\"naip\", lat=35.450943, lon=-119.2): returned (3.4 s)",
+    "Called the tool reasoning_imagery_check(claim=\"A building is visible here.\", kind=\"place\", nodes=[\"naip/obs:184299500\"]): returned (1.9 s)",
+    "Called the tool reasoning_imagery_check(claim=\"A parking lot is visible here.\", kind=\"place\", nodes=[\"naip/obs:184299500\"]): returned (1.8 s)",
+    "Called the tool search_chip_lat_lon(index=\"naip\", lat=35.449057, lon=-119.201153): returned (2.1 s)",
+    "Called the tool reasoning_imagery_check(claim=\"A solar array is visible here.\", kind=\"place\", nodes=[\"naip/obs:301302178\"]): returned (2.2 s)",
+    "Called the tool search_chip_lat_lon(index=\"naip\", lat=35.45, lon=-119.2): returned (2.1 s)",
+    "Called the tool reasoning_imagery_check(claim=\"A bare ground is visible here.\", kind=\"place\", nodes=[\"naip/obs:355534777\"]): returned (2.3 s)",
+    "Called the tool reasoning_imagery_check(claim=\"A vegetation is visible here.\", kind=\"place\", nodes=[\"naip/obs:355534777\"]): returned (1.8 s)",
+    "llm step rewrite (1.2 s, 1,083 tokens)"
+  ],
+  "struggled": [
+    "Nothing notable."
+  ],
+  "evaluation": [
+    "The Judge (anthropic.claude-opus-5-5) rated the Caption 0.65 (6.1 s, 1,463 tokens)"
+  ],
+  "stats": {
+    "steps": 10,
+    "tool_calls": 8,
+    "retries": 0,
+    "harness_faults": 0,
+    "environment_faults": 0,
+    "seconds": 22.88,
+    "tokens": 4748
+  }
+}

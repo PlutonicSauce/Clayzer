@@ -1,0 +1,13 @@
+{
+  "run_id": "fixed-dev-neg-1#1",
+  "markdown": "### What the Harness did\n- Called `us.amazon.nova-pro-v1:0` to caption the image, resulting in an initial caption.\n- Searched for chip latitude and longitude using `search_chip_lat_lon`.\n- Used `reasoning_imagery_check` to verify the presence of a building, finding it supported.\n- Used `reasoning_imagery_check` to verify the presence of a parking lot, finding it not supported.\n- Searched for another chip latitude and longitude using `search_chip_lat_lon`.\n- Used `reasoning_imagery_check` to verify the presence of a solar array, finding it not supported.\n- Searched for yet another chip latitude and longitude using `search_chip_lat_lon`.\n- Used `reasoning_imagery_check` to verify the presence of bare ground, finding it supported.\n- Used `reasoning_imagery_check` to verify the presence of vegetation, finding it not supported.\n- Called `us.amazon.nova-pro-v1:0` to rewrite the caption based on verifications.\n- Judged the fidelity of the final caption using `us.anthropic.claude-opus-5-5`.\n\n### Where it struggled\n- Nothing notable.\n\n### Verdict\nThe Run produced a Caption after verifying and rewriting based on image checks.",
+  "model": "us.amazon.nova-pro-v1:0",
+  "usage": {
+    "inputTokens": 2412,
+    "outputTokens": 286,
+    "totalTokens": 2698
+  },
+  "seconds": 1.83,
+  "created": "2026-11-04T12:53:47+00:00",
+  "trace_sha": "ffc04fef3d3f2db6"
+}

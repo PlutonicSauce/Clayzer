@@ -1,0 +1,33 @@
+{
+  "run_id": "fixed-dev-uspvdb-402150#2",
+  "status": "ok",
+  "verdict": "Captioned in 17.2 s: 5 Claims, 1 left uncertain.",
+  "did": [
+    "Asked amazon.nova-pro-v1:0 to caption chips/ca-uspvdb-402150-20220607.png: it submitted a Caption with 5 Claims, 1 thing left uncertain (3.3 s, 2,566 tokens)",
+    "Called the tool search_chip_lat_lon(index=\"naip\", lat=35.327068, lon=-118.978837): returned (0.3 s)",
+    "Called the tool reasoning_imagery_check(claim=\"A solar array is visible here.\", kind=\"place\", nodes=[\"naip/obs:660842969\"]): returned (2.4 s)",
+    "Called the tool search_chip_lat_lon(index=\"naip\", lat=35.327068, lon=-118.977688): returned (0.1 s)",
+    "Called the tool reasoning_imagery_check(claim=\"A solar array is visible here.\", kind=\"place\", nodes=[\"naip/obs:361970661\"]): returned (1.9 s)",
+    "Called the tool search_chip_lat_lon(index=\"naip\", lat=35.327068, lon=-118.976539): returned (2.9 s)",
+    "Called the tool reasoning_imagery_check(claim=\"A bare ground is visible here.\", kind=\"place\", nodes=[\"naip/obs:361970661\"]): failed (0.2 s)",
+    "Called the tool search_chip_lat_lon(index=\"naip\", lat=35.326127, lon=-118.977688): returned (2.3 s)",
+    "Called the tool reasoning_imagery_check(claim=\"A bare ground is visible here.\", kind=\"place\", nodes=[\"naip/obs:361970661\"]): returned (1.9 s)",
+    "Called the tool search_chip_lat_lon(index=\"naip\", lat=35.326127, lon=-118.976539): returned (0.1 s)",
+    "Called the tool reasoning_imagery_check(claim=\"A water is visible here.\", kind=\"place\", nodes=[\"naip/obs:361970661\"]): returned (1.9 s)"
+  ],
+  "struggled": [
+    "Step 6 (reasoning_imagery_check): Harness Fault. unrecognized failure (no code); ADR-0003 defaults to harness."
+  ],
+  "evaluation": [
+    "The Judge (anthropic.claude-opus-5-5) rated the Caption 0.6 (7.4 s, 1,781 tokens)"
+  ],
+  "stats": {
+    "steps": 11,
+    "tool_calls": 10,
+    "retries": 0,
+    "harness_faults": 1,
+    "environment_faults": 0,
+    "seconds": 17.25,
+    "tokens": 2566
+  }
+}

@@ -1,0 +1,2906 @@
+{
+  "batch_id": "20261105T011537Z-dev74-absence",
+  "cases": {
+    "fixed-dev-neg-1": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.6296296296296297,
+        "spread": 0.22452510468485445
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 0.5,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.45,
+        "spread": 0.08660254037844388
+      },
+      "components": {
+        "precision": 0.8888888888888888,
+        "recall": 0.5,
+        "count": null,
+        "position": 0.5,
+        "attributes": null,
+        "relations": 0.0
+      },
+      "unscored_share": 0.45714285714285713
+    },
+    "fixed-dev-neg-10": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 0.6666666666666666,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.5499999999999999,
+        "spread": 0.04999999999999999
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 0.6666666666666666,
+        "count": null,
+        "position": 1.0,
+        "attributes": null,
+        "relations": null
+      },
+      "unscored_share": 0.41111111111111115
+    },
+    "fixed-dev-neg-11": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.8333333333333334,
+        "spread": 0.28867513459481287
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.5,
+        "spread": 0.0
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "count": null,
+        "position": 0.6666666666666666,
+        "attributes": null,
+        "relations": null
+      },
+      "unscored_share": 0.6333333333333333
+    },
+    "fixed-dev-neg-12": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 0.6666666666666666,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.4833333333333334,
+        "spread": 0.07637626158259735
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 0.6666666666666666,
+        "count": null,
+        "position": 1.0,
+        "attributes": 1.0,
+        "relations": null
+      },
+      "unscored_share": 0.5888888888888889
+    },
+    "fixed-dev-neg-13": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.7166666666666667,
+        "spread": 0.028867513459481315
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.37333333333333335,
+        "spread": 0.06429100507328638
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "count": 0.0,
+        "position": 0.8666666666666667,
+        "attributes": 1.0,
+        "relations": null
+      },
+      "unscored_share": 0.30158730158730157
+    },
+    "fixed-dev-neg-14": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.7251984126984127,
+        "spread": 0.16399682732491486
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.43333333333333335,
+        "spread": 0.07637626158259735
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "count": 0.0,
+        "position": 0.5992063492063492,
+        "attributes": 1.0,
+        "relations": null
+      },
+      "unscored_share": 0.20000000000000004
+    },
+    "fixed-dev-neg-15": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.9166666666666666,
+        "spread": 0.07216878364870322
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.31666666666666665,
+        "spread": 0.02886751345948128
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "count": null,
+        "position": 0.8333333333333334,
+        "attributes": null,
+        "relations": null
+      },
+      "unscored_share": 0.1111111111111111
+    },
+    "fixed-dev-neg-16": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.5972222222222222,
+        "spread": 0.08673608331108885
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 0.6666666666666666,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.5166666666666667,
+        "spread": 0.028867513459481315
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 0.6666666666666666,
+        "count": 0.0,
+        "position": 0.7222222222222222,
+        "attributes": 0.6666666666666666,
+        "relations": null
+      },
+      "unscored_share": 0.4666666666666666
+    },
+    "fixed-dev-neg-17": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": null,
+        "spread": null
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": null,
+        "spread": null
+      },
+      "fidelity": {
+        "mean": 0.66,
+        "spread": 0.052915026221291815
+      },
+      "components": {
+        "precision": null,
+        "recall": null,
+        "count": null,
+        "position": null,
+        "attributes": null,
+        "relations": null
+      },
+      "unscored_share": 1.0
+    },
+    "fixed-dev-neg-18": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": null,
+        "spread": null
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": null,
+        "spread": null
+      },
+      "fidelity": {
+        "mean": 0.6066666666666666,
+        "spread": 0.011547005383792526
+      },
+      "components": {
+        "precision": null,
+        "recall": null,
+        "count": null,
+        "position": null,
+        "attributes": null,
+        "relations": null
+      },
+      "unscored_share": 1.0
+    },
+    "fixed-dev-neg-19": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": null,
+        "spread": null
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": null,
+        "spread": null
+      },
+      "fidelity": {
+        "mean": 0.8166666666666668,
+        "spread": 0.02886751345948125
+      },
+      "components": {
+        "precision": null,
+        "recall": null,
+        "count": null,
+        "position": null,
+        "attributes": null,
+        "relations": null
+      },
+      "unscored_share": 1.0
+    },
+    "fixed-dev-neg-2": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.6666666666666666,
+        "spread": 0.14433756729740643
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.5666666666666667,
+        "spread": 0.12583057392117913
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "count": null,
+        "position": 0.3333333333333333,
+        "attributes": null,
+        "relations": null
+      },
+      "unscored_share": 0.6857142857142856
+    },
+    "fixed-dev-neg-20": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": null,
+        "spread": null
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": null,
+        "spread": null
+      },
+      "fidelity": {
+        "mean": 0.6166666666666667,
+        "spread": 0.06506407098647712
+      },
+      "components": {
+        "precision": null,
+        "recall": null,
+        "count": null,
+        "position": null,
+        "attributes": null,
+        "relations": null
+      },
+      "unscored_share": 1.0
+    },
+    "fixed-dev-neg-3": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.6766666666666667,
+        "spread": 0.025166114784235805
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "count": null,
+        "position": 1.0,
+        "attributes": null,
+        "relations": null
+      },
+      "unscored_share": 0.38888888888888884
+    },
+    "fixed-dev-neg-4": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": null,
+        "spread": null
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": null,
+        "spread": null
+      },
+      "fidelity": {
+        "mean": 0.5833333333333334,
+        "spread": 0.02886751345948125
+      },
+      "components": {
+        "precision": null,
+        "recall": null,
+        "count": null,
+        "position": null,
+        "attributes": null,
+        "relations": null
+      },
+      "unscored_share": 1.0
+    },
+    "fixed-dev-neg-5": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.5,
+        "spread": 0.0
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 0.5,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.45,
+        "spread": 0.04999999999999999
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 0.5,
+        "count": null,
+        "position": 0.0,
+        "attributes": null,
+        "relations": null
+      },
+      "unscored_share": 0.6190476190476191
+    },
+    "fixed-dev-neg-6": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.7261904761904763,
+        "spread": 0.041239304942116105
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 0.8000000000000002,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.5333333333333333,
+        "spread": 0.05773502691896256
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 0.8000000000000002,
+        "count": 0.0,
+        "position": 0.9047619047619048,
+        "attributes": 1.0,
+        "relations": null
+      },
+      "unscored_share": 0.11574074074074074
+    },
+    "fixed-dev-neg-7": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.9833333333333334,
+        "spread": 0.028867513459481315
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.5499999999999999,
+        "spread": 0.04999999999999999
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "count": null,
+        "position": 0.9666666666666667,
+        "attributes": null,
+        "relations": null
+      },
+      "unscored_share": 0.23737373737373738
+    },
+    "fixed-dev-neg-8": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.9083333333333333,
+        "spread": 0.1244432043589007
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.5166666666666667,
+        "spread": 0.12583057392117916
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "count": null,
+        "position": 0.8916666666666666,
+        "attributes": 0.8333333333333334,
+        "relations": null
+      },
+      "unscored_share": 0.44722222222222224
+    },
+    "fixed-dev-neg-9": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.8548941798941799,
+        "spread": 0.0411367154848337
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.5,
+        "spread": 0.09999999999999998
+      },
+      "components": {
+        "precision": 0.9153439153439153,
+        "recall": 1.0,
+        "count": null,
+        "position": 0.7944444444444444,
+        "attributes": null,
+        "relations": null
+      },
+      "unscored_share": 0.3748917748917749
+    },
+    "fixed-dev-uspvdb-400115": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 0.5,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.6566666666666666,
+        "spread": 0.04041451884327378
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 0.5,
+        "count": null,
+        "position": 1.0,
+        "attributes": 1.0,
+        "relations": null
+      },
+      "unscored_share": 0.0
+    },
+    "fixed-dev-uspvdb-400117": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.6296296296296297,
+        "spread": 0.06415002990995845
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 0.5,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.5833333333333334,
+        "spread": 0.202072594216369
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 0.5,
+        "count": null,
+        "position": 0.8888888888888888,
+        "attributes": 0.0,
+        "relations": null
+      },
+      "unscored_share": 0.5666666666666667
+    },
+    "fixed-dev-uspvdb-400305": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.6666666666666666,
+        "spread": 0.0
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 0.5,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.6466666666666666,
+        "spread": 0.06429100507328636
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 0.5,
+        "count": null,
+        "position": 1.0,
+        "attributes": 0.0,
+        "relations": null
+      },
+      "unscored_share": 0.5555555555555555
+    },
+    "fixed-dev-uspvdb-400532": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.6666666666666666,
+        "spread": 0.0
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.65,
+        "spread": 0.030000000000000027
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "count": null,
+        "position": 1.0,
+        "attributes": 0.0,
+        "relations": null
+      },
+      "unscored_share": 0.0
+    },
+    "fixed-dev-uspvdb-400564": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 0.5,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.5833333333333334,
+        "spread": 0.12583057392117913
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 0.5,
+        "count": null,
+        "position": 1.0,
+        "attributes": 1.0,
+        "relations": null
+      },
+      "unscored_share": 0.0
+    },
+    "fixed-dev-uspvdb-400565": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.44166666666666665,
+        "spread": 0.08207381501496754
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 0.5,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.42333333333333334,
+        "spread": 0.1250333288900737
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 0.5,
+        "count": 0.0,
+        "position": 0.5888888888888889,
+        "attributes": 0.0,
+        "relations": null
+      },
+      "unscored_share": 0.5148148148148147
+    },
+    "fixed-dev-uspvdb-400714": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.611111111111111,
+        "spread": 0.0962250448649376
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.5833333333333334,
+        "spread": 0.14433756729740643
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "count": null,
+        "position": 0.8333333333333334,
+        "attributes": 0.0,
+        "relations": null
+      },
+      "unscored_share": 0.3333333333333333
+    },
+    "fixed-dev-uspvdb-400829": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.75,
+        "spread": 0.0
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 0.5,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.4666666666666666,
+        "spread": 0.11547005383792512
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 0.5,
+        "count": 0.0,
+        "position": 1.0,
+        "attributes": 1.0,
+        "relations": null
+      },
+      "unscored_share": 0.7962962962962963
+    },
+    "fixed-dev-uspvdb-400833": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.6666666666666666,
+        "spread": 0.0
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.6833333333333332,
+        "spread": 0.07637626158259735
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "count": null,
+        "position": 1.0,
+        "attributes": 0.0,
+        "relations": null
+      },
+      "unscored_share": 0.24444444444444446
+    },
+    "fixed-dev-uspvdb-400884": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.5694444444444444,
+        "spread": 0.048112522432468836
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.6,
+        "spread": 0.15
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "count": 0.0,
+        "position": 0.7777777777777777,
+        "attributes": 0.5,
+        "relations": null
+      },
+      "unscored_share": 0.35000000000000003
+    },
+    "fixed-dev-uspvdb-401002": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 0.5,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.6933333333333334,
+        "spread": 0.011547005383792462
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 0.5,
+        "count": null,
+        "position": 1.0,
+        "attributes": 1.0,
+        "relations": null
+      },
+      "unscored_share": 0.0
+    },
+    "fixed-dev-uspvdb-401138": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 0.5,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.7000000000000001,
+        "spread": 0.08660254037844388
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 0.5,
+        "count": null,
+        "position": 1.0,
+        "attributes": 1.0,
+        "relations": null
+      },
+      "unscored_share": 0.0
+    },
+    "fixed-dev-uspvdb-401262": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.5555555555555555,
+        "spread": 0.0962250448649376
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 0.5,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.5499999999999999,
+        "spread": 0.14999999999999997
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 0.5,
+        "count": 0.0,
+        "position": 1.0,
+        "attributes": 0.0,
+        "relations": null
+      },
+      "unscored_share": 0.0
+    },
+    "fixed-dev-uspvdb-401266": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.6666666666666666,
+        "spread": 0.0
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.6666666666666666,
+        "spread": 0.14433756729740643
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "count": null,
+        "position": 1.0,
+        "attributes": 0.0,
+        "relations": null
+      },
+      "unscored_share": 0.16666666666666666
+    },
+    "fixed-dev-uspvdb-401328": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 0.5,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.7666666666666666,
+        "spread": 0.07637626158259735
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 0.5,
+        "count": null,
+        "position": 1.0,
+        "attributes": 1.0,
+        "relations": null
+      },
+      "unscored_share": 0.3333333333333333
+    },
+    "fixed-dev-uspvdb-401411": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 0.5,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.7333333333333334,
+        "spread": 0.028867513459481315
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 0.5,
+        "count": null,
+        "position": 1.0,
+        "attributes": 1.0,
+        "relations": null
+      },
+      "unscored_share": 0.0
+    },
+    "fixed-dev-uspvdb-401501": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.5,
+        "spread": 0.0
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 0.5,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.6066666666666666,
+        "spread": 0.011547005383792526
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 0.5,
+        "count": 0.0,
+        "position": 1.0,
+        "attributes": 0.0,
+        "relations": null
+      },
+      "unscored_share": 0.0
+    },
+    "fixed-dev-uspvdb-401557": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.6666666666666666,
+        "spread": 0.0
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.5499999999999999,
+        "spread": 0.04999999999999999
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "count": null,
+        "position": 1.0,
+        "attributes": 0.0,
+        "relations": null
+      },
+      "unscored_share": 0.3
+    },
+    "fixed-dev-uspvdb-401605": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 0.5,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.7166666666666667,
+        "spread": 0.12583057392117916
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 0.5,
+        "count": null,
+        "position": 1.0,
+        "attributes": 1.0,
+        "relations": null
+      },
+      "unscored_share": 0.0
+    },
+    "fixed-dev-uspvdb-401667": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.9166666666666666,
+        "spread": 0.14433756729740643
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 0.5,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.65,
+        "spread": 0.17320508075688773
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 0.5,
+        "count": null,
+        "position": 1.0,
+        "attributes": 0.75,
+        "relations": null
+      },
+      "unscored_share": 0.16666666666666666
+    },
+    "fixed-dev-uspvdb-401742": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 0.5,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.5166666666666666,
+        "spread": 0.14433756729740643
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 0.5,
+        "count": null,
+        "position": 1.0,
+        "attributes": 1.0,
+        "relations": null
+      },
+      "unscored_share": 0.562962962962963
+    },
+    "fixed-dev-uspvdb-401811": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 0.5,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.6666666666666666,
+        "spread": 0.11547005383792519
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 0.5,
+        "count": null,
+        "position": 1.0,
+        "attributes": 1.0,
+        "relations": null
+      },
+      "unscored_share": 0.0
+    },
+    "fixed-dev-uspvdb-402150": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.7925925925925926,
+        "spread": 0.18098950700549063
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 0.7777777777777777,
+        "spread": 0.1924500897298753
+      },
+      "fidelity": {
+        "mean": 0.5166666666666667,
+        "spread": 0.12583057392117916
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 0.7777777777777777,
+        "count": null,
+        "position": 0.9333333333333332,
+        "attributes": 0.16666666666666666,
+        "relations": null
+      },
+      "unscored_share": 0.16666666666666666
+    },
+    "fixed-dev-uspvdb-402210": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.7777777777777777,
+        "spread": 0.1924500897298753
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 0.5,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.7566666666666667,
+        "spread": 0.0981495457622364
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 0.5,
+        "count": null,
+        "position": 1.0,
+        "attributes": 0.3333333333333333,
+        "relations": null
+      },
+      "unscored_share": 0.5
+    },
+    "fixed-dev-uspvdb-402927": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 0.5,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.48333333333333334,
+        "spread": 0.202072594216369
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 0.5,
+        "count": null,
+        "position": 1.0,
+        "attributes": 1.0,
+        "relations": null
+      },
+      "unscored_share": 0.40740740740740744
+    },
+    "fixed-dev-uspvdb-404294": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 0.5,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.65,
+        "spread": 0.08660254037844388
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 0.5,
+        "count": null,
+        "position": 1.0,
+        "attributes": 1.0,
+        "relations": null
+      },
+      "unscored_share": 0.0
+    },
+    "fixed-dev-uspvdb-404560": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.7222222222222222,
+        "spread": 0.2545875386086578
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 0.6666666666666666,
+        "spread": 0.28867513459481287
+      },
+      "fidelity": {
+        "mean": 0.6933333333333334,
+        "spread": 0.10066445913694336
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 0.6666666666666666,
+        "count": null,
+        "position": 0.8333333333333334,
+        "attributes": 0.0,
+        "relations": null
+      },
+      "unscored_share": 0.27777777777777773
+    },
+    "fixed-dev-uspvdb-404747": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 0.5,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.6166666666666667,
+        "spread": 0.07637626158259729
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 0.5,
+        "count": null,
+        "position": 1.0,
+        "attributes": 1.0,
+        "relations": null
+      },
+      "unscored_share": 0.0
+    },
+    "fixed-dev-uspvdb-406675": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 0.5,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.5166666666666666,
+        "spread": 0.14433756729740643
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 0.5,
+        "count": null,
+        "position": 1.0,
+        "attributes": 1.0,
+        "relations": null
+      },
+      "unscored_share": 0.2777777777777778
+    },
+    "fixed-dev-uswtdb-3006492": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.7527777777777778,
+        "spread": 0.1514589542246176
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.3666666666666667,
+        "spread": 0.028867513459481315
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "count": 0.0,
+        "position": 0.7000000000000001,
+        "attributes": null,
+        "relations": null
+      },
+      "unscored_share": 0.16666666666666666
+    },
+    "fixed-dev-uswtdb-3025451": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.7222222222222222,
+        "spread": 0.0962250448649376
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.6433333333333334,
+        "spread": 0.08144527815247074
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "count": null,
+        "position": 0.4444444444444444,
+        "attributes": null,
+        "relations": null
+      },
+      "unscored_share": 0.4388888888888889
+    },
+    "fixed-dev-uswtdb-3025453": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.7962962962962963,
+        "spread": 0.2245251046848545
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 0.8333333333333334,
+        "spread": 0.28867513459481287
+      },
+      "fidelity": {
+        "mean": 0.5833333333333334,
+        "spread": 0.02886751345948125
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 0.8333333333333334,
+        "count": null,
+        "position": 0.7777777777777777,
+        "attributes": null,
+        "relations": 0.0
+      },
+      "unscored_share": 0.43333333333333335
+    },
+    "fixed-dev-uswtdb-3033262": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.8472222222222222,
+        "spread": 0.02405626121623445
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.5933333333333334,
+        "spread": 0.09018499505645791
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "count": null,
+        "position": 0.6944444444444443,
+        "attributes": null,
+        "relations": null
+      },
+      "unscored_share": 0.2833333333333334
+    },
+    "fixed-dev-uswtdb-3036528": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.7416666666666667,
+        "spread": 0.13768926368215256
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.4166666666666667,
+        "spread": 0.057735026918962595
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "count": null,
+        "position": 0.48333333333333334,
+        "attributes": null,
+        "relations": null
+      },
+      "unscored_share": 0.13333333333333333
+    },
+    "fixed-dev-uswtdb-3036765": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.6666666666666666,
+        "spread": 0.14433756729740643
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 0.6666666666666666,
+        "spread": 0.28867513459481287
+      },
+      "fidelity": {
+        "mean": 0.5333333333333333,
+        "spread": 0.18929694486000911
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 0.6666666666666666,
+        "count": null,
+        "position": 0.3333333333333333,
+        "attributes": null,
+        "relations": null
+      },
+      "unscored_share": 0.6
+    },
+    "fixed-dev-uswtdb-3044325": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.6666666666666666,
+        "spread": 0.0
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.6666666666666666,
+        "spread": 0.07571877794400365
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "count": null,
+        "position": 0.3333333333333333,
+        "attributes": null,
+        "relations": null
+      },
+      "unscored_share": 0.7781385281385281
+    },
+    "fixed-dev-uswtdb-3045032": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.6166666666666667,
+        "spread": 0.12583057392117916
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.5499999999999999,
+        "spread": 0.1322875655532295
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "count": null,
+        "position": 0.2333333333333333,
+        "attributes": null,
+        "relations": null
+      },
+      "unscored_share": 0.2222222222222222
+    },
+    "fixed-dev-uswtdb-3045490": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.75,
+        "spread": 0.0
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.48333333333333334,
+        "spread": 0.02886751345948128
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "count": null,
+        "position": 0.5,
+        "attributes": null,
+        "relations": null
+      },
+      "unscored_share": 0.4444444444444444
+    },
+    "fixed-dev-uswtdb-3048764": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.7222222222222222,
+        "spread": 0.0962250448649376
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.4833333333333334,
+        "spread": 0.07637626158259735
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "count": null,
+        "position": 0.4444444444444444,
+        "attributes": null,
+        "relations": null
+      },
+      "unscored_share": 0.3
+    },
+    "fixed-dev-uswtdb-3050726": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 0.5,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.6333333333333333,
+        "spread": 0.10408329997330662
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 0.5,
+        "count": null,
+        "position": 1.0,
+        "attributes": null,
+        "relations": null
+      },
+      "unscored_share": 0.6666666666666666
+    },
+    "fixed-dev-uswtdb-3073564": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.6543209876543209,
+        "spread": 0.021383343303319438
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 0.6666666666666666,
+        "spread": 0.28867513459481287
+      },
+      "fidelity": {
+        "mean": 0.4666666666666666,
+        "spread": 0.20816659994661324
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 0.6666666666666666,
+        "count": 0.0,
+        "position": 0.9629629629629629,
+        "attributes": null,
+        "relations": null
+      },
+      "unscored_share": 0.2698412698412698
+    },
+    "fixed-dev-uswtdb-3110848": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.6666666666666666,
+        "spread": 0.14433756729740643
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.6266666666666666,
+        "spread": 0.11015141094572203
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "count": null,
+        "position": 0.3333333333333333,
+        "attributes": null,
+        "relations": null
+      },
+      "unscored_share": 0.4777777777777778
+    },
+    "fixed-dev-uspvdb-400222": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 0.5,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.7000000000000001,
+        "spread": 0.09165151389911683
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 0.5,
+        "count": null,
+        "position": 1.0,
+        "attributes": 1.0,
+        "relations": null
+      },
+      "unscored_share": 0.0
+    },
+    "change-dev-uspvdb-401501": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.75,
+        "spread": 0.0
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 0.5,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.4666666666666666,
+        "spread": 0.2309401076758503
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 0.5,
+        "count": 0.0,
+        "position": 1.0,
+        "attributes": null,
+        "relations": null
+      },
+      "unscored_share": 0.2962962962962963
+    },
+    "fixed-dev-lookalike-neg-101": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.6944444444444443,
+        "spread": 0.09622504486493767
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.3,
+        "spread": 0.04999999999999999
+      },
+      "components": {
+        "precision": 0.5555555555555555,
+        "recall": 1.0,
+        "count": null,
+        "position": 0.8333333333333334,
+        "attributes": null,
+        "relations": null
+      },
+      "unscored_share": 0.41111111111111115
+    },
+    "fixed-dev-lookalike-neg-102": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.625,
+        "spread": 0.1767766952966369
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 0.3333333333333333,
+        "spread": 0.3333333333333333
+      },
+      "fidelity": {
+        "mean": 0.6266666666666666,
+        "spread": 0.11015141094572203
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 0.3333333333333333,
+        "count": null,
+        "position": 0.25,
+        "attributes": null,
+        "relations": null
+      },
+      "unscored_share": 0.7936507936507936
+    },
+    "fixed-dev-lookalike-neg-103": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.0,
+        "spread": 0.0
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": null,
+        "spread": null
+      },
+      "fidelity": {
+        "mean": 0.29333333333333333,
+        "spread": 0.011547005383792493
+      },
+      "components": {
+        "precision": 0.0,
+        "recall": null,
+        "count": null,
+        "position": null,
+        "attributes": null,
+        "relations": null
+      },
+      "unscored_share": 0.8196969696969697
+    },
+    "fixed-dev-lookalike-neg-104": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.5,
+        "spread": 0.4330127018922193
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 0.6666666666666666,
+        "spread": 0.5773502691896257
+      },
+      "fidelity": {
+        "mean": 0.35000000000000003,
+        "spread": 0.08660254037844388
+      },
+      "components": {
+        "precision": 0.3333333333333333,
+        "recall": 0.6666666666666666,
+        "count": null,
+        "position": 1.0,
+        "attributes": null,
+        "relations": null
+      },
+      "unscored_share": 0.6722222222222222
+    },
+    "fixed-dev-lookalike-neg-105": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.7182539682539683,
+        "spread": 0.20423982908663127
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.5499999999999999,
+        "spread": 0.14999999999999997
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "count": 0.0,
+        "position": 0.7380952380952381,
+        "attributes": 1.0,
+        "relations": null
+      },
+      "unscored_share": 0.34074074074074073
+    },
+    "fixed-dev-lookalike-neg-106": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.7222222222222222,
+        "spread": 0.048112522432468836
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.6666666666666666,
+        "spread": 0.07637626158259735
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "count": 0.0,
+        "position": 1.0,
+        "attributes": 1.0,
+        "relations": null
+      },
+      "unscored_share": 0.05555555555555555
+    },
+    "fixed-dev-lookalike-neg-107": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.6666666666666666,
+        "spread": 0.0
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 0.8888888888888888,
+        "spread": 0.1924500897298753
+      },
+      "fidelity": {
+        "mean": 0.59,
+        "spread": 0.03605551275463986
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 0.8888888888888888,
+        "count": 0.0,
+        "position": 1.0,
+        "attributes": null,
+        "relations": null
+      },
+      "unscored_share": 0.4166666666666667
+    },
+    "fixed-dev-lookalike-neg-108": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.6666666666666666,
+        "spread": 0.0
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 0.6666666666666666,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.7666666666666666,
+        "spread": 0.04163331998932269
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 0.6666666666666666,
+        "count": 0.0,
+        "position": 1.0,
+        "attributes": null,
+        "relations": null
+      },
+      "unscored_share": 0.3333333333333333
+    },
+    "fixed-dev-lookalike-neg-110": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.5833333333333334,
+        "spread": 0.03608439182435161
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "fidelity": {
+        "mean": 0.35000000000000003,
+        "spread": 0.05000000000000002
+      },
+      "components": {
+        "precision": 0.7222222222222222,
+        "recall": 1.0,
+        "count": 0.0,
+        "position": 0.611111111111111,
+        "attributes": 1.0,
+        "relations": null
+      },
+      "unscored_share": 0.24444444444444446
+    },
+    "fixed-dev-lookalike-neg-112": {
+      "runs": 3,
+      "harness_faults": 0,
+      "sandbox_failures": 0,
+      "correctness": {
+        "mean": 0.9074074074074074,
+        "spread": 0.08486251286955258
+      },
+      "workflow": {
+        "mean": 1.0,
+        "spread": 0.0
+      },
+      "coverage": {
+        "mean": 0.7777777777777777,
+        "spread": 0.1924500897298753
+      },
+      "fidelity": {
+        "mean": 0.41333333333333333,
+        "spread": 0.21385353243127256
+      },
+      "components": {
+        "precision": 1.0,
+        "recall": 0.7777777777777777,
+        "count": null,
+        "position": 0.7222222222222222,
+        "attributes": 1.0,
+        "relations": null
+      },
+      "unscored_share": 0.4666666666666666
+    }
+  },
+  "batch": {
+    "correctness": 0.7695003578457684,
+    "workflow": 1.0,
+    "coverage": 0.7462418300653595,
+    "fidelity": 0.5641441441441442,
+    "retrieval_mrr": {
+      "mean": 0.7277059544722588,
+      "spread": 0.0613935685831346
+    },
+    "retrieval_recall_at_1": {
+      "mean": 0.09373520306637417,
+      "spread": 0.02405626121623441
+    },
+    "retrieval_hit_at_1": {
+      "mean": 0.7083333333333334,
+      "spread": 0.07216878364870322
+    },
+    "unscored_share": 0.3732989482989483,
+    "label_prep_seconds": 3974.1,
+    "label_prep_seconds_per_case": 53.704054054054055,
+    "label_preparation": {
+      "measurements": [
+        {
+          "value": 35.6,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 60.1,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 52.7,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 44.1,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 60.6,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 56.5,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 48.8,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 48.5,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 56.8,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 52.6,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 105.4,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 43.0,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 58.4,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 52.6,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 49.3,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 43.8,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 52.5,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 52.5,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 57.3,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 69.1,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 78.8,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 39.4,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 45.5,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 43.2,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 52.4,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 53.9,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 60.1,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 56.3,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 32.7,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 43.6,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 54.2,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 80.5,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 45.2,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 53.0,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 43.6,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 54.2,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 52.5,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 54.9,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 84.4,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 41.2,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 41.6,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 48.1,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 50.9,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 51.9,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 63.1,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 71.9,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 37.9,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 54.9,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 80.6,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 81.9,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 57.5,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 47.7,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 53.3,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 61.9,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 45.1,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 50.5,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 39.6,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 50.1,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 53.3,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 51.9,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 43.6,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 59.7,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 44.5,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 52.8,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 52.7,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 43.6,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 68.7,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 51.3,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 39.9,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 39.6,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 50.6,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 60.1,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 46.8,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        },
+        {
+          "value": 56.7,
+          "scope": "case_build",
+          "method": "legacy prep_seconds: Case builder monotonic wall clock; includes imagery and references",
+          "units": "seconds",
+          "reference_only": false,
+          "status": "observed"
+        }
+      ],
+      "observed_cases": 74,
+      "total_cases": 74,
+      "units": "seconds",
+      "by_scope": {
+        "case_build": {
+          "observed_cases": 74,
+          "sum_seconds": 3974.1
+        },
+        "reference_labels": {
+          "observed_cases": 0,
+          "sum_seconds": null
+        }
+      },
+      "scope": "case_build_or_explicit_reference_labels",
+      "caption_generation_seconds": 3.467972972972973
+    },
+    "cost": {
+      "gpu_seconds": null,
+      "gpu_count": null,
+      "gpu_type": null,
+      "status": "unavailable: hosted Bedrock does not expose GPU metrics"
+    },
+    "fidelity_kind": "model_opinion",
+    "fidelity_self_judged": false,
+    "retrieval_warnings": [],
+    "seconds_per_caption": 3.467972972972973,
+    "tokens_per_caption": 2627.5855855855857,
+    "usd_per_caption": 0.0026698090090090092,
+    "verified_claims_per_caption": 1.072072072072072,
+    "verified_claims_per_dollar": 401.55384465872646,
+    "verified_claims_per_gpu_second": null,
+    "runs": {
+      "planned": 222,
+      "ok": 222,
+      "harness_faults": 0,
+      "sandbox_failures": 0
+    },
+    "lookalikes": {
+      "greenhouse": {
+        "of": "solar_array",
+        "cases": 4,
+        "runs": 12,
+        "fooled": 9
+      },
+      "parking_lot": {
+        "of": "solar_array",
+        "cases": 4,
+        "runs": 12,
+        "fooled": 0
+      },
+      "reflective_roof": {
+        "of": "solar_array",
+        "cases": 2,
+        "runs": 6,
+        "fooled": 3
+      }
+    },
+    "step_faults": {
+      "harness": 0,
+      "environment": 0,
+      "sandbox": 0,
+      "soft": 0
+    }
+  },
+  "stopped": null,
+  "rescored": "2026-11-05T02:33:35+00:00"
+}

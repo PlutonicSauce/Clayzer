@@ -493,6 +493,13 @@ def create_app(
             body = redact(body.decode()).encode()
         return Response(body, media_type=kind)
 
+    @app.get("/api/stories")
+    def stories_list():
+        """The demo pack's Stories (demo/stories.toml), with each gate Story gated offline."""
+        from clayzer.stories import INDEX, with_gates
+
+        return with_gates(store, json.loads(store.get(INDEX))) if store.exists(INDEX) else []
+
     @app.get("/api/datasets")
     def datasets():
         cards = []

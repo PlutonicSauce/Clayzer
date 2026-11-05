@@ -1,0 +1,31 @@
+{
+  "batch_id": "20261104T052747Z-vague",
+  "label": "vague",
+  "created": "2026-11-04T05:27:47+00:00",
+  "region": "dev",
+  "repeats": 3,
+  "case_ids": [
+    "fixed-dev-uswtdb-3025453",
+    "fixed-dev-neg-1",
+    "fixed-dev-uspvdb-400117",
+    "fixed-dev-uspvdb-402150"
+  ],
+  "cases_sha": "2c807f06fd82",
+  "caption_model": "us.amazon.nova-pro-v1:0",
+  "judge_model": "us.anthropic.claude-opus-5-5",
+  "embed_model": "amazon.titan-embed-text-v2:0",
+  "prompt_sha": "60d1c8998b1c",
+  "prompt_source": "/tmp/clayzer-prompts/vague.txt",
+  "scorer_version": "grounding-4+workflow-1",
+  "tools": [],
+  "max_turns": 8,
+  "verify": null,
+  "judge_prompt_sha": null,
+  "ontology_version": null,
+  "ontology_sha": null,
+  "chips_sha": null,
+  "code_commit": null,
+  "code_dirty": null,
+  "summary_model": null,
+  "extra": {}
+}

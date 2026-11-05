@@ -1,0 +1,13 @@
+{
+  "run_id": "fixed-dev-lookalike-neg-101#1",
+  "markdown": "### What the Harness did\n- Called the `us.amazon.nova-pro-v1:0` model to caption the image `chips/ca-neg-101-20220607.png`.\n- Received a caption describing a large solar array in the north, divided by a road, with two fields and vegetation to the south.\n\n### Where it struggled\n- Nothing notable.\n\n### Verdict\nThe Run produced a Caption without any issues.",
+  "model": "us.amazon.nova-pro-v1:0",
+  "usage": {
+    "inputTokens": 713,
+    "outputTokens": 100,
+    "totalTokens": 813
+  },
+  "seconds": 1.37,
+  "created": "2026-11-05T00:38:04+00:00",
+  "trace_sha": "48c564528069691f"
+}

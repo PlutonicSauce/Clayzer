@@ -663,6 +663,30 @@ document.addEventListener("keydown", (ev) => {
   if (document.getElementById("case-fig")) CASE_KEYS.draw();
 });
 
+async function storiesPage() {
+  const me = SEQ;
+  const stories = await api("/api/stories");
+  if (stale(me)) return;
+  const gateBadge = (g) => {
+    const cls = { pass: "b-ok", fail: "b-bad", inconclusive: "b-warn" }[g.verdict];
+    return `<p><span class="badge ${cls} verdict">${esc(g.verdict.toUpperCase())}</span> ${g.reasons.map(esc).join("; ")}</p>`;
+  };
+  $view.innerHTML = `<h1>Stories</h1>
+    <p>Recorded Runs, each picked to show one point about the evaluation (${term("Story", "Stories")}).
+    They replay from the demo pack with no model, credentials, or network: start the app with
+    <code>clayzer ui --local-root demo/pack</code>.</p>
+    ${stories.length ? `<div class="case-grid">${stories.map((s) => {
+      const run = `#/runs/${encodeURIComponent(s.batch)}/${encodeURIComponent(s.case)}/${s.repeat}`;
+      return `<div class="case-card">
+        <a href="${run}"><img src="/api/chips/${encodeURIComponent(s.chip)}.png" alt="Chip ${esc(s.chip)}" loading="lazy"></a>
+        <div class="body"><b><a href="${run}">${esc(s.title)}</a></b>
+        <p class="sub">${esc(s.shows)}</p><p>${esc(s.note)}</p>
+        ${s.gate ? gateBadge(s.gate) : ""}
+        <small><a href="${run}">The Run</a>${s.baseline ? ` · <a href="#/compare/${encodeURIComponent(s.baseline)}/${encodeURIComponent(s.batch)}">Compare with its Baseline</a>` : ""}
+        · <span class="mono">${esc(s.case)} · Repeat ${esc(s.repeat)}</span></small></div></div>`;
+    }).join("")}</div>` : '<p class="empty">No Stories in this store. Build the demo pack with <code>clayzer stories pack</code>, then start the app with <code>clayzer ui --local-root demo/pack</code>.</p>'}`;
+}
+
 async function datasetsPage(id) {
   const me = SEQ;
   const cards = await api("/api/datasets");
@@ -1439,6 +1463,7 @@ async function route() {
     else if (page === "batches" && parts[1]) await batchPage(parts[1], parts[2]);
     else if (page === "batches") await batchesPage();
     else if (page === "datasets") await datasetsPage(parts[1]);
+    else if (page === "stories") await storiesPage();
     else if (page === "compare") await comparePage(parts[1], parts[2]);
     else if (page === "runs") await runPage(parts[1], parts[2], parts[3] || "1");
     else if (page === "sources") await sourcesPage();
