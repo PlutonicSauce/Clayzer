@@ -70,6 +70,14 @@ def test_replay_rescores_offline_and_reuses_the_rest(recorded, monkeypatch):
     )
 
 
+def test_rescoring_a_replayed_batch_keeps_it_marked_as_replayed(recorded, monkeypatch):
+    store, _, bid = recorded
+    offline(monkeypatch)
+    rid = batches.replay(bid, store, relabelled(), "fix", reports=False)
+    assert batches.rescore(rid, store)["replayed_from"] == bid
+    assert batches.load(store, rid)["summary"]["replayed_from"] == bid
+
+
 def test_a_replayed_baseline_gates_live_batches_on_the_new_cases(recorded, monkeypatch, tmp_path):
     store, settings, bid = recorded
     offline(monkeypatch)

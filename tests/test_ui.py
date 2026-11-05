@@ -285,3 +285,18 @@ def test_the_deck_gets_the_public_url_only_from_the_environment(tmp_path, monkey
     assert (
         TestClient(create_app(s)).get("/api/config").json()["public_url"] == "https://example.org"
     )
+
+
+def test_legacy_report_presentation_preserves_stored_evidence(client, tmp_path):
+    c, bid = client
+    path = tmp_path / "batches" / bid / "report.html"
+    original = path.read_bytes()
+    raw_url = f"/api/batches/{bid}/runs/{SOLAR['id']}--r1.json"
+    raw_before = c.get(raw_url).json()
+    response = c.get(f"/api/batches/{bid}/report.html")
+    assert response.status_code == 200
+    assert "--paper: #f8f7f2" in response.text
+    assert 'tabindex="0"' in response.text
+    assert path.read_bytes() == original
+    # Existing machine-readable evidence remains identical.
+    assert c.get(raw_url).json() == raw_before

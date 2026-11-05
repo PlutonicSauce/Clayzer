@@ -34,7 +34,7 @@ STEP_STYLE = """
   background: #fff; }
 .steps .head { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; }
 .steps .head b { font-size: 14.5px; }
-.steps .judge { opacity: .85; background: #faf7f5; }
+.steps .judge { background: #faf7f5; }
 .steps pre { white-space: pre-wrap; word-break: break-word; max-height: 360px; overflow: auto;
   background: #faf6f3; border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px;
   font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; }
