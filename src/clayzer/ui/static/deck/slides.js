@@ -9,7 +9,7 @@
 import { html } from "./html.js";
 import { ArchitectureDiagram } from "./diagram.js";
 import { CaptionChip } from "./caption-chip.js";
-import { SolutionFlow } from "./value-flow.js";
+import { ChipJourney } from "./chip-journey.js";
 import { OntologyViz } from "./ontology-slide.js";
 import { ChipStats, LeverList, PotteryScale } from "./scale-pottery.js";
 import { ProblemViz } from "./problem-slide.js";
@@ -89,14 +89,12 @@ function Trust({ step = 0 }) {
   </div>`;
 }
 
-// How it works, as one journey: public data in on the left, Clayzer's four numbered steps, and
-// trusted pairs out to Clay's text search, with what each part is worth along the bottom. (Merged
-// from the old story-architecture and downstream-value slides.)
-function Architecture() {
+// How it works, on one real Chip: each press is one of the four steps (chip-journey.js).
+function Architecture({ step = 0 }) {
   return html`<div class="arch-slide">
-    <${Kicker}>How it works · start to finish<//>
-    <h2>From aerial image to searchable caption</h2>
-    <${SolutionFlow} />
+    <${Kicker}>How it works · one image, start to finish<//>
+    <h2>Follow one aerial image through Clayzer</h2>
+    <${ChipJourney} step=${step} />
   </div>`;
 }
 
@@ -266,9 +264,9 @@ export const SLIDES = [
   { title: "Example search", section: "Value Unlock", seconds: 22, component: ExampleSearch,
     spoken: "Why does this matter? Trusted captions make satellite imagery searchable in plain words. Ask which rice fields near Bangkok became buildings since the 2011 flood, and you get matching before-and-after images. No map layer, no GIS skills. Fish ponds can pass for buildings, so we check every caption. Then anyone can ask questions like this, about homes, harvests and jobs, and trust the answers.",
     notes: ["Let the video play; it runs 22 s and holds on the end card. To replay it, leave the slide and come back.", "The line to land: anyone can ask the Earth a question, and checked captions make the answers trustworthy.", "Why text search and not just the latest image: you don't know where to look, no layer exists for it, and the change is slow, a few fields a year, so it only shows across dates.", "Look-alikes: fish ponds and flooded paddies look the same from above; that is what our look-alike vocabulary is for.", "Illustrative, not real results: our Cases today are US solar, wind and land cover. Don't imply we have run this search."] },
-  { title: "How it works", section: "Our Solution", seconds: 30, component: Architecture,
-    spoken: "Here is how it works, start to finish. An aerial image and public records go in. One: a model writes the caption from the image alone. Two: each fact is checked against the imagery before it is kept. Three: we score it against the public records, which the model never sees. Four: a gate keeps a change only if it beats the baseline. Only pairs that pass go on to Clay, ready to search.",
-    notes: ["Follow the numbers: 1 write, 2 verify, 3 score against hidden records, 4 gate.", "Point at the bottom row: answer keys for free, wrong captions caught before anyone searches, search in words.", "The dashed loop back from Clay is planned, not built: say 'next'."] },
+  { title: "How it works", section: "Our Solution", seconds: 30, component: Architecture, steps: 4,
+    spoken: "Let's follow one real image. One: the model writes five claims from the image alone. Two: each claim is checked against the imagery. That solar array is a storage yard, so it's gone before the caption is written. Three: we score it against public records it never saw: right, but it missed the road. Four: every change faces a gate. A vaguer prompt looked more correct, and failed. Only pairs that pass go out, to Clay, LGND, or other apps.",
+    notes: ["One press per step; the strip at the top lights the step you're on.", "Press 2 is the moment: point at the south-west cell, the storage yard that looks like panels.", "Real Runs: verify-2 neg-1 Repeat 1, and the vague-prompt gate (demo/stories.toml)."] },
   { title: "Our solution", section: "Our Solution", seconds: 34, component: Trust, steps: 6,
     spoken: "Here is how we make captions you can trust. We verify, then write: each fact is checked against the imagery before the caption is written. The answer keys are public records, cross-checked by code: where they agree, labels are automatic, and only where they conflict does a person look. The captioner never sees them. One shared vocabulary of objects and their look-alikes. We tune on one region and test on another it never saw. And a self-improvement loop keeps only the changes that beat the baseline. The result: a caption that matches what is really there.",
     notes: ["Press → for each point as you say it (5 presses); the 6th turns the caption green.", "Verify-then-write: in the 4-image test, every object it named was really there, and correctness rose 0.53 → 0.65. Don't claim it's in the baseline: the gate kept it out because coverage dropped.", "Say 'tune', not 'train': we tune the captioner's prompt and checks.", "Labels are automatic; a person only looks where the two records disagree."] },

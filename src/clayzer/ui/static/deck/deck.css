@@ -436,6 +436,57 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
   .onto-card { transition: none; }
 }
 
+/* How it works: one Chip through the four steps (chip-journey.js). */
+.journey-strip { display: flex; gap: 6px; list-style: none; margin: 0 0 22px; padding: 0;
+  align-items: center; }
+.journey-strip li { padding: 8px 18px; border-radius: 999px; font-size: 19px; font-weight: 600;
+  background: var(--data); color: var(--muted); border: 2px solid var(--data-line);
+  transition: background .35s ease, color .35s ease, border-color .35s ease; }
+.journey-strip li span { display: inline-block; width: 24px; height: 24px; margin-right: 8px;
+  border-radius: 50%; background: var(--muted); color: var(--paper); font-size: 14px;
+  line-height: 24px; text-align: center; }
+.journey-strip li.io { background: none; border-style: dashed; }
+.journey-strip li.now { background: var(--decision); border-color: var(--decision); color: var(--paper); }
+.journey-strip li.now span { background: var(--paper); color: var(--decision); }
+.journey-strip li.done { background: var(--evaluation); border-color: var(--evaluation-line); color: var(--ok); }
+.journey-strip li.done span { background: var(--ok); }
+.journey-grid { display: grid; grid-template-columns: 430px 1fr; gap: 40px; align-items: start; }
+.journey-frame { width: 430px; height: 430px; }
+.journey-frame .draft { opacity: 0; transition: opacity .45s ease; }
+.journey-frame .draft.in { opacity: 1; }
+.journey-frame .key rect { fill: none; stroke: #6fbf7e; stroke-width: 5; stroke-dasharray: 10 6;
+  opacity: 0; transition: opacity .5s ease; }
+.journey-frame .key.in rect { opacity: 1; }
+.jpill rect { fill: #8a5b0e; fill-opacity: .94; transition: fill .35s ease; }
+.jpill text { fill: #fffdfb; font: 700 19px system-ui, sans-serif; }
+.jpill.kept rect { fill: var(--ok); }
+.jpill.struck rect { fill: #a1352b; fill-opacity: .9; }
+.jpill.struck text { fill-opacity: .8; }
+.jpill line { stroke: #fffdfb; stroke-width: 3; }
+.journey-caption { margin-top: 12px; font-size: 18px; color: var(--muted); max-width: 430px; }
+.journey-caption b { color: var(--ink); }
+.journey-key { display: block; margin-top: 6px; }
+.journey-key i { display: inline-block; width: 14px; height: 14px; margin-right: 6px;
+  vertical-align: -2px; border: 3px dashed #6fbf7e; border-radius: 3px; }
+.journey-steps { display: grid; gap: 14px; }
+.jstep { padding: 12px 18px; border-left: 5px solid var(--line); background: #fbf8f5; border-radius: 8px; }
+.jstep b { font-size: 21px; }
+.jstep p { margin: 4px 0 0; font-size: 18px; line-height: 1.4; }
+.jstep q { font-style: italic; }
+.jnum { display: inline-block; margin: 0 4px; padding: 0 8px; border-radius: 6px;
+  background: var(--evaluation); font-weight: 700; color: var(--ok); }
+.jfail { display: inline-block; margin-left: 6px; padding: 1px 10px; border-radius: 999px;
+  background: #a1352b; color: var(--paper); font-weight: 800; letter-spacing: 1px; }
+.journey-out { margin: 4px 0 0; font-size: 20px; font-weight: 700; color: var(--decision); }
+.journey-strip li.arrow { padding: 0; border: 0; background: none; line-height: 0; }
+.journey-strip li.arrow line { stroke: var(--muted); stroke-width: 3; }
+.journey-strip li.arrow path { fill: var(--muted); }
+.journey-strip li.arrow.in line, .journey-strip li.arrow.out line { stroke-width: 4; }
+.journey-strip li.arrow.lit line { stroke: var(--decision); }
+.journey-strip li.arrow.lit path { fill: var(--decision); }
+.journey-strip li.io.out.lit { border-style: solid; border-color: var(--decision); color: var(--decision);
+  background: var(--delivery); }
+
 /* The problem slide (problem-slide.js), on the 1600 x 900 stage: the photo with labelled overlays
    on the left; how the caption was made on top right, then the two records side by side. */
 .problem-statement h2 { margin-bottom: 22px; }
