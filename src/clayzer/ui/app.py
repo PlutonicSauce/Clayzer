@@ -208,8 +208,14 @@ def create_app(
             if r["case_id"] not in best or score > best[r["case_id"]]["_score"]:
                 best[r["case_id"]] = {**r, "_score": score}
         out = []
-        for case_id, r in sorted(best.items(), key=lambda kv: -kv[1]["_score"])[:limit]:
+        for case_id, r in sorted(best.items(), key=lambda kv: -kv[1]["_score"]):
+            if len(out) >= limit:
+                break
             case, cap, g = cases[case_id], caps[(case_id, r["repeat"])], r["grounding"]
+            # A store can hold a Batch without its Chips (the demo pack keeps only the Stories'),
+            # and a featured Caption without its image can't be checked by eye.
+            if not store.exists(case["chips"][-1]["uri"]):
+                continue
             claims = [
                 {"object": row["claim"]["object"], "count": row["claim"]["count"],
                  "position": row["claim"]["position"], "verdict": row["verdict"],

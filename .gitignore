@@ -23,6 +23,7 @@ batches/
 !demo/pack/data/
 !demo/pack/batches/
 !demo/pack/batches/*/runs/
+demo/pack/baselines/.lock
 
 # CDK output, and lookups that record the account ID.
 infra/cdk.out/

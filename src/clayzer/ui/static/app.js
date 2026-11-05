@@ -282,6 +282,36 @@ function mission(title, done, total, note) {
     <div class="meter-bar"><span style="width:${Math.max(w, 2)}%"></span></div><small>${esc(note)}</small></div>`;
 }
 
+// The accepted Baseline on Clay's five criteria, beside a featured Caption: on the overview and
+// at the top of Results. wireShowcase steps through the featured Captions once it is on the page.
+function baselineScores(o) {
+  const B = o.baseline;
+  return `
+    <section class="home-score" aria-labelledby="score-title">
+      <div>
+        <h2 id="score-title">How good are the captions?</h2>
+        <p class="sub">${B ? `Scored on Clay's five criteria, from the accepted ${term("Baseline")}: ${plural(B.cases, "Case")} × ${plural(B.repeats, "Repeat")}, captioned by ${esc(B.caption_model.replace(/^us\./, ""))}${B.self_graded ? " (self-graded: it is also the Judge)" : ""}. Weights aren't set yet, so each criterion stands on its own.` : "No Baseline accepted yet."}</p>
+        ${B ? scorecard(B) : ""}
+      </div>
+      <div id="showcase">${showcaseCard(o.showcase, 0, B ? B.batch_id : "")}</div>
+    </section>
+`;
+}
+
+function wireShowcase(o) {
+  const B = o.baseline;
+  let shown = 0;
+  const wire = () => {
+    const next = document.getElementById("sc-next");
+    if (next) next.addEventListener("click", () => {
+      shown += 1;
+      document.getElementById("showcase").innerHTML = showcaseCard(o.showcase, shown, B ? B.batch_id : "");
+      wire();
+    });
+  };
+  wire();
+}
+
 async function overview() {
   const me = SEQ;
   const o = await api("/api/overview");
@@ -296,8 +326,8 @@ async function overview() {
       <div class="hero-body">
         <p class="hero-kicker">Clay Earth Dataset Foundry · caption track</p>
         <h1 id="hero-title">From black box to captions you can trust</h1>
-        <p class="hero-lede">Clay is making satellite and aerial imagery searchable in words. We write
-        captions for that imagery and check every fact against public records the captioner never
+        <p class="hero-lede">Clay is making satellite and aerial imagery searchable in words, and that search is
+        only as good as its captions. We write those captions and check every fact against public records the captioner never
         sees. Every change is a ${term("Batch")}, scored on Clay's five criteria, and kept only if the
         regression gate passes.</p>
         <div class="hero-cta">
@@ -308,14 +338,7 @@ async function overview() {
       </div>
     </section>
 
-    <section class="home-score" aria-labelledby="score-title">
-      <div>
-        <h2 id="score-title">How good are the captions?</h2>
-        <p class="sub">${B ? `Scored on Clay's five criteria, from the accepted ${term("Baseline")}: ${plural(B.cases, "Case")} × ${plural(B.repeats, "Repeat")}, captioned by ${esc(B.caption_model.replace(/^us\./, ""))}${B.self_graded ? " (self-graded: it is also the Judge)" : ""}. Weights aren't set yet, so each criterion stands on its own.` : "No Baseline accepted yet."}</p>
-        ${B ? scorecard(B) : ""}
-      </div>
-      <div id="showcase">${showcaseCard(o.showcase, 0, B ? B.batch_id : "")}</div>
-    </section>
+    ${baselineScores(o)}
 
     <div class="home-row">
       <section aria-labelledby="xlog-title">
@@ -333,16 +356,7 @@ async function overview() {
       </section>
     </div>`;
 
-  let shown = 0;
-  const wire = () => {
-    const next = document.getElementById("sc-next");
-    if (next) next.addEventListener("click", () => {
-      shown += 1;
-      document.getElementById("showcase").innerHTML = showcaseCard(o.showcase, shown, B ? B.batch_id : "");
-      wire();
-    });
-  };
-  wire();
+  wireShowcase(o);
 }
 
 const STEP_STATE = {
@@ -704,10 +718,11 @@ async function datasetsPage(id) {
 
 async function batchesPage() {
   const me = SEQ;
-  const [list, jobs] = await Promise.all([api("/api/batches"), api("/api/jobs")]);
+  const [list, jobs, o] = await Promise.all([api("/api/batches"), api("/api/jobs"), api("/api/overview")]);
   if (stale(me)) return;
   const running = jobs.filter((j) => j.state === "running");
   $view.innerHTML = `<h1>Results</h1><p class="lede" data-listen>Each evaluation experiment (Batch) records descriptions, evidence and separate scores. Open a report to understand what happened. Synthetic recordings demonstrate software behavior, not real model accuracy.</p>
+    ${baselineScores(o)}
     ${experimentCards(list)}
     <p class="sub">Measurements remain separate and use their recorded scoring versions. Open each report before comparing experiments.</p>
     ${CONFIG.allow_launch ? `<div class="launch"><b>Run a Batch</b> on every Case in the store
@@ -731,6 +746,7 @@ async function batchesPage() {
       <td><small class="mono">${esc(b.caption_model)} · prompt ${esc(b.prompt_sha)}</small>${b.self_graded ? ' <span class="badge b-warn" title="The captioner is also the Judge, so Fidelity is a model rating its own work">self-graded</span>' : ""}</td></tr>`).join("")}
     </table></details>${list.length ? "" : '<p class="empty">No saved experiments yet. <a href="#/cases">Explore the reference imagery</a> while evaluation results are unavailable.</p>'}`;
 
+  wireShowcase(o);
   const picks = () => [...document.querySelectorAll(".pick:checked")].map((x) => x.value);
   document.querySelectorAll(".pick").forEach((x) => x.addEventListener("change", () => {
     document.getElementById("cmp").disabled = picks().length !== 2;

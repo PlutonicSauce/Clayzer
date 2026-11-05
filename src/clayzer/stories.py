@@ -4,7 +4,8 @@ A Story is a recorded Run picked to show one point about the evaluation, with a 
 it shows (GLOSSARY.md). They're listed in demo/stories.toml. `pack` copies each Story's Batch
 from the store into a local folder laid out like a LocalStore, so `clayzer ui --local-root`
 shows them with no model, credentials, or network. Every text file is redacted on the way out,
-and only the Story Runs' Traces, reports, and Chips are copied.
+and only the Story Runs' Traces, reports, and Chips are copied, plus the accepted Baseline so the
+pack's Results page shows the scores the live site does.
 """
 
 import json
@@ -55,8 +56,17 @@ def _redacted(name: str, body: bytes) -> bytes:
     return redact(text).encode()
 
 
-def pack(store, stories: list[dict], out: Path = PACK) -> Path:
-    """Write the demo pack for `stories` from `store` into `out`, replacing an older pack."""
+def copy_baseline(src: Path, pack_root: Path) -> None:
+    """Copy the Baseline folder `src` into the pack's baselines/, redacted, under the same name."""
+    dest = pack_root / "baselines" / src.name
+    dest.mkdir(parents=True, exist_ok=True)
+    for f in sorted(p for p in src.iterdir() if p.is_file()):
+        (dest / f.name).write_bytes(_redacted(f.name, f.read_bytes()))
+
+
+def pack(store, stories: list[dict], out: Path = PACK, baseline: Path | None = None) -> Path:
+    """Write the demo pack for `stories` from `store` into `out`, replacing an older pack. With
+    `baseline`, a Baseline folder such as baselines/default, the pack carries it too."""
     with tempfile.TemporaryDirectory() as tmp:
         built = Path(tmp) / "pack"
         local = LocalStore(built / "data", built / "batches")
@@ -97,6 +107,8 @@ def pack(store, stories: list[dict], out: Path = PACK) -> Path:
             local.put(hkey, redact(html).encode())
             local.put(jkey, (json.dumps(redact(record), indent=2, default=str) + "\n").encode())
         local.put(INDEX, (json.dumps(index, indent=2) + "\n").encode())
+        if baseline is not None:
+            copy_baseline(baseline, built)
         # Case files carry OpenStreetMap labels, so their folders keep the ODbL notice.
         for folder in sorted(
             {p.parent for p in built.rglob("*.jsonl") if '"source": "osm' in p.read_text()}

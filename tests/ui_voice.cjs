@@ -97,7 +97,7 @@ const { chromium } = require("playwright-core");
     await page.locator("#listen-stop").click();
     assert.equal(await page.locator("#listen-stop").isDisabled(), true);
     await page
-      .getByRole("link", { name: "Explore how Clayzer works", exact: false })
+      .getByRole("link", { name: "Follow one image, start to finish", exact: false })
       .click();
     await page.waitForSelector(".journey-frame");
     await page.locator(".story-audio > summary").click();

@@ -52,7 +52,7 @@ const base = process.env.CLAYZER_UI_URL || "http://127.0.0.1:8786";
     await page.goto(base);
     await ready();
     await page
-      .getByRole("link", { name: "Explore how Clayzer works", exact: false })
+      .getByRole("link", { name: "Follow one image, start to finish", exact: false })
       .click();
     await ready();
     await page.waitForSelector(".journey-frame");
