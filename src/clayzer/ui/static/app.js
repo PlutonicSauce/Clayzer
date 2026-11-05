@@ -299,7 +299,8 @@ async function overview() {
         aerial imagery, and prove each change makes them better: every change is a ${term("Batch")},
         scored on Clay's five criteria, and kept only if the regression gate passes.</p>
         <div class="hero-cta">
-          <a class="hero-btn primary" href="#/how">How it works</a>
+          <a class="hero-btn primary" href="/deck">See the 4-minute pitch</a>
+          <a class="hero-btn" href="#/how">How it works</a>
           <a class="hero-btn" href="#/tasks">Pick a task</a>
         </div>
       </div>
