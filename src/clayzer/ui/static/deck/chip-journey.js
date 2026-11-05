@@ -2,7 +2,7 @@
 // (the verify-drops-invented-solar Story in demo/stories.toml). Each press is one of Clayzer's four
 // steps, and carries the points the old solution slide made: the ontology's vocabulary (step 1),
 // the records' cross-check (step 3), and the self-improvement loop and region split (step 4). 1: Nova Pro drafts five Claims
-// from the image alone. 2: LGND Geo's imagery check rejects
+// from the image alone, using the ontology's top-k classes (the previous slide). 2: LGND Geo's imagery check rejects
 // three of them at their cells (its reasons are quoted from the Trace), and the Caption is written
 // from the rest. 3: the Caption is scored against the Answer Key it never saw, the Case's current
 // Reference Labels (fixtures/caption/cases/caption-dev.jsonl), with today's scorer: correctness 1.0,
@@ -84,8 +84,8 @@ export function ChipJourney({ step = 0 }) {
       <div class="journey-steps">
         <div class=${`jstep build ${step >= 1 ? "in" : ""}`}>
           <b>1 · Write</b>
-          <p>Nova Pro drafts five Claims from the image alone: an object and its cell, in the words of
-            our ontology (next slide).</p>
+          <p>Nova Pro drafts five Claims from the image alone — each an object and its cell — chosen
+            from the ontology's top-k classes selected for this image (previous slide).</p>
         </div>
         <div class=${`jstep build ${step >= 2 ? "in" : ""}`}>
           <b>2 · Verify</b>

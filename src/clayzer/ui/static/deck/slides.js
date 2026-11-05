@@ -53,40 +53,23 @@ function Architecture({ step = 0 }) {
 // ontology.prompt_context's real output for the photo's classes; 9 of 12 is the Baseline's
 // look-alike count (summary.json `lookalikes`), captioned without the guidance.
 function Ontology({ step = 0 }) {
+  const steps = [
+    ["1 · Build the ontology, once", html`Feed <b>hundreds of training images</b> to an AI ontology
+      agent; it writes the ontology — every class name, each with an <b>embedding</b>.`],
+    ["2 · Embed a new image", html`Take an <b>input chip</b> and embed it with <b>Clay</b> into the
+      same vector space.`],
+    ["3 · Find the nearest classes", html`<b>Cosine-match</b> that embedding against the ontology and
+      keep the <b>top-k</b> most similar classes, with their look-alikes — not the whole ontology, and
+      never this image's answer. These prime the captioner (next).`],
+  ];
   return html`<div class="onto-slide">
     <${Kicker}>Our solution · the ontology<//>
-    <h2>From pixels to what the harness understands</h2>
+    <h2>One ontology, built once — queried for every image</h2>
     <div class="onto-grid">
       <${OntologyViz} step=${step} />
       <div class="onto-side">
-        <div class=${`onto-card ${step >= 2 ? "gone" : ""}`}>
-          <b>1 · The photo</b>
-          <p>A greenhouse beside buildings and a road, with farm fields and two ponds.</p>
-        </div>
-        <div class=${`onto-card after-graph build ${step >= 1 ? "in" : ""}`}>
-          <b>2 · The ontology</b>
-          <p class=${step >= 2 ? "folded" : ""}>17 classes in 5 families, in one file the harness
-            reads.</p>
-          <ul class="onto-key">
-            <li><i class="isa"></i>is a kind of</li>
-            <li><i class="near"></i>is typically found near</li>
-            <li><i class="alike"></i>is easily mistaken for</li>
-          </ul>
-        </div>
-        <div class=${`onto-card told build ${step >= 2 ? "in" : ""}`}>
-          <b>3 · Why it helps the caption</b>
-          <p class="onto-problem">Without it: greenhouses called solar farms in <b>9 of 12</b> runs.</p>
-          <p>Before it writes, the harness is told to:</p>
-          <ol class="onto-benefits">
-            <li><span>1</span><p><b>Tell look-alikes apart:</b> greenhouse vs solar array.</p></li>
-            <li><span>2</span><p><b>Look for what sits together:</b> greenhouse near road, said only
-              if seen.</p></li>
-            <li><span>3</span><p><b>Use words we can check:</b> 11 classes, each mapped to public
-              records.</p></li>
-          </ol>
-          <p class="onto-why">A semantic layer: knowledge the pixels can't give, never this photo's
-            answer.</p>
-        </div>
+        ${steps.map(([t, body], i) => html`<div class=${`onto-card flow-step ${step >= i ? "on" : ""}`}>
+          <b>${t}</b><p>${body}</p></div>`)}
       </div>
     </div>
   </div>`;
@@ -211,12 +194,12 @@ export const SLIDES = [
   { title: "Example search", section: "Value Unlock", seconds: 22, component: ExampleSearch,
     spoken: "Why does this matter? Trusted captions make satellite imagery searchable in plain words. Ask which rice fields near Bangkok became buildings since the 2011 flood, and you get matching before-and-after images. No map layer, no GIS skills. Fish ponds can pass for buildings, so we check every caption. Then anyone can ask questions like this, about homes, harvests and jobs, and trust the answers.",
     notes: ["Let the video play; it runs 22 s and holds on the end card. To replay it, leave the slide and come back.", "The line to land: anyone can ask the Earth a question, and checked captions make the answers trustworthy.", "Why text search and not just the latest image: you don't know where to look, no layer exists for it, and the change is slow, a few fields a year, so it only shows across dates.", "Look-alikes: fish ponds and flooded paddies look the same from above; that is what our look-alike vocabulary is for.", "Illustrative, not real results: our Cases today are US solar, wind and land cover. Don't imply we have run this search."] },
+  { title: "The ontology", section: "Our Solution", seconds: 20, component: Ontology, steps: 2,
+    spoken: "First, the ontology. It's built once, offline: we feed hundreds of training images to an AI agent that writes it — every class name, each with an embedding. Then, for every new image, we embed the chip with Clay and match it to the ontology by cosine similarity, keeping only the top-k nearest classes, with their look-alikes. Those few classes — never the whole ontology, and never this image's own answer — are what prime the captioner, which we follow next.",
+    notes: ["Builds: the ontology (built once from training images), then a new chip embedded with Clay, then cosine top-k keeps the nearest classes. The captioner comes on the next slide.", "Built once from a separate training region, never per image, so we never feed classes derived from the tiles we score (ADR-0006).", "The per-image top-k selection by embedding similarity (Layer B) is the idea we're pitching: built and opt-in, not yet on by default. Today the captioner is given the full claimable list, and may only ever name the ontology's 11 claimable classes.", "9 of 12, if asked: without any such guidance the Baseline called greenhouses solar farms nine times in twelve; the effect of the guidance isn't measured yet."] },
   { title: "How it works", section: "Our Solution", seconds: 42, component: Architecture, steps: 4,
-    spoken: "Let's follow one real image. One: the model writes five claims from the image alone, in the words of our ontology; more on that next. Two: each claim is checked against the imagery. That solar array is a storage yard, so it's gone before the caption is written. Three: we score it against public records it never saw, cross-checked, so a person only looks where they disagree: right, but it missed the road. Four: a self-improvement loop. Every change runs three times per image and faces a gate, tuned on one region and tested on another. A vaguer prompt looked more correct, and failed. Only pairs that pass go out, to Clay, LGND, or other apps.",
-    notes: ["One press per step; the strip at the top lights the step you're on.", "Press 1: name the ontology and move on: the next slide covers it.", "Press 2 is the moment: point at the south-west cell, the storage yard that looks like panels.", "Verify-then-write isn't in the Baseline: in the 4-image test every object it named was really there and correctness rose 0.53 → 0.65, but the gate kept it out because coverage dropped.", "Press 3, if asked: wind records agreed on 25 of 26 Cases, so a person rarely looks. The cross-check is built for solar and wind.", "Press 4: the self-improvement loop. Today we propose each change and the gate decides; an agent that proposes changes from the failures is planned, not built.", "Press 4, if asked: tuned on 74 Mojave images, tested once on 61 Texas images it never saw; correctness held, 0.76 against 0.75 on dev. Say 'tune', not 'train': we tune the prompt and checks.", "Real Runs: verify-2 neg-1 Repeat 1, and the vague-prompt gate (demo/stories.toml)."] },
-  { title: "The ontology", section: "Our Solution", seconds: 22, component: Ontology, steps: 2,
-    spoken: "Our caption harness also reads an ontology: a semantic layer of what things are, what they sit near, and what they are mistaken for. Without it, the captioner called greenhouses solar farms nine times in twelve. With it, it is warned before it writes, and every claim uses words we can check.",
-    notes: ["Press 1: the photo pixelates into the ontology graph; each tag lands on its class.", "Press 2: why it helps. The badges 1, 2, 3 on the graph match the three benefits. The quoted lines are the real output of ontology.prompt_context for these classes.", "9 of 12 is measured: the Baseline, captioned without the guidance. The effect with it isn't measured yet: it's the next Batch the gate tests. Don't claim it fixed the greenhouses.", "Don't claim it's in the baseline: the guidance is a Batch option (ontology_context), off in the Baseline. Always on: the captioner may only name the ontology's 11 classes."] },
+    spoken: "Now follow one real image. One: Nova Pro writes five claims from the image alone, drawn from the ontology's top-k classes we just selected. Two: each claim is checked against the imagery. That solar array is a storage yard, so it's gone before the caption is written. Three: we score it against public records it never saw, cross-checked, so a person only looks where they disagree: right, but it missed the road. Four: a self-improvement loop. Every change runs three times per image and faces a gate, tuned on one region and tested on another. A vaguer prompt looked more correct, and failed. Only pairs that pass go out, to Clay, LGND, or other apps.",
+    notes: ["One press per step; the strip at the top lights the step you're on.", "Press 1: Nova Pro writes, drawing its Claims from the ontology's top-k classes we selected on the previous slide.", "Press 2 is the moment: point at the south-west cell, the storage yard that looks like panels.", "Verify-then-write isn't in the Baseline: in the 4-image test every object it named was really there and correctness rose 0.53 → 0.65, but the gate kept it out because coverage dropped.", "Press 3, if asked: wind records agreed on 25 of 26 Cases, so a person rarely looks. The cross-check is built for solar and wind.", "Press 4: the self-improvement loop. Today we propose each change and the gate decides; an agent that proposes changes from the failures is planned, not built.", "Press 4, if asked: tuned on 74 Mojave images, tested once on 61 Texas images it never saw; correctness held, 0.76 against 0.75 on dev. Say 'tune', not 'train': we tune the prompt and checks.", "Real Runs: verify-2 neg-1 Repeat 1, and the vague-prompt gate (demo/stories.toml)."] },
   { title: "On AWS", section: "Our Solution", seconds: 27, component: Aws,
     spoken: "All of it runs on AWS, deployed with CDK. Bedrock writes, judges and searches the captions. The agentic captioner runs on AgentCore, which holds its LGND sign-in and reaches two MCP servers: LGND Geo to check imagery, and RODA for AWS open data. Results live in S3, and the site runs on Fargate behind CloudFront. Next: Step Functions to fan out, and SageMaker for GPU cost.",
     notes: ["Solid boxes are running now: this deck comes from that Fargate task.", "AgentCore is live: validated in us-west-2 on 2026-11-04, a verified Batch on 3 dev Cases with the LGND token from Identity. The Baseline ran locally with no tools, so don't tie its numbers to AgentCore.", "MCP servers are allowlisted: none may read an answer key (ADR-0006). RODA is pinned to 0.1.7; LGND is remote, so each Batch records the version it reports.", "Two CDK stacks per account, the web app and AgentCore; nothing crosses accounts. X-Ray spans are built but opt-in, because Transaction Search is account-wide: don't say they're on.", "Dashed boxes are next; lead into the scale slide: what it costs."] },

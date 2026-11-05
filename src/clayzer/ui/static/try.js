@@ -6,9 +6,14 @@
 // Read-only and honest: the page never computes a score. It replays what was recorded, or asks
 // the server to run a real Batch and then reads that Run's result. Globals ($view, esc, api,
 // CELLS, CONFIG, SEQ, stale, pageHead) come from app.js and public.js (shared classic-script scope).
+//
+// The ontology step reflects the pitched approach (ADR-0010 "Layer B"): rather than feed the whole
+// ontology, embed the image and give the captioner only its top-k most similar classes. That
+// selection is built and opt-in (--ontology-context), not yet on by default, so these classes are
+// the ontology's claimable vocabulary the caption may assert.
 
-// The caption may only assert these classes: the Object Ontology's claimable classes, fed to the
-// model on every Run (substituted into the prompt and enforced by the submit_caption schema).
+// The ontology's claimable classes: the pool the top-k nearest-class selection draws from, and the
+// only classes a caption may assert (enforced by the submit_caption schema).
 const TRY_CLASSES = [
   "solar_array", "wind_turbine", "road", "railroad", "building", "water",
   "field", "parking_lot", "greenhouse", "vegetation", "bare_ground",
@@ -63,7 +68,7 @@ function tryStepsFromTrace(events) {
       const tools = (d.tools || []).filter((t) => t !== "submit_caption");
       steps.push({ label: "Load the aerial image", detail: `${chip} · NAIP, 0.6 m per pixel, about 300 m across` });
       steps.push({ label: "Connect to Amazon Bedrock", detail: d.model_id || "" });
-      steps.push({ label: "Feed the Object Ontology", detail: `${TRY_CLASSES.length} claimable classes the caption may assert`, classes: true });
+      steps.push({ label: "Pick the closest ontology classes", detail: "embed the image and select the top-k most similar classes — with their look-alikes — from the ontology built on training imagery, rather than feeding the whole ontology", classes: true });
       if (tools.length) steps.push({ label: "Attach geospatial tools", detail: `${tools.length} MCP tools available (roda)` });
     } else if (ev.event === "step") {
       const kind = d.kind, name = d.name;

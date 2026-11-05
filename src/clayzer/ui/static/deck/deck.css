@@ -436,6 +436,40 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
   .onto-card { transition: none; }
 }
 
+/* The ontology slide as a 4-stage pipeline, with the ontology graph small in its box. */
+.onto-flow { width: 960px; height: 538px; overflow: visible; font-family: system-ui, sans-serif; }
+.onto-flow .stage { opacity: 0; transition: opacity .5s ease; }
+.onto-flow .stage.shown { opacity: 1; }
+.onto-flow .flow-divider { stroke: #d8d2cb; stroke-width: 1.5; stroke-dasharray: 3 7; }
+.onto-flow .flow-lane { font-size: 14px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; fill: #a79e95; }
+.onto-flow .flow-stack image { filter: drop-shadow(0 2px 4px rgba(37, 35, 35, .25)); }
+.onto-flow .flow-input { filter: drop-shadow(0 2px 5px rgba(37, 35, 35, .3)); }
+.onto-flow .flow-cap { font-size: 17px; font-weight: 600; fill: #4a4240; }
+.onto-flow .flow-cap2 { font-size: 16px; fill: #4a4240; font-style: italic; }
+.onto-flow .flow-link { stroke: #6b6461; stroke-width: 2.5; }
+.onto-flow .flow-link.clay { stroke: #b06a4f; }
+.onto-flow .flow-edge-t { font-size: 13px; font-weight: 600; fill: #6b6461; }
+.onto-flow .flow-edge-t.clay { fill: #b06a4f; }
+.onto-flow .flow-box rect { fill: #fffdfb; stroke: #c9c1b8; stroke-width: 2; }
+.onto-flow .flow-box-t { font-size: 19px; font-weight: 700; fill: #252323; }
+.onto-flow .flow-onto rect { fill: #fbf7f2; stroke: #c9c1b8; stroke-width: 2.5; }
+.onto-flow .flow-onto-t { font-size: 15px; font-weight: 700; fill: #6b6461; }
+.onto-flow .fchip text { font-weight: 700; fill: #252323; }
+.onto-flow .flow-topk rect { fill: #fffdfb; stroke: #b06a4f; stroke-width: 2.5; }
+.onto-flow .flow-topk-t { font-size: 16px; font-weight: 800; fill: #9a4a35; }
+.onto-flow .flow-match { fill: none; stroke: #b06a4f; stroke-width: 2.5; stroke-dasharray: 7 5; }
+.onto-flow .flow-match-t { font-size: 14px; font-weight: 600; fill: #b06a4f; }
+.onto-flow .flow-vec { fill: #b06a4f; }
+.onto-flow .flow-agent rect { fill: var(--captions); stroke: var(--captions-line); }
+/* The four step cards: the next one lights up with each press. */
+.onto-card.flow-step { opacity: .4; transition: opacity .4s ease; }
+.onto-card.flow-step.on { opacity: 1; }
+.onto-card.flow-step b { font-size: 20px; }
+.onto-card.flow-step p b { display: inline; margin: 0; font-size: inherit; color: var(--decision); }
+@media (prefers-reduced-motion: reduce) {
+  .onto-flow .stage, .onto-card.flow-step { transition: none; }
+}
+
 /* How it works: one Chip through the four steps (chip-journey.js). */
 .journey-strip { display: flex; gap: 6px; list-style: none; margin: 0 0 22px; padding: 0;
   align-items: center; }
