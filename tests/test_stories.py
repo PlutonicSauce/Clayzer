@@ -22,7 +22,11 @@ def story(b, case, repeat=1, **extra):
 def local_app(root):
     """The app over a local root, as `clayzer ui --local-root` starts it: no S3 store."""
     s = replace(
-        Settings.from_env(), store_url=None, data_dir=root / "data", batches_dir=root / "batches"
+        Settings.from_env(),
+        store_url=None,
+        data_dir=root / "data",
+        batches_dir=root / "batches",
+        baselines_dir=root / "baselines",
     )
     return TestClient(create_app(s))
 
@@ -55,6 +59,20 @@ def test_the_pack_copies_only_the_story_runs_redacted(env, tmp_path):  # noqa: F
     assert (
         json.loads((out / "data" / stories.INDEX).read_text())[0]["chip"] == SOLAR["chips"][0]["id"]
     )
+
+
+def test_the_pack_carries_the_baseline_redacted(env, tmp_path):  # noqa: F811
+    store, _, _ = env
+    b = run(env, "base")
+    accepted = tmp_path / "baselines" / "default"
+    accepted.mkdir(parents=True)
+    (accepted / "ACCEPTED_FROM").write_text(b["config"].batch_id + "\n")
+    (accepted / "summary.json").write_text(json.dumps({"note": "denied with Bearer abc.def"}))
+    out = stories.pack(store, [story(b, SOLAR["id"])], tmp_path / "pack", accepted)
+    packed = out / "baselines" / "default"
+    assert (packed / "ACCEPTED_FROM").read_text().strip() == b["config"].batch_id
+    summary = (packed / "summary.json").read_text()
+    assert "Bearer [REDACTED]" in summary and "abc.def" not in summary
 
 
 def test_the_pack_refuses_a_missing_run_and_a_folder_that_isnt_a_pack(env, tmp_path):  # noqa: F811
@@ -102,3 +120,8 @@ def test_the_committed_pack_replays_every_story_offline(monkeypatch):
             assert app.get(url).status_code == 200, (s["id"], url)
     gated = {s["id"]: s["gate"]["verdict"] for s in listed if s.get("gate")}
     assert gated == {"gate-rejects-vague-prompt": "fail"}
+    # Results shows the accepted Baseline's scores, and the Baseline's Batch is in the pack.
+    baseline = app.get("/api/overview").json()["baseline"]
+    assert baseline and baseline["batch_id"] in [
+        b["batch_id"] for b in app.get("/api/batches").json()
+    ]

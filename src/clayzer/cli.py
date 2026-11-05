@@ -540,7 +540,13 @@ def main(argv: list[str] | None = None) -> int:
     if a.cmd == "stories":
         from clayzer import stories
 
-        out = stories.pack(store, stories.load_stories(), a.out or stories.PACK)
+        accepted = settings.baselines_dir / "default"
+        out = stories.pack(
+            store,
+            stories.load_stories(),
+            a.out or stories.PACK,
+            accepted if (accepted / "summary.json").exists() else None,
+        )
         print(f"packed {len(stories.load_stories())} Stories into {out}")
         print(f"  view them offline: uv run clayzer ui --local-root {out}")
         return 0
