@@ -1,6 +1,6 @@
 # Clayzer: 4-minute pitch
 
-The spoken script for the 10-slide deck (`src/clayzer/ui/static/deck/slides.js`), one section per
+The spoken script for the 9-slide deck (`src/clayzer/ui/static/deck/slides.js`), one section per
 slide, with the deck's time budgets (they add up to 4:00). Each script is the slide's `spoken`
 text, the same words the A key reads aloud, so the presenter and the Listen button agree. The
 demo slide adds the Baseline's numbers, which the deck leaves to the live Overview.
@@ -11,15 +11,14 @@ Numbers come from the committed Baseline `20261105T011537Z-dev74-absence` (74 Ca
 | # | Slide | Section | Time | Ends at |
 |---|---|---|---|---|
 | 1 | Clayzer | | 0:10 | 0:10 |
-| 2 | The problem | Problem Statement | 0:35 | 0:45 |
-| 3 | Example search | Value Unlock | 0:22 | 1:07 |
-| 4 | How it works | Our Solution | 0:30 | 1:37 |
-| 5 | Our solution | Our Solution | 0:34 | 2:11 |
-| 6 | The ontology | Our Solution | 0:22 | 2:33 |
-| 7 | On AWS | Our Solution | 0:25 | 2:58 |
-| 8 | Live demo | Our Solution | 0:26 | 3:24 |
-| 9 | At Clay's scale | Scale | 0:20 | 3:44 |
-| 10 | Thank you | | 0:16 | 4:00 |
+| 2 | The problem | Problem Statement | 0:40 | 0:50 |
+| 3 | Example search | Value Unlock | 0:22 | 1:12 |
+| 4 | How it works | Our Solution | 0:42 | 1:54 |
+| 5 | The ontology | Our Solution | 0:22 | 2:16 |
+| 6 | On AWS | Our Solution | 0:27 | 2:43 |
+| 7 | Live demo | Our Solution | 0:26 | 3:09 |
+| 8 | At Clay's scale | Scale | 0:35 | 3:44 |
+| 9 | Thank you | | 0:16 | 4:00 |
 
 T starts the deck's timer; the notes panel warns when a slide runs long.
 
@@ -32,7 +31,7 @@ T starts the deck's timer; the notes panel warns when a slide runs long.
 > Clayzer, said KLAY-zer. It comes from glaze, the finish a potter fires onto clay. A solution
 > for producing captions you can trust, at scale.
 
-## 2. The problem (0:10–0:45)
+## 2. The problem (0:10–0:50)
 
 **On screen:** a photo of rows of white roofs (`fixed-dev-lookalike-neg-110`), and beside it how
 its caption was made: the real prompt, Nova Pro shown only the photo, and its caption, stamped
@@ -55,7 +54,7 @@ OpenStreetMap 18.*
 > database counts seventeen turbines and OpenStreetMap counts eighteen, because they put one
 > turbine two metres apart, either side of the edge.
 
-## 3. Example search (0:45–1:07)
+## 3. Example search (0:50–1:12)
 
 **On screen:** the paddy-search video, played once; it holds on the end card. No presses. It
 searches for rice fields near Bangkok that became buildings since 2011, shows three
@@ -67,32 +66,23 @@ before-and-after pairs, and drops the third when the check finds fish ponds, not
 > check every caption. Then anyone can ask questions like this, about homes, harvests and jobs,
 > and trust the answers.
 
-## 4. How it works (1:07–1:37)
+## 4. How it works (1:12–1:54)
 
 **On screen:** one real aerial image and the four steps along the top. Four presses, one per step:
 the drafted Claims appear on the grid, three are struck (point at the south-west cell: a storage
-yard that looks like panels), the public records' cells light up, and the gate says FAIL.
+yard that looks like panels), the public records' cells light up, and the gate says FAIL. The
+step cards also carry what used to be its own solution slide: the ontology's words (step 1), the
+records' cross-check (step 3), and the self-improvement loop and region split (step 4).
 
-> Let's follow one real image. One: the model writes five claims from the image alone. Two: each
-> claim is checked against the imagery. That solar array is a storage yard, so it's gone before
-> the caption is written. Three: we score it against public records it never saw: right, but it
-> missed the road. Four: every change faces a gate. A vaguer prompt looked more correct, and
-> failed. Only pairs that pass go out, to Clay, LGND, or other apps.
+> Let's follow one real image. One: the model writes five claims from the image alone, in the
+> words of our ontology; more on that next. Two: each claim is checked against the imagery. That
+> solar array is a storage yard, so it's gone before the caption is written. Three: we score it
+> against public records it never saw, cross-checked, so a person only looks where they disagree:
+> right, but it missed the road. Four: a self-improvement loop. Every change runs three times per
+> image and faces a gate, tuned on one region and tested on another. A vaguer prompt looked more
+> correct, and failed. Only pairs that pass go out, to Clay, LGND, or other apps.
 
-## 5. Our solution (1:37–2:11)
-
-**On screen:** the wind farm from slide 2's records comparison, with five points beside it. One
-press per point as you say it, and a sixth that turns its caption green.
-
-> Here is how we make captions you can trust. We verify, then write: each fact is checked
-> against the imagery before the caption is written. The answer keys are public records,
-> cross-checked by code: where they agree, labels are automatic, and only where they conflict
-> does a person look. The captioner never sees them. One shared vocabulary of objects and
-> their look-alikes. We tune on one region and test on another it never saw. And a
-> self-improvement loop keeps only the changes that beat the baseline. The result: a caption
-> that matches what is really there.
-
-## 6. The ontology (2:11–2:33)
+## 5. The ontology (1:54–2:16)
 
 **On screen:** a photo that pixelates into the ontology graph, then three numbered benefits. Two
 presses.
@@ -107,7 +97,7 @@ presses.
 > Without it, the captioner called greenhouses solar farms nine times in twelve. With it, it is
 > warned before it writes, and every claim uses words we can check.
 
-## 7. On AWS (2:33–2:58)
+## 6. On AWS (2:16–2:43)
 
 **On screen:** the AWS architecture diagram. No presses.
 
@@ -116,7 +106,7 @@ presses.
 > LGND Geo to check imagery, and RODA for AWS open data. Results live in S3, and the site runs on
 > Fargate behind CloudFront. Next: Step Functions to fan out, and SageMaker for GPU cost.
 
-## 8. Live demo (2:58–3:24)
+## 7. Live demo (2:43–3:09)
 
 **On screen:** the live site, in four stops. Rehearse the clicks. Keep the recorded Batch open
 in another tab as the offline fallback.
@@ -131,7 +121,7 @@ in another tab as the offline fallback.
 4. **Compare**
    > And compare to baseline: the gate says better, worse, or inconclusive.
 
-## 9. At Clay's scale (3:24–3:44)
+## 8. At Clay's scale (3:09–3:44)
 
 **On screen:** "How it scales". A pot on a turning potter's wheel, filled above a dashed quality
 bar, stands for the job: Clay's 70M chips captioned to the same quality. Beside it, bricks of
@@ -162,7 +152,7 @@ the quality bar, and the gate catches it.
 > times cheaper. Time scales too: one at a time it would take six years, but captions run in
 > parallel, so it's days.
 
-## 10. Thank you (3:44–4:00)
+## 9. Thank you (3:44–4:00)
 
 **On screen:** the closing slide, with links to the live site and the repository. Leave it up
 for questions.
@@ -174,13 +164,12 @@ for questions.
 
 ## Rehearsal notes
 
-- At a calm 145 words a minute the whole script is about 640 words, 4:24, so it runs about 24
-  seconds over. Slide 9 is most of it: about 104 words, 43 seconds against a 20-second budget.
-  Rehearse it fast, or give only the first and last price and the time line. Slide 5 runs about
-  6 seconds long (it now carries the cross-check rule), slide 3 about 5 (65 words against 22
-  seconds; drop "No map layer, no GIS skills" if you need it), slide 4 about 3, and slide 7
-  about 2. Slide 2 fits its 35 seconds. Slide 8 has about 7 seconds spare, which the clicks will
-  use, and slide 10 about 5, now that it no longer carries the ask.
+- At a calm 145 words a minute the whole script is about 590 words, 4:05, so it runs about 5
+  seconds over. Slide 8 runs about 8 seconds over (104 words against 35 seconds): give only the
+  first and last price and the time line if you're behind. Slide 4 runs about 6 over (116 words
+  against 42 seconds), and slide 3 about 4 (64 words against 22 seconds; drop "No map layer, no
+  GIS skills" if you need it). Slide 2 has about 6 seconds spare, slide 9 about 5, and slide 7
+  about 2, which the clicks will use.
 - Verify-then-write is part of the approach, but the Baseline ran without it. If asked whether
   77% includes it, say no: the Baseline is the plain captioner. In the 4-image test, every object
   it named was really there, and correctness rose from 0.53 to 0.65.
@@ -194,16 +183,16 @@ for questions.
   greenhouses. The guidance is a Batch option, off in the Baseline.
 - AgentCore is live, but the Baseline ran locally with no tools: don't tie its numbers to
   AgentCore. X-Ray spans are built but opt-in, so don't say they're on.
-- On slide 9, if "chip" needs a word: one small square tile of a big aerial or satellite image,
+- On slide 8, if "chip" needs a word: one small square tile of a big aerial or satellite image,
   like the three on screen. It's Clay's own term (their v1.5 spec: "70 million … chips").
-- Slide 9's $181K is our measured $0.0026 per caption (2,559 tokens, Nova Pro, AWS list price)
+- Slide 8's $181K is our measured $0.0026 per caption (2,559 tokens, Nova Pro, AWS list price)
   × Clay's ~70M chips. Ours are 512 px NAIP chips; Clay's are 256 px and from several sensors, so
   it's likely on the high side, and radar chips may not caption well. Neither is measured.
-- Slide 9's quality, if asked: batch pricing changes only billing and turnaround, so the output
+- Slide 8's quality, if asked: batch pricing changes only billing and turnaround, so the output
   is the same. The three "assumed" rows are hypotheses: each becomes a gated run, kept only if no
   score drops beyond the Baseline's run-to-run spread. Say "$3.9K is the best case if all three
   pass". The gate catching the clay on each press shows the mechanism, not a result.
-- Slide 9's time: 2.9 s per caption is measured; 6.4 years one at a time. "Days" assumes about
+- Slide 8's time: 2.9 s per caption is measured; 6.4 years one at a time. "Days" assumes about
   1,000 in parallel (about 2.3 days), which we haven't been granted or tested: the Bedrock quota
   sets it. The judge cost ($1.1M for Opus on every caption, against our $5.5K) is in the slide's
   footnote: use it only if asked.
@@ -217,16 +206,20 @@ for questions.
 - On the problem slide, the solar caption and the turbine records are two different Cases: the
   white roofs are `lookalike-neg-110` (3 of 3 Repeats said solar), the 17 or 18 turbines are
   `uswtdb-3073564`. Don't present them as one photo.
-- If asked about the cross-check: it's built for solar and wind. A confidence threshold for labels
-  is planned, not built.
+- If asked about the cross-check (slide 4, step 3): it's built for solar and wind, and wind
+  records agreed on 25 of 26 Cases. A confidence threshold for labels is planned, not built.
+- The self-improvement loop (slide 4, step 4) is run by us today: we propose each change and the
+  gate decides. An agent that proposes changes from the failures is planned, not built.
+- If asked about the region split (slide 4, step 4): tuned on 74 Mojave images, tested once on
+  61 Texas images it never saw; correctness held, 0.76 against 0.75 on dev.
 - Say "tune", not "train": we tune the captioner's prompt and checks.
 - Before the pitch, check that the Listen button is on the deployed site and that the MP3 exists
   for the Batch you'll open.
 - Speak the numbers as words people can picture ("77% of the facts are correct"), not metric
   names (correctness, MRR).
-- Judging criteria each slide covers: the story is slides 4 and 7, a non-technical proof of
-  concept is slide 8, audio is slides 8 and 10 (Listen, and the A key), scale is slides 7 and 9,
-  and originality is slides 2, 5 and 6.
+- Judging criteria each slide covers: the story is slides 4 and 6, a non-technical proof of
+  concept is slide 7, audio is slides 7 and 9 (Listen, and the A key), scale is slides 6 and 8,
+  and originality is slides 2, 4 and 5.
 
 ---
 
