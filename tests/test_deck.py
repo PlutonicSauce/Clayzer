@@ -1,4 +1,4 @@
-"""The pitch deck at /deck: served, self-contained, and seven minutes long."""
+"""The pitch deck at /deck: served, self-contained, and four minutes long."""
 
 import re
 
@@ -13,8 +13,8 @@ def test_deck_is_served_with_its_modules(client):  # noqa: F811
     c, _ = client
     page = c.get("/deck")
     assert page.status_code == 200
-    for src in re.findall(r'"(/static/deck/[^"]+)"', page.text):
-        assert c.get(src).status_code == 200, src
+    for src in re.findall(r'"(static/deck/[^"]+)"', page.text):
+        assert c.get("/" + src).status_code == 200, src
 
 
 def test_every_relative_import_resolves():
@@ -30,6 +30,6 @@ def test_no_network_dependencies():
         ), f.name
 
 
-def test_slide_budgets_add_up_to_seven_minutes():
+def test_slide_budgets_add_up_to_four_minutes():
     seconds = [int(s) for s in re.findall(r"seconds: (\d+)", (DECK / "slides.js").read_text())]
-    assert sum(seconds) == 7 * 60
+    assert sum(seconds) == 4 * 60

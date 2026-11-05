@@ -74,6 +74,56 @@ function Edge({ e }) {
   </g>`;
 }
 
+// A story version of the architecture: one image enters on the left, a trustworthy verdict leaves
+// on the right, with four numbered stops a non-technical listener can follow. Colours are SVG
+// attributes (not CSS) so it renders the same wherever it's exported.
+const STORY = [
+  { n: "in", x: 12, y: 150, w: 150, h: 120, kind: "external", title: "Aerial image", sub: ["NAIP tile", "0.6 m / pixel"] },
+  { n: "1", x: 212, y: 60, w: 212, h: 130, kind: "captions", title: "Write a caption", sub: ["Nova Pro on Bedrock", "objects, counts, places"] },
+  { n: "2", x: 212, y: 250, w: 212, h: 130, kind: "captions", title: "Verify each claim", sub: ["checked against imagery", "wrong claims dropped"] },
+  { n: "3", x: 474, y: 60, w: 212, h: 130, kind: "evaluation", title: "Score vs open data", sub: ["USGS, OpenStreetMap", "the model never sees them"] },
+  { n: "4", x: 474, y: 250, w: 212, h: 130, kind: "evaluation", title: "Gate the change", sub: ["better, worse, or", "inconclusive vs Baseline"] },
+  { n: "out", x: 736, y: 150, w: 200, h: 130, kind: "platform", title: "A verdict you trust", sub: ["scores, failure modes,", "cost — kept with its Trace"] },
+];
+const STORY_EDGES = [
+  [[162, 210], [212, 125], "", false],
+  [[162, 210], [212, 315], "", false],
+  [[424, 125], [474, 125], "", false],
+  [[424, 315], [474, 315], "", false],
+  [[686, 125], [736, 205], "", false],
+  [[686, 315], [736, 225], "", false],
+];
+
+function StoryNode({ n }) {
+  const { fill, stroke } = KINDS[n.kind];
+  const cx = n.x + n.w / 2;
+  const lines = n.sub.length;
+  const top = n.y + n.h / 2 - ((lines + 1) * 20) / 2 + 10;
+  const badge = !["in", "out"].includes(n.n);
+  return html`<g>
+    <rect x=${n.x} y=${n.y} width=${n.w} height=${n.h} rx="14" fill=${fill} stroke=${stroke} stroke-width="2.5" />
+    ${badge && html`<circle cx=${n.x + 26} cy=${n.y + 26} r="17" fill=${INK} />`}
+    ${badge && html`<text x=${n.x + 26} y=${n.y + 33} text-anchor="middle" font-size="20" font-weight="800" fill="#fffdfb">${n.n}</text>`}
+    <text x=${cx} y=${top} text-anchor="middle" font-size="23" font-weight="700" fill=${INK}>${n.title}</text>
+    ${n.sub.map((line, k) => html`<text x=${cx} y=${top + 26 + k * 20} text-anchor="middle"
+      font-size="16.5" fill=${SUB}>${line}</text>`)}
+  </g>`;
+}
+
+export function StoryArchitecture() {
+  return html`<svg class="arch" viewBox="0 0 950 430" role="img"
+      aria-label="One aerial image enters on the left. Step 1, a model writes a caption. Step 2, each claim is verified against imagery. Step 3, the caption is scored against open map data the model never saw. Step 4, a gate decides if it is good enough. A trustworthy verdict leaves on the right.">
+    <defs>
+      <marker id="story-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill=${MUTED} />
+      </marker>
+    </defs>
+    ${STORY_EDGES.map(([[x1, y1], [x2, y2]]) => html`<line x1=${x1} y1=${y1} x2=${x2} y2=${y2}
+      stroke=${MUTED} stroke-width="2.5" marker-end="url(#story-arrow)" />`)}
+    ${STORY.map((n) => html`<${StoryNode} n=${n} />`)}
+  </svg>`;
+}
+
 export function ArchitectureDiagram() {
   return html`<svg class="arch" viewBox="0 0 1400 640" role="img"
       aria-label="AWS deployment: browser to CloudFront, load balancer, and a Fargate task that reads the S3 store; the caption pipeline calls Bedrock and writes to S3; SageMaker, Step Functions, ADOT, and AgentCore are planned.">
