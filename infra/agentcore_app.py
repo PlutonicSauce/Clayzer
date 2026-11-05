@@ -5,22 +5,28 @@ with only what a Run needs, and the workload identity that names who asks AgentC
 the LGND sign-in. It is a separate CDK app from app.py (the web app), so neither's `cdk deploy`
 changes the other.
 
-    cd infra
-    npx aws-cdk@2 bootstrap                       # once per account and region
-    npx aws-cdk@2 --app "uv run --group infra python agentcore_app.py" deploy
-    uv run clayzer agentcore login lgnd           # once per account: the LGND sign-in, in a browser
-    export CLAYZER_AGENTCORE_RUNTIME=<the RuntimeArn output>
-    uv run clayzer batch --harness agentcore --verify ...
+Deployment and inbound Cognito credential setup are documented in docs/cli.md, "Running the
+Harness on AgentCore". Install the pinned CLI with `npm ci` in infra, then invoke
+`npx --no-install cdk --app "uv run --group infra python agentcore_app.py"`.
+After an account owner enables CloudWatch Transaction Search, pass `-c traces=true` on every
+deploy/redeploy that should export spans. Without it, only the Batch's JSONL Trace is kept.
+LGND browser consent is separate from the Cognito credential the Batch uses to invoke. Consent
+is per workload identity; destroying/recreating that identity requires a new approval.
 
-`cdk destroy` removes everything this creates. Two things are not CDK's to create, because they
-need a person: the LGND sign-in itself, and the OAuth client behind it (registering it needs the
-callback address that only exists once Identity has made the client record). `clayzer agentcore
-login` does both, and is safe to run again.
+Destroy removes the Runtime, its role, workload identity, Cognito resources and Runtime log group.
+The KMS key is scheduled for deletion (30 days). Shared bootstrap/ECR assets, the OAuth provider
+and its Identity-managed client secret, account Transaction Search settings, and CDK provider
+Lambda diagnostic log groups survive. Provider diagnostic logs expire after seven days. A
+resource policy written by AgentCore for span delivery is outside CloudFormation ownership;
+inspect it after teardown before removing it. Never remove another workload's policy.
+
+This stack is validated in us-west-2 and uses US inference profiles (`us.`); EU/APAC profiles
+and other AWS partitions require adapting the model ARNs before deployment.
 
 Options, as `-c name=value`: `workload` (the Identity workload name, default `clayzer`), `provider`
 (the OAuth client name, default `clayzer-lgnd`), `user` (the shared team identity, default
 `clayzer-team`), `models` (comma-separated Bedrock model ids the Runtime may call, default Nova
-Pro and Opus 5.5), `return_url`. Behind a private package mirror or TLS-intercepting proxy, set
+Pro and Opus 5.5), `return_url`, and `traces` (default false; requires Transaction Search). Behind a private package mirror or TLS-intercepting proxy, set
 CLAYZER_BUILD_BASE_IMAGE, CLAYZER_BUILD_PIP_INDEX (a file holding the index URL) and
 CLAYZER_BUILD_CA_BUNDLE (a .pem file), as for app.py.
 """
@@ -34,6 +40,9 @@ from aws_cdk import aws_bedrockagentcore as agentcore
 from aws_cdk import aws_cognito as cognito
 from aws_cdk import aws_ecr_assets as ecr_assets
 from aws_cdk import aws_iam as iam
+from aws_cdk import aws_kms as kms
+from aws_cdk import aws_logs as logs
+from aws_cdk import custom_resources as cr
 from constructs import Construct
 
 REPO = Path(__file__).resolve().parents[1]
@@ -77,6 +86,7 @@ class AgentCoreStack(cdk.Stack):
         user: str = "clayzer-team",
         models: list[str] | None = None,
         return_url: str = DEFAULT_RETURN_URL,
+        traces: bool = False,
         build: str = "unknown",
         **kwargs,
     ) -> None:
@@ -107,7 +117,7 @@ class AgentCoreStack(cdk.Stack):
                 "bedrock-agentcore.amazonaws.com",
                 conditions={
                     "StringEquals": {"aws:SourceAccount": self.account},
-                    "ArnLike": {"aws:SourceArn": f"{arn}:*"},
+                    "ArnLike": {"aws:SourceArn": f"{arn}:runtime/{RUNTIME_NAME}-*"},
                 },
             ),
         )  # fmt: skip
@@ -126,8 +136,43 @@ class AgentCoreStack(cdk.Stack):
             sid="Logs",
             actions=["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents",
                      "logs:DescribeLogStreams"],
-            resources=[f"arn:aws:logs:{self.region}:{self.account}:log-group:/aws/bedrock-agentcore/runtimes/*"],
+            resources=[f"arn:aws:logs:{self.region}:{self.account}:log-group:/aws/bedrock-agentcore/runtimes/{RUNTIME_NAME}-*"],
         ))  # fmt: skip
+        # These X-Ray APIs have no resource-level scope. Keep the account's existing
+        # destination; enabling Transaction Search is a separate account-wide decision.
+        role.add_to_policy(
+            iam.PolicyStatement(
+                sid="RuntimeTraces",
+                actions=[
+                    "xray:PutTraceSegments",
+                    "xray:PutTelemetryRecords",
+                    "xray:GetSamplingRules",
+                    "xray:GetSamplingTargets",
+                ],
+                resources=["*"],
+            )
+        )
+        if traces:
+            role.add_to_policy(
+                iam.PolicyStatement(
+                    sid="UnifiedTraceLogPolicy",
+                    actions=["logs:PutResourcePolicy"],
+                    resources=[
+                        (
+                            f"arn:aws:logs:{self.region}:{self.account}:log-group:"
+                            f"/aws/bedrock-agentcore/runtimes/{RUNTIME_NAME}-*"
+                        )
+                    ],
+                )
+            )
+        role.add_to_policy(
+            iam.PolicyStatement(
+                sid="RuntimeMetrics",
+                actions=["cloudwatch:PutMetricData"],
+                resources=["*"],
+                conditions={"StringEquals": {"cloudwatch:namespace": "bedrock-agentcore"}},
+            )
+        )
         # Fetch the LGND token held in Identity: this workload, this OAuth client, nothing else.
         role.add_to_policy(iam.PolicyStatement(
             sid="LgndSignIn",
@@ -203,10 +248,83 @@ class AgentCoreStack(cdk.Stack):
                 "CLAYZER_AGENTCORE_PROVIDER": provider,
                 "CLAYZER_AGENTCORE_RETURN_URL": return_url,
                 "CLAYZER_BUILD": build,
+                "UNIFIED_TRACES_DESTINATION_ENABLED": str(traces).lower(),
+                "OTEL_TRACES_EXPORTER": "otlp" if traces else "none",
             },
         )  # fmt: skip
         runtime.node.add_dependency(role)  # the role's policy must exist before the first Run
         runtime.node.add_dependency(identity)
+
+        # AgentCore creates this group during Runtime creation. Configure it instead of
+        # declaring a competing AWS::Logs::LogGroup resource (which fails AlreadyExists).
+        log_prefix = (
+            f"arn:aws:logs:{self.region}:{self.account}:log-group:"
+            f"/aws/bedrock-agentcore/runtimes/{RUNTIME_NAME}-*"
+        )
+        log_key = kms.Key(
+            self,
+            "RuntimeLogKey",
+            enable_key_rotation=True,
+            removal_policy=cdk.RemovalPolicy.DESTROY,
+        )
+        log_key.add_to_resource_policy(
+            iam.PolicyStatement(
+                principals=[iam.ServicePrincipal(f"logs.{self.region}.amazonaws.com")],
+                actions=[
+                    "kms:Encrypt",
+                    "kms:Decrypt",
+                    "kms:ReEncrypt*",
+                    "kms:GenerateDataKey*",
+                    "kms:DescribeKey",
+                ],
+                resources=["*"],
+                conditions={"ArnLike": {"kms:EncryptionContext:aws:logs:arn": log_prefix}},
+            )
+        )
+        log_group_name = f"/aws/bedrock-agentcore/runtimes/{runtime.attr_agent_runtime_id}-DEFAULT"
+        log_group_arn = f"arn:aws:logs:{self.region}:{self.account}:log-group:{log_group_name}"
+        sdk_policy = cr.AwsCustomResourcePolicy.from_sdk_calls(
+            resources=[log_group_arn, log_group_arn + ":*"]
+        )
+        encryption_call = cr.AwsSdkCall(
+            service="CloudWatchLogs",
+            action="associateKmsKey",
+            parameters={"logGroupName": log_group_name, "kmsKeyId": log_key.key_arn},
+            physical_resource_id=cr.PhysicalResourceId.of(log_group_name + "-encryption"),
+        )
+        encryption = cr.AwsCustomResource(
+            self,
+            "RuntimeLogEncryption",
+            on_create=encryption_call,
+            on_update=encryption_call,
+            policy=sdk_policy,
+            install_latest_aws_sdk=False,
+            log_retention=logs.RetentionDays.ONE_WEEK,
+        )
+        log_key.grant(encryption, "kms:DescribeKey")
+        retention_call = cr.AwsSdkCall(
+            service="CloudWatchLogs",
+            action="putRetentionPolicy",
+            parameters={"logGroupName": log_group_name, "retentionInDays": 7},
+            physical_resource_id=cr.PhysicalResourceId.of(log_group_name),
+        )
+        retention = cr.AwsCustomResource(
+            self,
+            "RuntimeLogRetention",
+            on_create=retention_call,
+            on_update=retention_call,
+            on_delete=cr.AwsSdkCall(
+                service="CloudWatchLogs",
+                action="deleteLogGroup",
+                parameters={"logGroupName": log_group_name},
+                ignore_error_codes_matching="ResourceNotFoundException",
+            ),
+            policy=sdk_policy,
+            install_latest_aws_sdk=False,
+            log_retention=logs.RetentionDays.ONE_WEEK,
+        )
+        retention.node.add_dependency(encryption)
+        cdk.CfnOutput(self, "RuntimeLogGroup", value=log_group_name)
 
         cdk.CfnOutput(self, "RuntimeArn", value=runtime.attr_agent_runtime_arn,
                       description="Set CLAYZER_AGENTCORE_RUNTIME to this")  # fmt: skip
@@ -218,12 +336,26 @@ class AgentCoreStack(cdk.Stack):
                       description="CLAYZER_AGENTCORE_INBOUND_TOKEN_URL")  # fmt: skip
         cdk.CfnOutput(self, "InboundClientId", value=client.user_pool_client_id,
                       description="CLAYZER_AGENTCORE_INBOUND_CLIENT_ID")  # fmt: skip
+        cdk.CfnOutput(self, "InboundUserPoolId", value=pool.user_pool_id,
+                      description="Use with describe-user-pool-client to retrieve the secret")  # fmt: skip
         cdk.CfnOutput(self, "InboundScope", value="clayzer-runtime/invoke",
                       description="CLAYZER_AGENTCORE_INBOUND_SCOPE")  # fmt: skip
         cdk.CfnOutput(self, "InboundClientSecretCommand", value=(
             f"aws cognito-idp describe-user-pool-client --user-pool-id {pool.user_pool_id} "
-            f"--client-id {client.user_pool_client_id} --query UserPoolClient.ClientSecret --output text"),
+            f"--client-id {client.user_pool_client_id} --region {self.region} "
+            "--query UserPoolClient.ClientSecret --output text"),
             description="Prints the inbound client secret for CLAYZER_AGENTCORE_INBOUND_CLIENT_SECRET")  # fmt: skip
+
+
+def traces_flag(value) -> bool:
+    """Read `-c traces=...`, refusing anything that is not clearly on or off: a typo must not
+    silently deploy with span export turned off."""
+    text = str(value if value is not None else "false").strip().lower()
+    if text in {"true", "1", "yes", "on"}:
+        return True
+    if text in {"false", "0", "no", "off", ""}:
+        return False
+    raise SystemExit(f"traces must be true or false, not {value!r}")
 
 
 def main() -> None:
@@ -238,6 +370,7 @@ def main() -> None:
         user=ctx("user") or os.environ.get("CLAYZER_AGENTCORE_USER_ID", "clayzer-team"),
         models=[m.strip() for m in models.split(",") if m.strip()] if models else None,
         return_url=ctx("return_url") or DEFAULT_RETURN_URL,
+        traces=traces_flag(ctx("traces")),
         build=ctx("build") or git_build(),
         env=cdk.Environment(
             account=os.environ.get("CDK_DEFAULT_ACCOUNT"),

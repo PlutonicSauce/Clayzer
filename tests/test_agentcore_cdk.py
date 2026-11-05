@@ -31,10 +31,12 @@ def synthesised(tmp_path_factory):
     return Template.from_stack(stack), app.synth(), module
 
 
-def statements(template: Template) -> list[dict]:
+def statements(template: Template, runtime: bool = True) -> list[dict]:
+    """The Runtime role's statements, or (runtime=False) every other policy's: the CDK helpers'."""
     out = []
-    for policy in template.find_resources("AWS::IAM::Policy").values():
-        out += policy["Properties"]["PolicyDocument"]["Statement"]
+    for name, policy in template.find_resources("AWS::IAM::Policy").items():
+        if name.startswith("RuntimeRole") == runtime:
+            out += policy["Properties"]["PolicyDocument"]["Statement"]
     return out
 
 
@@ -57,6 +59,8 @@ def test_one_runtime_runs_the_image_publicly_with_the_sign_in_taken_from_identit
             "CLAYZER_AGENTCORE_PROVIDER": "clayzer-lgnd",
             "CLAYZER_BUILD": "abc123",
             "AWS_REGION": "us-west-2",
+            "OTEL_TRACES_EXPORTER": "none",
+            "UNIFIED_TRACES_DESTINATION_ENABLED": "false",
         }),
     })  # fmt: skip
     assert "-" not in module.RUNTIME_NAME  # AgentCore allows letters, digits and underscores
@@ -82,7 +86,7 @@ def test_only_agentcore_in_this_account_can_assume_the_role(synthesised):
             "Principal": {"Service": "bedrock-agentcore.amazonaws.com"},
             "Condition": {
                 "StringEquals": {"aws:SourceAccount": "123456789012"},
-                "ArnLike": {"aws:SourceArn": "arn:aws:bedrock-agentcore:us-west-2:123456789012:*"},
+                "ArnLike": {"aws:SourceArn": "arn:aws:bedrock-agentcore:us-west-2:123456789012:runtime/clayzer_harness-*"},
             },
         })]
     }})  # fmt: skip
@@ -94,10 +98,33 @@ def test_the_role_cannot_reach_the_store_or_anything_broad(synthesised):
     # ADR-0006: the Runtime never touches the store, where Cases and Reference Labels live.
     assert not {a for a in actions if a.startswith("s3:")}
     assert not {a for a in actions if a.endswith("*")}  # no wildcard actions at all
-    # Only ecr:GetAuthorizationToken (which AWS requires) may apply to every resource.
+    # These APIs lack resource-level permissions. Metrics are additionally namespace-scoped.
+    unscoped = {
+        "ecr:GetAuthorizationToken",
+        "xray:PutTraceSegments",
+        "xray:PutTelemetryRecords",
+        "xray:GetSamplingRules",
+        "xray:GetSamplingTargets",
+        "cloudwatch:PutMetricData",
+    }
     for s in statements(template):
         if "*" in as_list(s["Resource"]):
-            assert as_list(s["Action"]) == ["ecr:GetAuthorizationToken"]
+            assert set(as_list(s["Action"])) <= unscoped
+        if "cloudwatch:PutMetricData" in as_list(s["Action"]):
+            assert s["Condition"] == {"StringEquals": {"cloudwatch:namespace": "bedrock-agentcore"}}
+
+
+def test_the_deploy_helpers_get_nothing_broad_either(synthesised):
+    template, _, _ = synthesised
+    helpers = statements(template, runtime=False)
+    assert helpers  # the log-configuration custom resources exist
+    for s in helpers:
+        actions = as_list(s["Action"])
+        assert not {a for a in actions if a.endswith("*")}
+        assert not {a for a in actions if a.startswith(("s3:", "iam:", "bedrock"))}
+        if "*" in as_list(s["Resource"]):
+            # CDK's LogRetention provider takes no resource scope; it may only set retention.
+            assert set(actions) <= {"logs:PutRetentionPolicy", "logs:DeleteRetentionPolicy"}
 
 
 def test_the_role_may_call_only_the_named_models_and_fetch_only_the_lgnd_token(synthesised):
@@ -125,6 +152,21 @@ def test_the_outputs_name_the_runtime_to_set(synthesised):
     outputs = template.to_json()["Outputs"]
     assert "CLAYZER_AGENTCORE_RUNTIME" in outputs["RuntimeArn"]["Description"]
     assert {"RuntimeArn", "RuntimeRoleArn", "Build"} <= set(outputs)
+    assert "--region us-west-2" in json.dumps(outputs["InboundClientSecretCommand"])
+
+
+def test_runtime_logs_are_encrypted_retained_and_owned_by_the_stack(synthesised):
+    template, _, _ = synthesised
+    # AgentCore owns creation; two idempotent SDK calls configure the existing group.
+    custom = json.dumps(template.find_resources("Custom::AWS"))
+    assert all(
+        action in custom for action in ("associateKmsKey", "putRetentionPolicy", "deleteLogGroup")
+    )
+    assert "retentionInDays" in custom and "kmsKeyId" in custom
+    assert "ResourceNotFoundException" in custom
+    assert not template.find_resources("AWS::Logs::LogGroup")
+    template.has_resource_properties("AWS::KMS::Key", {"EnableKeyRotation": True})
+    assert "RuntimeLogGroup" in template.to_json()["Outputs"]
 
 
 def test_options_change_the_names_and_models(tmp_path):
@@ -132,7 +174,7 @@ def test_options_change_the_names_and_models(tmp_path):
     app = cdk.App(outdir=str(tmp_path))
     stack = module.AgentCoreStack(app, "T2", workload="team-b", provider="team-b-lgnd",
                                   user="team-b-user", models=["amazon.nova-lite-v1:0"],
-                                  build="x", env=ENV)  # fmt: skip
+                                  build="x", traces=True, env=ENV)  # fmt: skip
     template = Template.from_stack(stack)
     template.has_resource_properties("AWS::BedrockAgentCore::WorkloadIdentity", {"Name": "team-b"})
     template.has_resource_properties("AWS::BedrockAgentCore::Runtime", {
@@ -141,3 +183,28 @@ def test_options_change_the_names_and_models(tmp_path):
     })  # fmt: skip
     blob = json.dumps(statements(template))
     assert "nova-lite" in blob and "nova-pro" not in blob
+    assert "logs:PutResourcePolicy" in blob
+    template.has_resource_properties(
+        "AWS::BedrockAgentCore::Runtime",
+        {
+            "EnvironmentVariables": Match.object_like(
+                {
+                    "OTEL_TRACES_EXPORTER": "otlp",
+                    "UNIFIED_TRACES_DESTINATION_ENABLED": "true",
+                }
+            ),
+        },
+    )
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [(None, False), ("false", False), ("True", True), ("1", True), ("yes", True), (True, True)],
+)
+def test_the_traces_flag_reads_common_spellings(value, expected):
+    assert load_app_module().traces_flag(value) is expected
+
+
+def test_the_traces_flag_refuses_a_typo():
+    with pytest.raises(SystemExit):
+        load_app_module().traces_flag("ture")

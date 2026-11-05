@@ -352,17 +352,33 @@ Identity instead of one person's machine, and the Harness runs where the model a
 #    bootstrapped account). The Runtime ARN is printed as the RuntimeArn output.
 uv sync --group infra
 cd infra
-npx aws-cdk@2 bootstrap                                  # once per account and region
-npx aws-cdk@2 --app "uv run --group infra python agentcore_app.py" deploy
+npm ci
+npx --no-install cdk bootstrap                          # only if not already bootstrapped
+npx --no-install cdk --app "uv run --group infra python agentcore_app.py" synth --strict
+npx --no-install cdk --app "uv run --group infra python agentcore_app.py" diff
+npx --no-install cdk --app "uv run --group infra python agentcore_app.py" deploy
 cd ..
 
-# 2. Keep the LGND sign-in in AgentCore Identity. Once per account; needs a browser.
+# 2. Keep the LGND sign-in in AgentCore Identity. Once per workload identity; needs a browser.
 uv run clayzer agentcore login lgnd
 
 # 3. Run a Batch on it.
 export CLAYZER_AGENTCORE_RUNTIME=<the RuntimeArn output>
+export CLAYZER_AGENTCORE_INBOUND_TOKEN_URL=<the InboundTokenUrl output>
+export CLAYZER_AGENTCORE_INBOUND_CLIENT_ID=<the InboundClientId output>
+export CLAYZER_AGENTCORE_INBOUND_SCOPE=<the InboundScope output>
+# Capture the credential into the environment; do not echo it or put it in a report.
+export CLAYZER_AGENTCORE_INBOUND_CLIENT_SECRET="$(aws cognito-idp describe-user-pool-client \
+  --region us-west-2 \
+  --user-pool-id <the InboundUserPoolId output> \
+  --client-id "$CLAYZER_AGENTCORE_INBOUND_CLIENT_ID" \
+  --query UserPoolClient.ClientSecret --output text)"
 uv run clayzer batch --harness agentcore --verify --repeats 3 --label agentcore
 ```
+
+CDK and the AWS CLI use the shell's AWS credentials/profile. The Clayzer CLI additionally
+loads `.env`; keep that file consistent with the deployment account. The inbound credential
+authenticates the Batch to the Runtime; the separate LGND consent authorizes tool access.
 
 `login` prints a link. Open it, sign in to LGND, and approve. The browser then goes to a
 `localhost:8765` address that won't load; that is expected. Paste the whole address from the
@@ -392,9 +408,40 @@ What to know:
 - **Cost of a failed Run.** A Bedrock error inside the Runtime comes back as the same error
   code, so the Batch treats it as a Sandbox Failure (excluded, and run again by `--resume`). A
   model that never submits a Caption is a Harness Fault, scored 0.
-- **Tear down.** `npx aws-cdk@2 --app "uv run --group infra python agentcore_app.py" destroy`
-  removes the Runtime, its role, and its workload identity. The OAuth client and approval from
-  `login` are kept in Identity; delete them in the AgentCore console.
+- **Runtime logs.** `RuntimeLogGroup` names the KMS-encrypted group, retained for seven days.
+  AgentCore creates the group during Runtime creation; CDK uses idempotent SDK calls to apply
+  encryption and retention to it. Declaring a second log-group resource fails with
+  `AlreadyExists`. The configuration provider's diagnostic logs also expire after seven days.
+  The ARM64 image uses a hashed telemetry dependency lock and contains Harness modules and
+  ontology configuration; Cases, Chips, scorers and the web app are excluded.
+  Span export defaults off; the Batch's JSONL Trace is always complete. After an account owner
+  enables CloudWatch Transaction Search, deploy with `-c traces=true` to send OTLP spans to the
+  encrypted Runtime log group. This adds the scoped `logs:PutResourcePolicy` permission that
+  AgentCore requires. The stack does not change account-wide trace routing or indexing.
+  Sending OTLP spans while the account's destination is still `XRay` returns HTTP 400, even
+  with valid execution-role permissions.
+- **Tear down.** From `infra`, run
+  `npx --no-install cdk --app "uv run --group infra python agentcore_app.py" destroy ClayzerAgentCore`.
+  It removes the Runtime, role, workload identity, Cognito resources and Runtime log group,
+  and schedules the log-encryption key for deletion. The shared CDK bootstrap/ECR assets and
+  separate Gateway deployment remain. The OAuth provider and approval created by `login` are
+  outside the stack. The client registration survives, but destroying and recreating the workload
+  identity requires fresh browser consent: the lifecycle test confirmed that the old consent
+  is not reusable by the recreated identity. Normal stack updates preserve the identity.
+  Delete the provider only after confirming no remaining workload uses it.
+  The KMS deletion waiting period is 30 days. CDK provider Lambda diagnostic log groups remain
+  with seven-day retention. Account Transaction Search settings remain; inspect any
+  AgentCore-created span-delivery resource policy before removing it, because it is outside
+  CloudFormation ownership.
+
+For a teammate's account, use a clean checkout of the same commit and that account's credentials.
+Deploy before running `login`, then run a small Batch including a Fixed and a Change Case.
+Record the commit, runtime build, Case/Chip hashes, scores, failed Runs, latency and cost alongside
+a matching local Batch. Verify the stack's teardown before calling account portability complete.
+One Repeat is a functional smoke check; it does not establish score equivalence.
+These commands and the model permissions are validated in `us-west-2` with US (`us.`)
+inference profiles. Adapt the model ARNs and CLI region for other regions; EU/APAC profiles
+and other AWS partitions are not covered by this validation.
 
 Options for the stack are passed as `-c name=value`; see the docstring of
 [`infra/agentcore_app.py`](../infra/agentcore_app.py). The token source is chosen by

@@ -76,6 +76,13 @@ jobs:
           uv run python -m zipfile -e /tmp/agentcore.zip /tmp/agentcore-package
           cd /tmp/agentcore-package
           uv run --no-project --python 3.12 python -I -S -c "import sys; sys.path.insert(0, '/tmp/agentcore-package'); import entrypoint, clayzer.mcp_auth, clayzer.store, clayzer.config, mcp.client.streamable_http, botocore.config; from clayzer.agentcore.gateway_runtime import create_app; assert create_app()"
+      - name: Build and smoke-test the Batch Runtime container
+        run: |
+          docker build --platform linux/arm64 -f infra/agentcore/Dockerfile \
+            --build-arg BUILD="$GITHUB_SHA" -t clayzer-agentcore-batch:ci .
+          docker run --rm --network none \
+            --mount type=bind,source="$PWD/tests/agentcore_container_smoke.py",target=/tmp/smoke.py,readonly \
+            --entrypoint python clayzer-agentcore-batch:ci /tmp/smoke.py
       - uses: actions/upload-artifact@v7
         with:
           name: agentcore-runtime
