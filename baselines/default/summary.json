@@ -2236,8 +2236,8 @@
       "spread": 0.02405626121623441
     },
     "retrieval_hit_at_1": {
-      "mean": null,
-      "spread": null
+      "mean": 0.7083333333333334,
+      "spread": 0.07216878364870322
     },
     "unscored_share": 0.3732989482989483,
     "label_prep_seconds": 3974.1,

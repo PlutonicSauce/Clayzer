@@ -126,6 +126,18 @@ def rank_recording(recording: dict, k: int = 1) -> dict:
     }
 
 
+def hit_at_1(row: dict) -> float | None:
+    """A Repeat's hit@1: the share of its queries whose top result is relevant. Rows recorded
+    before hit@1 was stored have only their rankings, so it's computed from those, which lets a
+    rescore or a Baseline backfill it offline."""
+    if row.get("hit@1") is not None:
+        return row["hit@1"]
+    queries = [q for q in row.get("queries") or [] if q.get("ranked")]
+    if not queries:
+        return None
+    return sum(q["ranked"][0] in q["relevant"] for q in queries) / len(queries)
+
+
 def retrieval(
     client,
     model: str,

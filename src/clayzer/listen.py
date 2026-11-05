@@ -79,7 +79,7 @@ def facts(b: dict, baseline: dict | None, gate_result=None) -> dict:
         "repeats": cfg.repeats,
         "runs": batch.get("runs") or {},
         "scores": {k: _pts(batch.get(k)) for k in METRICS},
-        "retrieval_top1": _pts((batch.get("retrieval_recall_at_1") or {}).get("mean")),
+        "retrieval_top1": _pts((batch.get("retrieval_hit_at_1") or {}).get("mean")),
         "stopped": s.get("stopped"),
     }
     per_case = s.get("cases") or {}

@@ -50,7 +50,7 @@ from clayzer.grounding import grounding
 from clayzer.harness import CHANGE_PROMPT
 from clayzer.judge import fidelity, self_judging
 from clayzer.output_score import VERSION, grounding_by_class, preparation, score_caption
-from clayzer.retrieval import freeze_queries, retrieval
+from clayzer.retrieval import freeze_queries, hit_at_1, retrieval
 from clayzer.summarize import SummarySink
 from clayzer.tools import servers_named
 from clayzer.trace import RunInfo, StoreSink, Tracer, watch_retries
@@ -709,7 +709,7 @@ def summarize(cfg: BatchConfig, cases: list[dict], results: list[dict], retr: li
     mrr = [row["mrr"] for row in retr if row["mrr"] is not None]
     # Recall is fraction of relevant captions found, hit rate is whether any was found.
     top1 = [row["recall@1"] for row in retr if row.get("recall@1") is not None]
-    hit1 = [row["hit@1"] for row in retr if row.get("hit@1") is not None]
+    hit1 = [h for h in map(hit_at_1, retr) if h is not None]
     measurements = [preparation(c)["reference_preparation"] for c in cases]
     prep = [m["value"] for m in measurements if m.get("value") is not None]
     # Verified Claims per dollar and per GPU-second, over the Runs whose cost is known: Runs
