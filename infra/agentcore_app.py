@@ -36,6 +36,7 @@ from aws_cdk import aws_ecr_assets as ecr_assets
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_kms as kms
 from aws_cdk import aws_logs as logs
+from aws_cdk import custom_resources as cr
 from constructs import Construct
 
 REPO = Path(__file__).resolve().parents[1]
@@ -233,8 +234,8 @@ class AgentCoreStack(cdk.Stack):
         runtime.node.add_dependency(role)  # the role's policy must exist before the first Run
         runtime.node.add_dependency(identity)
 
-        # Runtime sessions start on invocation, after this encrypted group is provisioned.
-        # The shared CDK bootstrap and the separate Gateway deployment are not owned here.
+        # AgentCore creates this group during Runtime creation. Configure it instead of
+        # declaring a competing AWS::Logs::LogGroup resource (which fails AlreadyExists).
         log_prefix = (
             f"arn:aws:logs:{self.region}:{self.account}:log-group:"
             f"/aws/bedrock-agentcore/runtimes/{RUNTIME_NAME}-*"
@@ -259,15 +260,50 @@ class AgentCoreStack(cdk.Stack):
                 conditions={"ArnLike": {"kms:EncryptionContext:aws:logs:arn": log_prefix}},
             )
         )
-        log_group = logs.LogGroup(
-            self,
-            "RuntimeLogs",
-            log_group_name=f"/aws/bedrock-agentcore/runtimes/{runtime.attr_agent_runtime_id}-DEFAULT",
-            encryption_key=log_key,
-            retention=logs.RetentionDays.ONE_WEEK,
-            removal_policy=cdk.RemovalPolicy.DESTROY,
+        log_group_name = f"/aws/bedrock-agentcore/runtimes/{runtime.attr_agent_runtime_id}-DEFAULT"
+        log_group_arn = f"arn:aws:logs:{self.region}:{self.account}:log-group:{log_group_name}"
+        sdk_policy = cr.AwsCustomResourcePolicy.from_sdk_calls(
+            resources=[log_group_arn, log_group_arn + ":*"]
         )
-        cdk.CfnOutput(self, "RuntimeLogGroup", value=log_group.log_group_name)
+        encryption_call = cr.AwsSdkCall(
+            service="CloudWatchLogs",
+            action="associateKmsKey",
+            parameters={"logGroupName": log_group_name, "kmsKeyId": log_key.key_arn},
+            physical_resource_id=cr.PhysicalResourceId.of(log_group_name + "-encryption"),
+        )
+        encryption = cr.AwsCustomResource(
+            self,
+            "RuntimeLogEncryption",
+            on_create=encryption_call,
+            on_update=encryption_call,
+            policy=sdk_policy,
+            install_latest_aws_sdk=False,
+            log_retention=logs.RetentionDays.ONE_WEEK,
+        )
+        log_key.grant(encryption, "kms:DescribeKey")
+        retention_call = cr.AwsSdkCall(
+            service="CloudWatchLogs",
+            action="putRetentionPolicy",
+            parameters={"logGroupName": log_group_name, "retentionInDays": 7},
+            physical_resource_id=cr.PhysicalResourceId.of(log_group_name),
+        )
+        retention = cr.AwsCustomResource(
+            self,
+            "RuntimeLogRetention",
+            on_create=retention_call,
+            on_update=retention_call,
+            on_delete=cr.AwsSdkCall(
+                service="CloudWatchLogs",
+                action="deleteLogGroup",
+                parameters={"logGroupName": log_group_name},
+                ignore_error_codes_matching="ResourceNotFoundException",
+            ),
+            policy=sdk_policy,
+            install_latest_aws_sdk=False,
+            log_retention=logs.RetentionDays.ONE_WEEK,
+        )
+        retention.node.add_dependency(encryption)
+        cdk.CfnOutput(self, "RuntimeLogGroup", value=log_group_name)
 
         cdk.CfnOutput(self, "RuntimeArn", value=runtime.attr_agent_runtime_arn,
                       description="Set CLAYZER_AGENTCORE_RUNTIME to this")  # fmt: skip

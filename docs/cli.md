@@ -408,6 +408,9 @@ What to know:
   code, so the Batch treats it as a Sandbox Failure (excluded, and run again by `--resume`). A
   model that never submits a Caption is a Harness Fault, scored 0.
 - **Runtime logs.** `RuntimeLogGroup` names the KMS-encrypted group, retained for seven days.
+  AgentCore creates the group during Runtime creation; CDK uses idempotent SDK calls to apply
+  encryption and retention to it. Declaring a second log-group resource fails with
+  `AlreadyExists`. The configuration provider's diagnostic logs also expire after seven days.
   The ARM64 image uses a hashed telemetry dependency lock and contains Harness modules and
   ontology configuration; Cases, Chips, scorers and the web app are excluded.
   Spans use X-Ray through the account's existing destination. This stack sets

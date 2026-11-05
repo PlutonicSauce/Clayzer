@@ -33,8 +33,9 @@ def synthesised(tmp_path_factory):
 
 def statements(template: Template) -> list[dict]:
     out = []
-    for policy in template.find_resources("AWS::IAM::Policy").values():
-        out += policy["Properties"]["PolicyDocument"]["Statement"]
+    for name, policy in template.find_resources("AWS::IAM::Policy").items():
+        if name.startswith("RuntimeRole"):
+            out += policy["Properties"]["PolicyDocument"]["Statement"]
     return out
 
 
@@ -139,17 +140,15 @@ def test_the_outputs_name_the_runtime_to_set(synthesised):
 
 def test_runtime_logs_are_encrypted_retained_and_owned_by_the_stack(synthesised):
     template, _, _ = synthesised
-    template.has_resource_properties(
-        "AWS::Logs::LogGroup",
-        {
-            "RetentionInDays": 7,
-            "KmsKeyId": Match.any_value(),
-            "LogGroupName": Match.any_value(),
-        },
+    # AgentCore owns creation; two idempotent SDK calls configure the existing group.
+    custom = json.dumps(template.find_resources("Custom::AWS"))
+    assert all(
+        action in custom for action in ("associateKmsKey", "putRetentionPolicy", "deleteLogGroup")
     )
+    assert "retentionInDays" in custom and "kmsKeyId" in custom
+    assert "ResourceNotFoundException" in custom
+    assert not template.find_resources("AWS::Logs::LogGroup")
     template.has_resource_properties("AWS::KMS::Key", {"EnableKeyRotation": True})
-    for resource in template.find_resources("AWS::Logs::LogGroup").values():
-        assert resource["DeletionPolicy"] == "Delete"
     assert "RuntimeLogGroup" in template.to_json()["Outputs"]
 
 
