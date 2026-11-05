@@ -224,39 +224,43 @@ function Next() {
   </div>`;
 }
 
-// Ten slides, exactly 4:00: the problem, the value it unlocks (downstream search and an example),
-// then the solution (the story, how we earn trust, the AWS services, the cost at Clay's scale),
-// the live demo, and the close.
+// Ten slides, exactly 4:00, in four sections: the problem; the value it unlocks (downstream search
+// and an example); our solution (the story, how we earn trust, the AWS services, the live demo);
+// the cost at Clay's scale; then the close.
+// The deck's sections, in order, for the breadcrumb at the top of each slide (deck.js). A slide's
+// `section` names one; the title and closing slides have none.
+export const SECTIONS = ["Problem Statement", "Value Unlock", "Our Solution", "Scale"];
+
 export const SLIDES = [
   { title: "Clayzer", seconds: 10, theme: "dark", component: Title,
     spoken: "Clayzer, said KLAY-zer, rhymes with laser. A solution for producing captions you can trust, at scale.",
     notes: ["Say the name, KLAY-zer, then the one-line definition, and move on.", "4:00 total. T starts the timer, A reads a slide aloud."] },
-  { title: "The problem", seconds: 35, component: Problem, steps: 3,
+  { title: "The problem", section: "Problem Statement", seconds: 35, component: Problem, steps: 3,
     spoken: "New caption, who dis? That is how captions on Clay's imagery work today. Here is a real one: the model saw only this photo and said eighteen wind turbines, mostly in the centre. The public records put the turbines all around the centre, not in it. But the records disagree too: the government database counts seventeen, OpenStreetMap counts eighteen, because they put this turbine two metres apart, either side of the edge. So we never trust one source. We cross-check them: when they agree, the label is automatic, and only when they conflict, like here, does a person look.",
     notes: ["Open with the label as a joke: \"New caption, who dis? That's how Clay's imagery works today: a caption shows up and nobody knows if it's legit.\"", "Press 1: the 17 turbines both records agree on. The caption is wrong: they're all around the centre.", "Press 2: the gold turbine. USGS puts it just outside the top edge, OpenStreetMap just inside, 2 m apart: 17 or 18.", "Press 3: we stay out of hand-labelling unless sources conflict or confidence is too low. This conflict was flagged automatically (wind agreed on 25 of 26 Cases); a person checked the photo and confirmed 18.", "If asked: the cross-check is built for solar and wind; a confidence threshold for labels is the plan, not built yet.", "The 3 × 3 grid is ours: the model sees the plain photo, and the prompt makes it name each object's place as one of 9 cells."] },
-  { title: "Downstream value", seconds: 20, component: Downstream,
+  { title: "Downstream value", section: "Value Unlock", seconds: 20, component: Downstream,
     spoken: "Now imagine those captions were checked. Imagery and public records go into Clayzer. We write each caption from the image alone and check every fact against the records. Only pairs that pass go on to Clay, which makes the imagery searchable in words.",
     notes: ["Left to right: public data, Clayzer (our part, the dashed box), Clay.", "The line to land: search results are only as good as the captions behind them.", "The Thailand flood search is an illustration: our Cases today are US solar, wind and land cover. Don't imply we have run it.", "The dashed loop back is planned, not built: say 'next'."] },
-  { title: "Example search", seconds: 18, component: ExampleSearch,
+  { title: "Example search", section: "Value Unlock", seconds: 18, component: ExampleSearch,
     spoken: "Here is what that looks like. Ask in plain words, like the economic impact of flooding in Bangkok and access to aid, and you get the images whose checked captions match: flooded streets, a market under water, a relief site, and the route to reach it.",
     notes: ["Let the video play; it loops every 16 s.", "Illustrative, not real results: don't imply we have run this search."] },
-  { title: "How it works", seconds: 20, component: Architecture,
+  { title: "How it works", section: "Our Solution", seconds: 20, component: Architecture,
     spoken: "Here is the whole journey. One aerial image comes in on the left. A model on AWS writes a caption. Before each statement is kept, we check it against the imagery. We score it against open map data the model never saw. A gate decides whether it is good enough. What comes out is a verdict you can trust, and the same path works for one image or a million.",
     notes: ["One image in on the left, a verdict out on the right.", "Point at each numbered stop. End on: same path scales to millions."] },
-  { title: "Our solution", seconds: 40, component: Trust, steps: 6,
+  { title: "Our solution", section: "Our Solution", seconds: 40, component: Trust, steps: 6,
     spoken: "Here is how we make captions you can trust. We verify, then write: each fact is checked against the imagery before the caption is written. The answer keys are public records, cross-checked by code, that the captioner never sees. One shared vocabulary of objects and their look-alikes. We tune on one region and test on another it never saw. And a self-improvement loop keeps only the changes that beat the baseline. The result: a caption that matches what is really there.",
     notes: ["Press → for each point as you say it (5 presses); the 6th turns the caption green.", "Verify-then-write: in the 4-image test, every object it named was really there, and correctness rose 0.53 → 0.65. Don't claim it's in the baseline: the gate kept it out because coverage dropped.", "Say 'tune', not 'train': we tune the captioner's prompt and checks.", "Labels are automatic; a person only looks where the two records disagree."] },
-  { title: "On AWS", seconds: 25, component: Aws,
+  { title: "On AWS", section: "Our Solution", seconds: 25, component: Aws,
     spoken: "All of it runs on AWS, from one deploy command. Bedrock writes, judges and searches the captions, with Nova Pro, Claude Opus and Titan embeddings. Results live in S3, and the site runs on Fargate behind CloudFront. The dashed boxes are next: Step Functions to fan out, SageMaker for GPU cost, and AgentCore for the agentic captioner.",
     notes: ["Solid boxes are running now: this deck comes from that Fargate task.", "One cdk deploy per account; nothing crosses accounts.", "Dashed boxes are next; lead into the scale slide: what it costs."] },
-  { title: "At Clay's scale", seconds: 20, component: Scale,
+  { title: "Live demo", section: "Our Solution", seconds: 32, component: Demo,
+    spoken: "Now the site. The overview shows the current baseline. A caption, with each claim marked supported or not, right on the image. The report, five criteria side by side, which can read itself aloud. And compare to baseline: the gate says better, worse, or inconclusive.",
+    notes: ["Overview → a Caption on its grid → report and Listen → Compare.", "Keep the recorded Batch open as the offline fallback."] },
+  { title: "At Clay's scale", section: "Scale", seconds: 20, component: Scale,
     spoken: "What does this cost at Clay's scale? Clay's own training set is seventy million chips, and that is only a five percent sample of the world. Captioning all of it with our current model would cost about one hundred and eighty thousand dollars. Batch pricing halves that. A cheap model first, with only the hard images sent to the strong one, smaller images where objects are still visible, and reusing captions for look-alike chips bring it to about four thousand dollars, forty-six times cheaper. Checking matters too: a large model judging every caption would cost over a million dollars, but our checks against open data need no model at all.",
     notes: ["Clay itself is a ~5% sample; the archives are 100× bigger, so cost per Caption decides what gets captioned.",
       "Batch is a published 50%; the green 'assumed' rows are hypotheses our gate can test, which is the point.",
       "Land the judge line: scoring with a big model costs more than captioning, and our grounding is free."] },
-  { title: "Live demo", seconds: 32, component: Demo,
-    spoken: "Now the site. The overview shows the current baseline. A caption, with each claim marked supported or not, right on the image. The report, five criteria side by side, which can read itself aloud. And compare to baseline: the gate says better, worse, or inconclusive.",
-    notes: ["Overview → a Caption on its grid → report and Listen → Compare.", "Keep the recorded Batch open as the offline fallback."] },
   { title: "What it means for Clay", seconds: 20, theme: "dark", component: Next,
     spoken: "Hand Clayzer a caption set and get a verdict: how much to trust, where it fails, what it costs to fix. Our ask is Clay's real caption set and its rubric weights. And any slide here reads itself aloud.",
     notes: ["Close on the ask: Clay's real caption set and its rubric weights.", "Mention Listen (A) as the accessibility point."] },

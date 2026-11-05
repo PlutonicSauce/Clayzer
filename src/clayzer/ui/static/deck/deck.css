@@ -258,3 +258,15 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .stakes .wrong-card p { font-size: 21px; }
 .stakes .triage-foot { margin-top: 6px; font-size: 17px; color: var(--muted); }
 .ex-frame .disputed-ring { fill: none; stroke: #f2c14e; stroke-width: 5; stroke-dasharray: 7 5; }
+
+/* Section breadcrumb across the top of each slide: where we are in the story. */
+.sections { position: absolute; top: 22px; right: 32px; display: flex; gap: 6px; z-index: 3; }
+.sections button { display: flex; align-items: center; gap: 8px; padding: 6px 14px 6px 7px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--paper); color: var(--muted);
+  font: 600 15px system-ui, sans-serif; cursor: pointer; }
+.sections .n { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--line); color: var(--ink); font-size: 13px; font-weight: 800; }
+.sections button.done { color: var(--ink); }
+.sections button.done .n { background: var(--evaluation-line); }
+.sections button.current { background: var(--decision); border-color: var(--decision); color: #fffdfb; }
+.sections button.current .n { background: #fffdfb; color: var(--decision); }

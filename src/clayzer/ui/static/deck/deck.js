@@ -14,12 +14,15 @@
 // one press at a time, so they arrive as the presenter says them. Going back into a slide shows it
 // complete.
 //
+// Sections: a slide with a `section` shows the deck's sections across the top, its own
+// highlighted; clicking one jumps to that section's first slide.
+//
 // Slides, their time budgets, their notes, and their spoken scripts live in slides.js.
 
 import { render } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { html } from "./html.js";
-import { SLIDES } from "./slides.js";
+import { SECTIONS, SLIDES } from "./slides.js";
 
 const canSpeak = typeof speechSynthesis !== "undefined";
 
@@ -88,6 +91,17 @@ function Notes({ i, elapsed, running }) {
   </aside>`;
 }
 
+function Sections({ current, onGo }) {
+  const at = SECTIONS.indexOf(current);
+  return html`<nav class="sections" aria-label="Sections">
+    ${SECTIONS.map((name, k) => html`<button type="button"
+        class=${k === at ? "current" : k < at ? "done" : ""}
+        aria-current=${k === at ? "step" : undefined}
+        onClick=${(e) => { e.stopPropagation(); onGo(SLIDES.findIndex((s) => s.section === name)); }}>
+      <span class="n">${k + 1}</span>${name}</button>`)}
+  </nav>`;
+}
+
 function Deck() {
   const [i, setI] = useState(fromHash());
   const [step, setStep] = useState(stepFromHash());
@@ -148,6 +162,7 @@ function Deck() {
           aria-label=${`${i + 1} of ${SLIDES.length}: ${SLIDES[i].title}`}>
           <${Slide} step=${step} />
         </section>
+        ${SLIDES[i].section && html`<${Sections} current=${SLIDES[i].section} onGo=${go} />`}
         <div class="progress" style=${{ width: `${((i + 1) / SLIDES.length) * 100}%` }}></div>
         <div class="pageno">${i + 1} / ${SLIDES.length}</div>
         ${canSpeak && html`<button class="speak" title="Read this slide aloud (A)"
