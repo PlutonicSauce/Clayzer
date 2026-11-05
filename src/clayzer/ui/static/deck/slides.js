@@ -128,8 +128,9 @@ function Architecture() {
 
 // The ontology the caption harness reads (ontology/objects.toml), shown on one photo: its objects
 // and their "near" links, the photo pixelating into the ontology graph, then the guidance the
-// captioner is given (ontology-slide.js). The guidance lines are ontology.prompt_context's real
-// output for the photo's classes, shortened to the pairs on the graph.
+// captioner is given and why it helps (ontology-slide.js). The guidance quoted is
+// ontology.prompt_context's real output for the photo's classes; 9 of 12 is the Baseline's
+// look-alike count (summary.json `lookalikes`), captioned without the guidance.
 function Ontology({ step = 0 }) {
   return html`<div class="onto-slide">
     <${Kicker}>Our solution · the ontology<//>
@@ -137,13 +138,14 @@ function Ontology({ step = 0 }) {
     <div class="onto-grid">
       <${OntologyViz} step=${step} />
       <div class="onto-side">
-        <div class="onto-card">
+        <div class=${`onto-card ${step >= 2 ? "gone" : ""}`}>
           <b>1 · The photo</b>
           <p>A greenhouse beside buildings and a road, with farm fields and two ponds.</p>
         </div>
         <div class=${`onto-card after-graph build ${step >= 1 ? "in" : ""}`}>
           <b>2 · The ontology</b>
-          <p>17 classes in 5 families, in one file the harness reads.</p>
+          <p class=${step >= 2 ? "folded" : ""}>17 classes in 5 families, in one file the harness
+            reads.</p>
           <ul class="onto-key">
             <li><i class="isa"></i>is a kind of</li>
             <li><i class="near"></i>is typically found near</li>
@@ -151,11 +153,18 @@ function Ontology({ step = 0 }) {
           </ul>
         </div>
         <div class=${`onto-card told build ${step >= 2 ? "in" : ""}`}>
-          <b>3 · What the captioner is told</b>
-          <p class="onto-quote">Look-alikes to tell apart: Greenhouse vs Solar array; Water vs Solar
-            array.</p>
-          <p class="onto-quote">Typical neighbours (only state a relation you can see): Greenhouse
-            near Building; Greenhouse near Road.</p>
+          <b>3 · Why it helps the caption</b>
+          <p class="onto-problem">Without it: greenhouses called solar farms in <b>9 of 12</b> runs.</p>
+          <p>Before it writes, the harness is told to:</p>
+          <ol class="onto-benefits">
+            <li><span>1</span><p><b>Tell look-alikes apart:</b> greenhouse vs solar array.</p></li>
+            <li><span>2</span><p><b>Look for what sits together:</b> greenhouse near road, said only
+              if seen.</p></li>
+            <li><span>3</span><p><b>Use words we can check:</b> 11 classes, each mapped to public
+              records.</p></li>
+          </ol>
+          <p class="onto-why">A semantic layer: knowledge the pixels can't give, never this photo's
+            answer.</p>
         </div>
       </div>
     </div>
@@ -294,8 +303,8 @@ export const SLIDES = [
     spoken: "Here is how we make captions you can trust. We verify, then write: each fact is checked against the imagery before the caption is written. The answer keys are public records, cross-checked by code, that the captioner never sees. One shared vocabulary of objects and their look-alikes. We tune on one region and test on another it never saw. And a self-improvement loop keeps only the changes that beat the baseline. The result: a caption that matches what is really there.",
     notes: ["Press → for each point as you say it (5 presses); the 6th turns the caption green.", "Verify-then-write: in the 4-image test, every object it named was really there, and correctness rose 0.53 → 0.65. Don't claim it's in the baseline: the gate kept it out because coverage dropped.", "Say 'tune', not 'train': we tune the captioner's prompt and checks.", "Labels are automatic; a person only looks where the two records disagree."] },
   { title: "The ontology", section: "Our Solution", seconds: 22, component: Ontology, steps: 2,
-    spoken: "Our caption harness also reads an ontology. Here, a greenhouse sits beside buildings and a road. The harness knows a greenhouse is a kind of building, usually near roads, and easily mistaken for solar panels. So before writing, it's told to tell them apart, and to state only what it sees.",
-    notes: ["Press 1: the photo pixelates into the ontology graph; each tag lands on its class.", "Press 2: what the captioner is told. These lines are the real output of ontology.prompt_context for these classes.", "Land the look-alike: greenhouses fooled the captioner 9 of 12 times, which is why the ontology names them.", "Don't claim it's in the baseline: the guidance is a Batch option (ontology_context), off in the Baseline. Always on: the captioner may only name the ontology's 11 classes."] },
+    spoken: "Our caption harness also reads an ontology: a semantic layer of what things are, what they sit near, and what they are mistaken for. Without it, the captioner called greenhouses solar farms nine times in twelve. With it, it is warned before it writes, and every claim uses words we can check.",
+    notes: ["Press 1: the photo pixelates into the ontology graph; each tag lands on its class.", "Press 2: why it helps. The badges 1, 2, 3 on the graph match the three benefits. The quoted lines are the real output of ontology.prompt_context for these classes.", "9 of 12 is measured: the Baseline, captioned without the guidance. The effect with it isn't measured yet: it's the next Batch the gate tests. Don't claim it fixed the greenhouses.", "Don't claim it's in the baseline: the guidance is a Batch option (ontology_context), off in the Baseline. Always on: the captioner may only name the ontology's 11 classes."] },
   { title: "On AWS", section: "Our Solution", seconds: 25, component: Aws,
     spoken: "All of it runs on AWS, from one deploy command. Bedrock writes, judges and searches the captions, with Nova Pro, Claude Opus and Titan embeddings. Results live in S3, and the site runs on Fargate behind CloudFront. The dashed boxes are next: Step Functions to fan out, SageMaker for GPU cost, and AgentCore for the agentic captioner.",
     notes: ["Solid boxes are running now: this deck comes from that Fargate task.", "One cdk deploy per account; nothing crosses accounts.", "Dashed boxes are next; lead into the scale slide: what it costs."] },

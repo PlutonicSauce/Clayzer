@@ -354,6 +354,31 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .onto-key i.near { border-top: 3px dashed #b06a4f; }
 .onto-key i.alike { border-top: 4px dotted #9a4a35; }
 
+/* Last build: the photo card folds away to make room; numbered badges join the graph to the
+   three benefits on the slide. */
+.onto-card { max-height: 520px; transition: opacity .45s ease, transform .45s ease, max-height .4s ease,
+  padding .4s ease, margin .4s ease; }
+.onto-card.gone { max-height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; margin-bottom: -14px;
+  overflow: hidden; border-width: 0; }
+.onto-card .onto-problem { margin-bottom: 10px; padding: 8px 12px; border-radius: 8px;
+  background: rgba(154, 74, 53, .1); color: var(--ink); }
+.onto-card .onto-problem b { display: inline; margin: 0; font-size: inherit; color: var(--decision); }
+.onto-benefits { margin: 8px 0 10px; padding: 0; list-style: none; }
+.onto-benefits li { display: grid; grid-template-columns: 30px 1fr; gap: 10px; align-items: start;
+  margin-bottom: 8px; }
+.onto-benefits span { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%;
+  background: var(--decision); color: #fffdfb; font-size: 16px; font-weight: 800; }
+.onto-benefits p { font-size: 17px; line-height: 1.35; }
+.onto-benefits b { display: inline; margin: 0; font-size: inherit; color: var(--ink); }
+.onto-card .onto-why { padding-top: 10px; border-top: 1px solid var(--captions-line); font-size: 16px;
+  font-style: italic; }
+.onto-card p.folded { display: none; }
+.onto-viz .badges { opacity: 0; }
+.onto-viz.told .badges { opacity: 1; transition: opacity .4s .3s; }
+.onto-viz .badge circle { fill: var(--decision); stroke: #fffdfb; stroke-width: 3; }
+.onto-viz .badge text { fill: #fffdfb; font-size: 20px; font-weight: 800; }
+
 @media (prefers-reduced-motion: reduce) {
   .onto-viz *, .onto-viz.graph * { transition: none !important; }
+  .onto-card { transition: none; }
 }

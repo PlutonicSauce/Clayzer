@@ -9,7 +9,8 @@
 //   1  the photo pixelates (24 x 24, then 12 x 12 blocks of its real colours), the blocks scatter,
 //      and each tag glides to its class in the ontology graph: families as clusters, is-a solid,
 //      "near" dashed amber (the Ontology page's graph, ADR-0012), look-alikes dotted
-//   2  the guidance the captioner is given for these classes, the look-alike edge highlighted
+//   2  why it helps the caption: numbered badges on the graph match the slide's three benefits
+//      (look-alikes to tell apart, neighbours to look for, words that can be checked)
 // All motion is CSS transitions keyed off the step (no hooks, so tests/deck_smoke.mjs can render
 // it); arriving at a build directly shows its end state. Reduced motion: no transitions.
 //
@@ -58,6 +59,9 @@ const ELSEWHERE = [
   { id: "parking_lot", name: "Parking lot", family: "transportation", node: [845, 240] },
 ];
 const NODE_W = 170, NODE_H = 48;
+
+// The last build's badges: which part of the graph each numbered benefit on the slide comes from.
+const BADGES = [[1, 300, 236], [2, 700, 236], [3, 406, 150]];
 
 // The ontology's "near" pairs among the photo's objects (objects.toml), drawn on the photo.
 const PHOTO_NEAR = [["greenhouse", "building"], ["greenhouse", "road"], ["building", "road"]];
@@ -137,5 +141,8 @@ export function OntologyViz({ step = 0 }) {
     </g>
     <g class="elsewhere-nodes">${ELSEWHERE.map((c) => html`<${Node} c=${c} graph dashed />`)}</g>
     ${TAGS.map((t) => html`<${Node} c=${t} graph=${graph} />`)}
+    <g class="badges">${BADGES.map(([n, x, y]) => html`<g class="badge">
+      <circle cx=${x} cy=${y} r="19" /><text x=${x} y=${y + 7} text-anchor="middle">${n}</text>
+    </g>`)}</g>
   </svg>`;
 }
