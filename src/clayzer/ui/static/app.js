@@ -296,8 +296,8 @@ async function overview() {
       <div class="hero-body">
         <p class="hero-kicker">Clay Earth Dataset Foundry · caption track</p>
         <h1 id="hero-title">From black box to captions you can trust</h1>
-        <p class="hero-lede">Clay is making satellite and aerial imagery searchable in words. We write
-        captions for that imagery and check every fact against public records the captioner never
+        <p class="hero-lede">Clay is making satellite and aerial imagery searchable in words, and that search is
+        only as good as its captions. We write those captions and check every fact against public records the captioner never
         sees. Every change is a ${term("Batch")}, scored on Clay's five criteria, and kept only if the
         regression gate passes.</p>
         <div class="hero-cta">
