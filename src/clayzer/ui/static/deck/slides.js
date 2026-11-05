@@ -40,7 +40,7 @@ function Problem({ step = 0 }) {
             image.”</blockquote>
           <p class="hook-note">${shown
             ? "Count right, place wrong: the records put every turbine around the centre."
-            : "Nova Pro saw only the photo, cut into a 3 × 3 grid."}</p>
+            : "Nova Pro saw only the photo. We ask it to name each object's place as one of our 9 grid cells, so \u201cwhere\u201d can be checked."}</p>
         </div>
       </div>
       <div class="stakes">
@@ -225,7 +225,7 @@ export const SLIDES = [
     notes: ["One line, then move on.", "4:00 total. T starts the timer, A reads a slide aloud."] },
   { title: "The problem", seconds: 25, component: Problem, steps: 1,
     spoken: "New caption, who dis? That is how captions on Clay's imagery work today. Here is a real one: the model saw only this photo and said eighteen wind turbines, mostly in the centre. The public records put every turbine around the centre, not in it. Plausible, and wrong, and Clay has seventy million images like this. Nobody can check them by hand.",
-    notes: ["Open with the label as a joke: \"New caption, who dis? That's how Clay's imagery works today: a caption shows up and nobody knows if it's legit.\"", "Every image is cut into a 3 × 3 grid, so a caption's \"where\" is a cell we can check. The amber box is where the caption put the turbines.", "Press → once: the records' dots appear, and the two lines on the right.", "Problem only here: the fixes come on the solution slide."] },
+    notes: ["Open with the label as a joke: \"New caption, who dis? That's how Clay's imagery works today: a caption shows up and nobody knows if it's legit.\"", "The 3 × 3 grid is ours, not the image's: the model sees the plain photo, and our prompt makes it name each object's place as one of 9 cells, so \"where\" is checkable. The dashed lines are drawn for the audience. The amber box is the cell the caption picked.", "Press → once: the records' dots appear, and the two lines on the right.", "Problem only here: the fixes come on the solution slide."] },
   { title: "Downstream value", seconds: 20, component: Downstream,
     spoken: "Now imagine those captions were checked. Imagery and public records go into Clayzer. We write each caption from the image alone and check every fact against the records. Only pairs that pass go on to Clay, which makes the imagery searchable in words.",
     notes: ["Left to right: public data, Clayzer (our part, the dashed box), Clay.", "The line to land: search results are only as good as the captions behind them.", "The Thailand flood search is an illustration: our Cases today are US solar, wind and land cover. Don't imply we have run it.", "The dashed loop back is planned, not built: say 'next'."] },
