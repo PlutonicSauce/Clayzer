@@ -76,7 +76,7 @@ yard that looks like panels), the public records' cells light up, and the gate s
 > claim is checked against the imagery. That solar array is a storage yard, so it's gone before
 > the caption is written. Three: we score it against public records it never saw: right, but it
 > missed the road. Four: every change faces a gate. A vaguer prompt looked more correct, and
-> failed. Only pairs that pass go on to Clay.
+> failed. Only pairs that pass go out, to Clay, LGND, or other apps.
 
 ## 5. Our solution (1:37–2:11)
 

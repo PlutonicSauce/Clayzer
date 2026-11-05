@@ -461,7 +461,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 }
 
 /* How it works: one Chip through the four steps (chip-journey.js). */
-.journey-strip { display: flex; gap: 10px; list-style: none; margin: 0 0 22px; padding: 0;
+.journey-strip { display: flex; gap: 6px; list-style: none; margin: 0 0 22px; padding: 0;
   align-items: center; }
 .journey-strip li { padding: 8px 18px; border-radius: 999px; font-size: 19px; font-weight: 600;
   background: var(--data); color: var(--muted); border: 2px solid var(--data-line);
@@ -502,3 +502,11 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .jfail { display: inline-block; margin-left: 6px; padding: 1px 10px; border-radius: 999px;
   background: #a1352b; color: var(--paper); font-weight: 800; letter-spacing: 1px; }
 .journey-out { margin: 4px 0 0; font-size: 20px; font-weight: 700; color: var(--decision); }
+.journey-strip li.arrow { padding: 0; border: 0; background: none; line-height: 0; }
+.journey-strip li.arrow line { stroke: var(--muted); stroke-width: 3; }
+.journey-strip li.arrow path { fill: var(--muted); }
+.journey-strip li.arrow.in line, .journey-strip li.arrow.out line { stroke-width: 4; }
+.journey-strip li.arrow.lit line { stroke: var(--decision); }
+.journey-strip li.arrow.lit path { fill: var(--decision); }
+.journey-strip li.io.out.lit { border-style: solid; border-color: var(--decision); color: var(--decision);
+  background: var(--delivery); }

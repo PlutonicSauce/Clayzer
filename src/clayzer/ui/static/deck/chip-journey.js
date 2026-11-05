@@ -26,6 +26,9 @@ const DRAFT = [
 // The Answer Key's cells: OpenStreetMap's building and road (the north row) and railroad (south).
 const KEY = ["north_west", "north", "north_east", "south"];
 
+const Arrow = () => html`<svg viewBox="0 0 40 16" width="40" height="16">
+  <line x1="2" y1="8" x2="30" y2="8" /><path d="M28 2 38 8 28 14z" /></svg>`;
+
 function Pill({ claim, k, step }) {
   const i = CELLS.indexOf(claim.cell);
   const n = DRAFT.filter((d, j) => j < k && d.cell === claim.cell).length;
@@ -41,11 +44,15 @@ function Pill({ claim, k, step }) {
 export function ChipJourney({ step = 0 }) {
   const box = (cell) => { const i = CELLS.indexOf(cell); return [(i % 3) * C, Math.floor(i / 3) * C]; };
   return html`<div class="journey">
-    <ol class="journey-strip" aria-label="Clayzer's four steps">
+    <ol class="journey-strip" aria-label="An aerial image goes in, through Clayzer's four steps, and
+        checked image and caption pairs go out to Clay, LGND, or downstream applications">
       <li class="io">Aerial image</li>
+      <li class="arrow in" aria-hidden="true"><${Arrow} /></li>
       ${STEPS.map((s, k) => html`<li class=${step === k + 1 ? "now" : step > k + 1 ? "done" : ""}>
-        <span>${k + 1}</span>${s}</li>`)}
-      <li class="io">Clay</li>
+        <span>${k + 1}</span>${s}</li>
+        <li class=${`arrow ${k === STEPS.length - 1 ? `out ${step >= 4 ? "lit" : ""}` : ""}`}
+          aria-hidden="true"><${Arrow} /></li>`)}
+      <li class=${`io out ${step >= 4 ? "lit" : ""}`}>Clay · LGND · downstream apps</li>
     </ol>
     <div class="journey-grid">
       <figure class="ex-chip">
@@ -90,11 +97,11 @@ export function ChipJourney({ step = 0 }) {
         </div>
         <div class=${`jstep build ${step >= 4 ? "in" : ""}`}>
           <b>4 · Gate</b>
-          <p>Every change must beat the Baseline. A vaguer prompt: correctness 0.59 → 0.96, but
-            coverage 0.60 → 0.35. <span class="jfail">FAIL</span></p>
+          <p>Every change must beat the Baseline. A vaguer prompt: correct 0.59 → 0.96, coverage
+            0.60 → 0.35. <span class="jfail">FAIL</span></p>
         </div>
         <p class=${`journey-out build ${step >= 4 ? "in" : ""}`}>Only image + caption pairs that pass
-          go on to Clay, ready to search in words.</p>
+          go out to Clay, LGND, or downstream apps.</p>
       </div>
     </div>
   </div>`;
