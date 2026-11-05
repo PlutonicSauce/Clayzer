@@ -137,6 +137,8 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
   transition: opacity .35s ease; font-variant-numeric: tabular-nums; }
 .pottery .pot-cost.on { opacity: 1; }
 .pottery .pot-unit { font-size: 16px; fill: var(--muted); }
+.pottery .pot-time { font-size: 26px; font-weight: 800; fill: var(--ink); }
+.pottery .pot-time-sub { font-size: 17px; fill: #4a4240; }
 .pottery .brick { fill: #b06a4f; stroke: #8a4a33; stroke-width: 1.5; transform-box: fill-box;
   transform-origin: left center; transform: scaleX(var(--s)); }
 .pottery .brick.gone { opacity: 0; transform: translateY(46px) rotate(8deg) scaleX(var(--s));

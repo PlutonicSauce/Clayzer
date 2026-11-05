@@ -59,6 +59,14 @@ export function PotteryScale({ step = 0 }) {
     <text class="pot-unit" x=${BX} y="148">one brick = $10K</text>
     <g class="bricks">${Bricks({ cost })}</g>
 
+    <!-- Time, the other half of the Vision document's cost criterion: 2.9 s per Caption measured
+         (dev63-base); 70M of them one at a time is 6.4 years; they're independent, so in
+         parallel the limit is the account's Bedrock quota (scale-napkin-math.md §5). -->
+    <text class="pot-label" x=${BX} y="436">TIME TO CAPTION THEM</text>
+    <text class="pot-time" x=${BX} y="468">2.9 s each, measured</text>
+    <text class="pot-time-sub" x=${BX} y="494">one at a time: 6.4 years</text>
+    <text class="pot-time-sub" x=${BX} y="518">in parallel: days, set by the Bedrock quota</text>
+
     <path class="chute" d="M376 170 C 480 172, 586 186, 600 230" />
     <g class="drips">
       ${[0, 1, 2].map((k) => html`<circle class="drip" cx="600" cy="238" r="9" style=${`--k: ${k}`} />`)}
