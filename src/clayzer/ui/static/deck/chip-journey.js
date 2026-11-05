@@ -79,7 +79,8 @@ export function ChipJourney({ step = 0 }) {
         </div>
         <div class=${`jstep build ${step >= 2 ? "in" : ""}`}>
           <b>2 · Verify</b>
-          <p>LGND checks each Claim at its cell and rejects three. The solar array?${" "}
+          <p>MCP tools check each Claim against imagery at its cell and reject three. The solar
+            array?${" "}
             <q>A storage yard … instead of a solar array.</q> The Caption is written from the rest.</p>
         </div>
         <div class=${`jstep build ${step >= 3 ? "in" : ""}`}>
