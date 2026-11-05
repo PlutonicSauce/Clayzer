@@ -162,3 +162,40 @@ jobs:
           done
           echo "::error::${{ steps.deploy.outputs.url }}/api/config did not answer after 2 minutes"
           exit 1
+      # The Harness Runtime (infra/agentcore_app.py) is a separate stack, deployed after the web
+      # app so a Runtime failure never holds the site back. Opt in per account with the
+      # environment variable AGENTCORE_DEPLOY=true once that account has Bedrock model access;
+      # set AGENTCORE_TRACES=true only after its owner enables CloudWatch Transaction Search.
+      # The one-time LGND consent (`clayzer agentcore login lgnd`) stays a manual browser step;
+      # routine deploys keep the workload identity, so they keep that consent.
+      - name: CDK deploy the AgentCore Runtime
+        id: agentcore
+        if: vars.AGENTCORE_DEPLOY == 'true'
+        working-directory: infra
+        env:
+          CDK_DEFAULT_REGION: ${{ vars.AWS_REGION }}
+          TRACES: ${{ vars.AGENTCORE_TRACES || 'false' }}
+        run: |
+          npx --yes aws-cdk@2 --app "uv run --group infra python agentcore_app.py" \
+            deploy ClayzerAgentCore --require-approval never \
+            -c traces="$TRACES" --outputs-file agentcore-outputs.json
+          arn=$(jq -r '.ClayzerAgentCore.RuntimeArn' agentcore-outputs.json)
+          echo "::add-mask::$arn"
+          echo "arn=$arn" >> "$GITHUB_OUTPUT"
+      # Inbound OAuth must refuse a caller with no token. Only the JWT authorizer of a Runtime that
+      # exists answers 401; an unknown Runtime ARN gets 403 from the front door, so 403 fails.
+      - name: Smoke test the Runtime refuses an unauthenticated caller
+        if: steps.agentcore.outcome == 'success'
+        env:
+          ARN: ${{ steps.agentcore.outputs.arn }}
+          REGION: ${{ vars.AWS_REGION }}
+        run: |
+          encoded=$(jq -rn --arg a "$ARN" '$a|@uri')
+          url="https://bedrock-agentcore.$REGION.amazonaws.com/runtimes/$encoded/invocations?qualifier=DEFAULT"
+          code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 -X POST \
+            -H 'Content-Type: application/json' -d '{}' "$url")
+          if [ "$code" != 401 ]; then
+            echo "::error::Expected 401 from the Runtime's JWT authorizer without a token, got $code"
+            exit 1
+          fi
+          echo "The Runtime refused an unauthenticated call (401), as it should"

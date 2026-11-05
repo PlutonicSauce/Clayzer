@@ -118,6 +118,15 @@ partway.
    - secret `AWS_DEPLOY_ROLE_ARN`: the `RoleArn` output
    - variable `AWS_REGION`: `us-west-2`
    - variable `CLAYZER_STORE`: the live store, `s3://<bucket>/<prefix>`
+   - variable `AGENTCORE_DEPLOY`: `true` to also deploy the Harness Runtime stack
+     (`ClayzerAgentCore`, [infra/agentcore_app.py](../infra/agentcore_app.py)) after the web app.
+     Leave it unset until the account has Bedrock access to the Runtime's models. After the first
+     AgentCore deploy, someone with that account's credentials runs `uv run clayzer agentcore
+     login lgnd` once to approve LGND in a browser; later deploys keep that approval. A failed
+     AgentCore deploy fails the job, but the web app is already live by then.
+   - variable `AGENTCORE_TRACES`: `true` only after the account owner enables CloudWatch
+     Transaction Search (it changes trace routing for the whole account and region). Default
+     `false`: Batches still keep their JSONL Traces.
 3. **Run it once by hand** from a branch the environment allows, and check the job's URL.
 4. **Mark `github-ci` and `cdk` done** in [docs/tasks.toml](tasks.toml) once main deploys on its
    own.
