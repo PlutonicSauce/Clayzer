@@ -1,5 +1,7 @@
 """The team web app's API, offline, over a local store with one fake Batch."""
 
+from dataclasses import replace
+
 import pytest
 from fastapi.testclient import TestClient
 from test_loop import SOLAR, WIND, FakeBedrock
@@ -273,3 +275,13 @@ def test_docs_are_served_and_nothing_else_is(client):
     ):
         assert c.get(bad).status_code == 404, bad
     assert c.get("/docs", follow_redirects=False).status_code in (302, 307)
+
+
+def test_the_deck_gets_the_public_url_only_from_the_environment(tmp_path, monkeypatch):
+    monkeypatch.delenv("CLAYZER_PUBLIC_URL", raising=False)
+    assert Settings.from_env().public_url is None  # the slide falls back to the serving host
+    monkeypatch.setenv("CLAYZER_PUBLIC_URL", "https://example.org")
+    s = replace(Settings.from_env(), store_url=None, data_dir=tmp_path, batches_dir=tmp_path)
+    assert (
+        TestClient(create_app(s)).get("/api/config").json()["public_url"] == "https://example.org"
+    )

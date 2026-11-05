@@ -206,9 +206,14 @@ function Scale() {
 }
 
 // The close: where to see it and read it. No hero background; two big links the audience can
-// note down, and the ask. The site link is wherever this deck is being served from, so no
-// deployment hostname is committed (tests/test_repo_readiness.py).
-const SITE = typeof location !== "undefined" ? location.origin : "";
+// note down, and the ask. The site link is the app's CLAYZER_PUBLIC_URL, so a deck presented
+// from a laptop still shows the deployed site, else wherever this deck is being served from.
+// Either way no deployment hostname is committed (tests/test_repo_readiness.py).
+const here = typeof location !== "undefined" ? location.origin : "";
+const SITE = await fetch("/api/config")
+  .then((r) => (r.ok ? r.json() : {}))
+  .then((c) => c.public_url || here)
+  .catch(() => here);
 const REPO = "https://github.com/PlutonicSauce/Clayzer";
 
 function Next() {
