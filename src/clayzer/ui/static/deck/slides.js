@@ -205,15 +205,31 @@ function Scale() {
   </div>`;
 }
 
+// The close: where to see it and read it. No hero background; two big links the audience can
+// note down, and the ask. The site link is wherever this deck is being served from, so no
+// deployment hostname is committed (tests/test_repo_readiness.py).
+const SITE = typeof location !== "undefined" ? location.origin : "";
+const REPO = "https://github.com/PlutonicSauce/Clayzer";
+
 function Next() {
-  return html`<div class="title-slide closing">
-    <${Kicker}>What it means for Clay<//>
-    <h2>Trust your captions before anyone searches them</h2>
-    <p class="lede">Hand Clayzer a caption set, get a verdict: how much to trust, where it fails,
-      what it costs to fix.</p>
-    <p class="team">The ask: Clay's real caption set and its rubric weights, so the verdict is
-      Clay's, not our stand-in's.</p>
-    <p class="access-note">Any slide reads itself aloud — press <b>A</b> or the Listen button.</p>
+  return html`<div class="closing-links">
+    <${Kicker}>Thank you · try it yourself<//>
+    <h2>See it live, and read the code</h2>
+    <div class="link-cards">
+      <a class="link-card" href=${SITE} target="_blank" rel="noopener">
+        <span class="link-kind">The live site</span>
+        <b>${SITE.replace(/^https?:\/\//, "") || "this site"}</b>
+        <span>Every Case, Batch and report, and this deck at /deck</span>
+      </a>
+      <a class="link-card" href=${REPO} target="_blank" rel="noopener">
+        <span class="link-kind">The code · Apache-2.0</span>
+        <b>${REPO.replace("https://", "")}</b>
+        <span>Open source: the pipeline, the scoring, and this deck</span>
+      </a>
+    </div>
+    <p class="big">The ask: Clay's real caption set and its rubric weights, so the verdict is Clay's,
+      not our stand-in's.</p>
+    <p class="source">Any slide reads itself aloud: press <b>A</b> or the Listen button.</p>
   </div>`;
 }
 
@@ -251,7 +267,7 @@ export const SLIDES = [
     notes: ["Clay itself is a ~5% sample; the archives are 100× bigger, so cost per Caption decides what gets captioned.",
       "Batch is a published 50%; the green 'assumed' rows are hypotheses our gate can test, which is the point.",
       "Land the judge line: scoring with a big model costs more than captioning, and our grounding is free."] },
-  { title: "What it means for Clay", seconds: 20, theme: "dark", component: Next,
-    spoken: "Hand Clayzer a caption set and get a verdict: how much to trust, where it fails, what it costs to fix. Our ask is Clay's real caption set and its rubric weights. And any slide here reads itself aloud.",
-    notes: ["Close on the ask: Clay's real caption set and its rubric weights.", "Mention Listen (A) as the accessibility point."] },
+  { title: "Thank you", seconds: 20, component: Next,
+    spoken: "Thank you. You can see it live on our site, and read every line of the code on GitHub. Our ask is Clay's real caption set and its rubric weights. And any slide here reads itself aloud.",
+    notes: ["Point at the two links; leave this slide up for questions.", "Close on the ask: Clay's real caption set and its rubric weights.", "Mention Listen (A) as the accessibility point."] },
 ];

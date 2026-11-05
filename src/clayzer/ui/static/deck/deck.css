@@ -272,3 +272,15 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .sections button.current .n { background: #fffdfb; color: var(--decision); }
 .video-slide h2 { align-self: flex-start; margin-bottom: 20px; }
 .video-slide .slide-video { max-height: 560px; }
+
+/* Closing slide: no hero image; the live site and the repository as two big links. */
+.closing-links { justify-content: center; }
+.link-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin: 6px 0 38px; }
+.link-card { display: flex; flex-direction: column; gap: 10px; padding: 30px 32px; border-radius: 18px;
+  background: var(--data); border: 2px solid var(--data-line); color: var(--ink); text-decoration: none; }
+.link-card:hover { border-color: var(--decision); }
+.link-card .link-kind { font-size: 18px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--decision); }
+.link-card b { font-size: 34px; letter-spacing: -.01em; word-break: break-all; }
+.link-card span:last-child { font-size: 21px; color: #4a4240; }
+.closing-links .big { max-width: none; }
