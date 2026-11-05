@@ -359,7 +359,7 @@ npx --no-install cdk --app "uv run --group infra python agentcore_app.py" diff
 npx --no-install cdk --app "uv run --group infra python agentcore_app.py" deploy
 cd ..
 
-# 2. Keep the LGND sign-in in AgentCore Identity. Once per account; needs a browser.
+# 2. Keep the LGND sign-in in AgentCore Identity. Once per workload identity; needs a browser.
 uv run clayzer agentcore login lgnd
 
 # 3. Run a Batch on it.
@@ -369,6 +369,7 @@ export CLAYZER_AGENTCORE_INBOUND_CLIENT_ID=<the InboundClientId output>
 export CLAYZER_AGENTCORE_INBOUND_SCOPE=<the InboundScope output>
 # Capture the credential into the environment; do not echo it or put it in a report.
 export CLAYZER_AGENTCORE_INBOUND_CLIENT_SECRET="$(aws cognito-idp describe-user-pool-client \
+  --region us-west-2 \
   --user-pool-id <the InboundUserPoolId output> \
   --client-id "$CLAYZER_AGENTCORE_INBOUND_CLIENT_ID" \
   --query UserPoolClient.ClientSecret --output text)"
@@ -424,14 +425,23 @@ What to know:
   It removes the Runtime, role, workload identity, Cognito resources and Runtime log group,
   and schedules the log-encryption key for deletion. The shared CDK bootstrap/ECR assets and
   separate Gateway deployment remain. The OAuth provider and approval created by `login` are
-  outside the stack; retain them for redeployment, or delete only that provider after confirming
-  no remaining workload uses it.
+  outside the stack. The client registration survives, but destroying and recreating the workload
+  identity requires fresh browser consent: the lifecycle test confirmed that the old consent
+  is not reusable by the recreated identity. Normal stack updates preserve the identity.
+  Delete the provider only after confirming no remaining workload uses it.
+  The KMS deletion waiting period is 30 days. CDK provider Lambda diagnostic log groups remain
+  with seven-day retention. Account Transaction Search settings remain; inspect any
+  AgentCore-created span-delivery resource policy before removing it, because it is outside
+  CloudFormation ownership.
 
 For a teammate's account, use a clean checkout of the same commit and that account's credentials.
 Deploy before running `login`, then run a small Batch including a Fixed and a Change Case.
 Record the commit, runtime build, Case/Chip hashes, scores, failed Runs, latency and cost alongside
 a matching local Batch. Verify the stack's teardown before calling account portability complete.
 One Repeat is a functional smoke check; it does not establish score equivalence.
+These commands and the model permissions are validated in `us-west-2` with US (`us.`)
+inference profiles. Adapt the model ARNs and CLI region for other regions; EU/APAC profiles
+and other AWS partitions are not covered by this validation.
 
 Options for the stack are passed as `-c name=value`; see the docstring of
 [`infra/agentcore_app.py`](../infra/agentcore_app.py). The token source is chosen by

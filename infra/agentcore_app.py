@@ -5,22 +5,28 @@ with only what a Run needs, and the workload identity that names who asks AgentC
 the LGND sign-in. It is a separate CDK app from app.py (the web app), so neither's `cdk deploy`
 changes the other.
 
-    cd infra
-    npx aws-cdk@2 bootstrap                       # once per account and region
-    npx aws-cdk@2 --app "uv run --group infra python agentcore_app.py" deploy
-    uv run clayzer agentcore login lgnd           # once per account: the LGND sign-in, in a browser
-    export CLAYZER_AGENTCORE_RUNTIME=<the RuntimeArn output>
-    uv run clayzer batch --harness agentcore --verify ...
+Deployment and inbound Cognito credential setup are documented in docs/cli.md, "Running the
+Harness on AgentCore". Install the pinned CLI with `npm ci` in infra, then invoke
+`npx --no-install cdk --app "uv run --group infra python agentcore_app.py"`.
+After an account owner enables CloudWatch Transaction Search, pass `-c traces=true` on every
+deploy/redeploy that should export spans. Without it, only the Batch's JSONL Trace is kept.
+LGND browser consent is separate from the Cognito credential the Batch uses to invoke. Consent
+is per workload identity; destroying/recreating that identity requires a new approval.
 
-`cdk destroy` removes everything this creates. Two things are not CDK's to create, because they
-need a person: the LGND sign-in itself, and the OAuth client behind it (registering it needs the
-callback address that only exists once Identity has made the client record). `clayzer agentcore
-login` does both, and is safe to run again.
+Destroy removes the Runtime, its role, workload identity, Cognito resources and Runtime log group.
+The KMS key is scheduled for deletion (30 days). Shared bootstrap/ECR assets, the OAuth provider
+and its Identity-managed client secret, account Transaction Search settings, and CDK provider
+Lambda diagnostic log groups survive. Provider diagnostic logs expire after seven days. A
+resource policy written by AgentCore for span delivery is outside CloudFormation ownership;
+inspect it after teardown before removing it. Never remove another workload's policy.
+
+This stack is validated in us-west-2 and uses US inference profiles (`us.`); EU/APAC profiles
+and other AWS partitions require adapting the model ARNs before deployment.
 
 Options, as `-c name=value`: `workload` (the Identity workload name, default `clayzer`), `provider`
 (the OAuth client name, default `clayzer-lgnd`), `user` (the shared team identity, default
 `clayzer-team`), `models` (comma-separated Bedrock model ids the Runtime may call, default Nova
-Pro and Opus 5.5), `return_url`. Behind a private package mirror or TLS-intercepting proxy, set
+Pro and Opus 5.5), `return_url`, and `traces` (default false; requires Transaction Search). Behind a private package mirror or TLS-intercepting proxy, set
 CLAYZER_BUILD_BASE_IMAGE, CLAYZER_BUILD_PIP_INDEX (a file holding the index URL) and
 CLAYZER_BUILD_CA_BUNDLE (a .pem file), as for app.py.
 """
@@ -336,7 +342,8 @@ class AgentCoreStack(cdk.Stack):
                       description="CLAYZER_AGENTCORE_INBOUND_SCOPE")  # fmt: skip
         cdk.CfnOutput(self, "InboundClientSecretCommand", value=(
             f"aws cognito-idp describe-user-pool-client --user-pool-id {pool.user_pool_id} "
-            f"--client-id {client.user_pool_client_id} --query UserPoolClient.ClientSecret --output text"),
+            f"--client-id {client.user_pool_client_id} --region {self.region} "
+            "--query UserPoolClient.ClientSecret --output text"),
             description="Prints the inbound client secret for CLAYZER_AGENTCORE_INBOUND_CLIENT_SECRET")  # fmt: skip
 
 

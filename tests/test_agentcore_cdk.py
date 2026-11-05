@@ -138,6 +138,7 @@ def test_the_outputs_name_the_runtime_to_set(synthesised):
     outputs = template.to_json()["Outputs"]
     assert "CLAYZER_AGENTCORE_RUNTIME" in outputs["RuntimeArn"]["Description"]
     assert {"RuntimeArn", "RuntimeRoleArn", "Build"} <= set(outputs)
+    assert "--region us-west-2" in json.dumps(outputs["InboundClientSecretCommand"])
 
 
 def test_runtime_logs_are_encrypted_retained_and_owned_by_the_stack(synthesised):
