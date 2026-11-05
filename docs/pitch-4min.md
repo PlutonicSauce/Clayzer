@@ -156,3 +156,120 @@ in another tab as the offline fallback.
 - Judging criteria each slide covers: the story is slides 4 and 6, a non-technical proof of
   concept is slide 7, audio is slides 7 and 9 (Listen, and the A key), scale is slides 6 and 8,
   and originality is slides 2 and 5.
+
+---
+
+## Appendix: questions to expect
+
+Where Clayzer stands against the hackathon's vision and tech documents
+(`docs/vision-hackathon.md`, `docs/tech-hackathon.md`). Numbers are from the Baseline above
+unless a line says otherwise. Each item gives the gap, then an answer to give.
+
+### A. The five hardest questions
+
+**1. "The brief says evaluating the agent is the product. Where's the agent?"**
+
+- The Baseline captioner calls no tools (`"tools": []`), so its Workflow Score is 1.0 on every
+  Run: there are no tool calls to get wrong.
+- The agentic Harness exists: it calls RODA and LGND Geo over MCP, runs on AgentCore, and is
+  held to a tool allowlist. No committed Batch uses it yet.
+- *Answer:* it was a design choice. Models given tools often skipped them, so our code does the
+  checking, every time, and each check is a step in the Trace. The agentic Harness is built and
+  hosted, but it hasn't beaten the Baseline yet.
+
+**2. "Do you get counts right?"**
+
+- The Overview shows a count score of 0.00. USGS and OSM are incomplete, so their counts are
+  lower bounds. A claim at or above the bound is unknown, and one below it scores 0. So the
+  score only ever records failures: 45 counts were scored, all 0.
+- 37% of claim fields are unscored for reasons like this.
+- *Answer:* public maps are incomplete, so we refuse to reward a count we can't prove. Count is
+  the weakest-measured part of grounding. The problem slide's "18" was confirmed by a person,
+  not by the scorer.
+
+**3. "Relationality is a named requirement. How do you score it?"**
+
+- Relations were scored on only 2 Cases, and both scored 0.
+- *Answer:* the scoring is built (OSM roads and water against fixed relations such as "south
+  of"), but the captioner rarely asserts relations we can check. This is an honest gap.
+
+**4. "Cost is meant to be GPU time across VLMs, not tokens."**
+
+- We record seconds, tokens and dollars per caption. Hosted Bedrock doesn't expose GPU
+  metrics, and the code says so in each Run's cost record.
+- An open VLM on a SageMaker GPU (`gpu-vlm`) is blocked on GPU quota.
+- Opus 5.5 ran as a second captioner. Its scores are flagged as self-graded, because the judge
+  is Opus too.
+- The scale slide is in dollars, which the brief says not to use.
+- *Answer:* cost records are ready for GPU-seconds, and verified claims per GPU-second is a
+  metric already, but we have no GPU numbers yet.
+
+**5. "Can a caption be found from text alone?"**
+
+- MRR is 0.73, but recall@1 is only 0.09. The cause isn't checked yet. A likely one is that
+  captions of similar solar fields compete for the same query.
+- Clay's own retrieval evaluation set never arrived (`example-captions` is blocked).
+- *Answer:* don't quote MRR alone. Captions are usually near the top of the results, but
+  rarely first.
+
+### B. Change captions (two dates of one place)
+
+- Built end to end. A Change Case is two NAIP images of one place, before and after a USGS site
+  was built, cut to the same footprint. The captioner gets both, earlier first, with its own
+  prompt. Each object it names says whether it appeared, disappeared, or was unchanged.
+- The answer keys come free. USGS records each site's install year. Global Renewables Watch
+  cross-checks it, and if the two disagree by more than a year, a person chooses.
+- Only 1 Change Case, Kingbird B Solar (2014 → 2022), and none in the Texas set. The change
+  was right on all 3 Repeats: the solar array appeared. Count was wrong every time, and the
+  judge scored 0.2, 0.6 and 0.6.
+- Change Cases aren't verified with LGND Geo, because its images aren't dated to the pair. OSM
+  has no history, so roads and water aren't scored for change.
+- *Answer:* "Yes. The pipeline handles before-and-after pairs, and USGS install years give us
+  change answer keys for free, cross-checked against a second dataset. We've proven it on one
+  site: it sees that the solar farm appeared, but miscounts the arrays. More pairs are cheap,
+  because the labels come free."
+
+### C. LGND Geo: a corroborator, never the truth
+
+- Answer keys are public records only: USGS, OSM, and GRW for dates. LGND Geo never feeds a
+  score (ADR-0006).
+- Verify-then-write asks LGND whether its image of a Claim's grid cell shows the object. If it
+  doesn't, the Claim moves to `uncertain`; it isn't deleted. If LGND is down, the Claim stays,
+  marked unverified.
+- If LGND wrongly rejects a true fact, the hidden records catch it as lost coverage. That is
+  why the gate kept verify-then-write out of the Baseline.
+- LGND also supplies the Clay embeddings used to pick images, find look-alike negatives, and
+  give class-level hints. None of these is an answer key (ADR-0010).
+- The Baseline ran with no LGND at all. Its free tier allows 150 calls a day.
+- *Answer:* "LGND corroborates and never decides. Public records are our answer keys and the
+  only thing we score against. If LGND is wrong, the hidden records catch it, and the gate
+  measures the trade-off."
+
+### D. Other gaps against the briefs
+
+| The brief asks for | Where we are | Answer |
+|---|---|---|
+| ADB agentic eval (the recommended starting task) | Clayzer is caption-only | Our Trace format follows the Sandbox's (`breaking-barriers`), so its summarizer can read ours |
+| Vantor sample data | Not used | Disaster Change Cases were a Could |
+| Change caption datasets (LEVIR-CC and others) | Not used | Our Change Cases come from USGS and GRW instead |
+| Clay's example captions | Never received | This is the closing slide's ask; an RSICD importer stands in |
+| Model swappable | Yes: Opus 5.5 ran as a second captioner | A strength |
+| Tracing tool swappable | Own Trace format with pluggable sinks; OpenTelemetry and X-Ray through AgentCore | Partly: a side-by-side tracer swap is still a to-do (`tracing-swap`) |
+| Recorded-trace replay | Done, with no model or network | A strength, and the demo fallback |
+| Fidelity (LLM judge) | 0.56 | The judge is strict, and calibration against people is blocked; don't call it caption quality |
+| Label preparation time | About 54 s per Case | The exact definition is still a question for Clay |
+| Sensitivity analysis (stretch) | 3 Repeats with spread, and the gate | Partial: inputs and models aren't varied yet |
+| Multi-agent traces (stretch) | No | Draft, verify and rewrite is one pipeline, not several agents |
+
+### E. Strengths to lean on
+
+- **Region split, as ADB suggested.** Tuned on Mojave, tested once on Texas. Texas against
+  dev, from the earlier Baseline `20261104T193330Z-dev74-base`: correctness 0.76 vs 0.75,
+  fidelity 0.57 vs 0.56. Texas coverage was higher (0.86 vs 0.76) because its labels are
+  sparser, not because the captioner is better.
+- **Answer keys for free,** cross-checked across sources, with a person only where they
+  conflict.
+- **Provenance on every Batch:** models, prompt hashes, code commit and Case set.
+- **Open by default:** Apache-2.0, with an ODbL notice for the OSM labels.
+- **One deploy command per account,** and nothing crosses accounts, which the brief disallows
+  anyway.
