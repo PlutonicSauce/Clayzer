@@ -149,6 +149,43 @@ function ExampleSearch() {
   </div>`;
 }
 
+// Per 1,000 Captions and for Clay's ~70M training chips; docs/scale-napkin-math.md has the sums.
+const LEVERS = [
+  ["Nova Pro, on-demand", 2.59, "$181K", "measured"],
+  ["+ Bedrock batch inference", 1.30, "$91K", "published"],
+  ["+ Nova Lite first, 20% escalated to Pro", 0.36, "$25K", "assumed"],
+  ["+ 256 px where the class is still visible", 0.28, "$20K", "assumed"],
+  ["+ Caption 1 in 5, reuse via Clay embeddings", 0.056, "$3.9K", "assumed"],
+];
+
+function Scale() {
+  return html`<div>
+    <${Kicker}>At Clay's scale<//>
+    <h2>46× cheaper to caption Clay's 70M chips</h2>
+    <div class="scale">
+      <div class="magnitude">
+        <p><b>70M</b> chips in Clay v1.5, a stratified sample: ~5% of MGRS tiles, at most 6 dates
+          per place</p>
+        <p><b>86M</b> Chips in one NAIP pass over CONUS</p>
+        <p><b>~13B</b> in the Sentinel-2 archive over land</p>
+      </div>
+      <div class="ladder">
+        ${LEVERS.map(([name, per1k, total, basis]) => html`<div class="lever">
+          <span class="name">${name}</span>
+          <span class="bar"><i style=${`width: ${Math.max(1.5, (per1k / 2.59) * 100)}%`}></i></span>
+          <span class="total">${total}</span>
+          <span class=${`basis ${basis}`}>${basis}</span>
+        </div>`)}
+        <p class="judge">Scoring: an Opus judge on every Caption would cost <b>$1.1M</b>, 6× the
+          captions. Grounding needs no model call, so ours is <b>$5.5K</b> with Opus on a 1%
+          sample.</p>
+      </div>
+    </div>
+    <p class="source">Measured: 2,559 tokens and 2.9 s per Caption (dev63, 189 Captions). Prices:
+      AWS Price List, us-east-1. "Assumed" rows are the next Batches to run.</p>
+  </div>`;
+}
+
 function Next() {
   return html`<div class="title-slide closing">
     <${Kicker}>What it means for Clay<//>
@@ -161,10 +198,9 @@ function Next() {
   </div>`;
 }
 
-// Eight slides, exactly 4:00: the problem with one real caption and how we earn trust, the
+// Nine slides, exactly 4:00: the problem with one real caption and how we earn trust, the
 // architecture as a story, the novel ideas, the site, the downstream value for Clay, an example
-// search, and the close. Results
-// ride on the demo's live Overview; scale rides on the downstream slide.
+// search, the cost at Clay's scale, and the close. Results ride on the demo's live Overview.
 export const SLIDES = [
   { title: "Clayzer", seconds: 10, theme: "dark", component: Title,
     spoken: "Clayzer. Give us your caption set, and we tell you how much of it you can trust.",
@@ -172,13 +208,13 @@ export const SLIDES = [
   { title: "The problem", seconds: 50, component: Problem, steps: 4,
     spoken: "New caption, who dis? That is how captions on Clay's imagery work today: a caption shows up, and nobody knows if it is legit. Here is a real one: the model saw only this photo and said eighteen wind turbines, mostly in the centre. So how do we make captions you can trust? First, we enrich the inputs: these dots are the public records, cross-checked by code, and they show the turbines are all around the centre, not in it. Second, we tune on one region and test on another it never saw. Third, a self-improvement loop that keeps only the changes that beat the baseline. The result: a caption that matches what is really there.",
     notes: ["Open with the label as a joke: \"New caption, who dis? That's how Clay's imagery works today: a caption shows up and nobody knows if it's legit. So we check.\"", "Every image is cut into a 3 × 3 grid, so a caption's \"where\" is a cell we can check. The amber box is where the caption put the turbines.", "Press → for each point as you say it. Press 1 also draws the records' dots on the photo; press 4 turns the caption green.", "Count right, place wrong: the caption said 18 (right) in the centre (wrong).", "Say 'tune', not 'train': we tune the captioner's prompt and checks, we don't train a model.", "Labels are automatic; a person only looks where the two records disagree (the gold dot, 2 m apart)."] },
-  { title: "How it works", seconds: 40, component: Architecture,
+  { title: "How it works", seconds: 30, component: Architecture,
     spoken: "Here is the whole journey. One aerial image comes in on the left. A model on AWS writes a caption. Before each statement is kept, we check it against the imagery. We score it against open map data the model never saw. A gate decides whether it is good enough. What comes out is a verdict you can trust, and the same path works for one image or a million.",
     notes: ["One image in on the left, a verdict out on the right.", "Point at each numbered stop. End on: same path scales to millions."] },
   { title: "Our approach · what's new", seconds: 25, component: Approach,
     spoken: "Three things set this apart. Verify-then-write: each claim is checked against imagery as the caption is written. Hidden answer keys: the captioner never sees the ground truth, so a good score is earned. And an ontology learned from captions and fed back into the model, so it confuses a greenhouse for a solar array less often. It scores captions and teaches the next ones.",
     notes: ["Verify-then-write, hidden keys, the ontology that feeds the model.", "The loop: the ontology scores AND teaches, proven by the gate."] },
-  { title: "Live demo", seconds: 55, component: Demo,
+  { title: "Live demo", seconds: 45, component: Demo,
     spoken: "Now the site. The overview shows the current baseline. A caption, with each claim marked supported or not, right on the image. The report, five criteria side by side, which can read itself aloud. And compare to baseline: the gate says better, worse, or inconclusive.",
     notes: ["Overview → a Caption on its grid → report and Listen → Compare.", "Keep the recorded Batch open as the offline fallback."] },
   { title: "Downstream value", seconds: 22, component: Downstream,
@@ -187,6 +223,11 @@ export const SLIDES = [
   { title: "Example search", seconds: 18, component: ExampleSearch,
     spoken: "Here is what that looks like. Ask in plain words, like the economic impact of flooding in Bangkok and access to aid, and you get the images whose checked captions match: flooded streets, a market under water, a relief site, and the route to reach it.",
     notes: ["Let the video play; it loops every 16 s.", "Illustrative, not real results: don't imply we have run this search."] },
+  { title: "At Clay's scale", seconds: 20, component: Scale,
+    spoken: "What does this cost at Clay's scale? Clay's own training set is seventy million chips, and that is only a five percent sample of the world. Captioning all of it with our current model would cost about one hundred and eighty thousand dollars. Batch pricing halves that. A cheap model first, with only the hard images sent to the strong one, smaller images where objects are still visible, and reusing captions for look-alike chips bring it to about four thousand dollars, forty-six times cheaper. Checking matters too: a large model judging every caption would cost over a million dollars, but our checks against open data need no model at all.",
+    notes: ["Clay itself is a ~5% sample; the archives are 100× bigger, so cost per Caption decides what gets captioned.",
+      "Batch is a published 50%; the green 'assumed' rows are hypotheses our gate can test, which is the point.",
+      "Land the judge line: scoring with a big model costs more than captioning, and our grounding is free."] },
   { title: "What it means for Clay", seconds: 20, theme: "dark", component: Next,
     spoken: "Hand Clayzer a caption set and get a verdict: how much to trust, where it fails, what it costs to fix. Our ask is Clay's real caption set and its rubric weights. And any slide here reads itself aloud.",
     notes: ["Close on the ask: Clay's real caption set and its rubric weights.", "Mention Listen (A) as the accessibility point."] },

@@ -124,6 +124,22 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
   border-radius: 4px; border: 2px solid #6b6461; }
 .legend i.planned { border-style: dashed; border-color: #a59d99; }
 
+/* Scale slide: magnitude on the left, the cost ladder on the right. */
+.scale { display: grid; grid-template-columns: 0.75fr 1.6fr; gap: 56px; align-items: start; }
+.magnitude p { font-size: 22px; line-height: 1.4; color: var(--muted); margin-bottom: 26px; }
+.magnitude b { display: block; font-size: 52px; line-height: 1.05; color: var(--ink); }
+.lever { display: grid; grid-template-columns: 430px 1fr 96px 104px; align-items: center; gap: 16px;
+  padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 22px; }
+.lever .bar { height: 22px; background: var(--data); border-radius: 4px; }
+.lever .bar i { display: block; height: 100%; border-radius: 4px; background: var(--decision); }
+.lever .total { font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+.lever .basis { font-size: 15px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--muted); }
+.lever .basis.assumed { color: var(--ok); }
+.lever:last-of-type .total { color: var(--decision); }
+.judge { margin-top: 24px; padding: 16px 20px; border-radius: 12px; font-size: 22px; line-height: 1.4;
+  background: var(--evaluation); border: 2px solid var(--evaluation-line); }
+
 /* Presenter notes, over the bottom of the window (N). */
 .notes { position: fixed; left: 0; right: 0; bottom: 0; max-height: 40vh; overflow: auto;
   padding: 14px 24px 18px; background: rgba(20, 18, 17, .94); color: var(--paper);
