@@ -145,3 +145,12 @@ def test_a_failed_summary_after_a_batch_is_reported_not_raised(env, monkeypatch)
     assert listen_mod.after_batch(store, settings, bid, progress=said.append) is None
     assert "spoken summary skipped" in said[0] and f"clayzer listen {bid}" in said[0]
     assert not store.exists(audio_key(bid))
+
+
+def test_digits_inside_an_id_are_not_numbers_the_script_may_say(env):  # noqa: F811
+    # A Batch id ends in random hex; its digits used to count as facts, so an invented number
+    # got through whenever the hex happened to contain it (about one run in 20).
+    f = facts(run(env, "base"), None)
+    f["batch_id"] = "20261104T235507159978Z-a4eab516b9ed4a5c82be87f1945c9de8-base"
+    assert unsupported_numbers("Correctness was 87 out of 100.", f) == ["87"]
+    assert unsupported_numbers(code_script(f), f) == []

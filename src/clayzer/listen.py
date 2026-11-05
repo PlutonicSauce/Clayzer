@@ -196,9 +196,14 @@ def digest(f: dict) -> str:
     )
 
 
+# A number standing on its own, not digits inside an id: a Batch id ends in random hex
+# ("...be87f19..."), and counting its digits let an invented 87 through about one time in 20.
+NUMBER = re.compile(r"(?<![A-Za-z0-9])\d+(?![A-Za-z0-9])")
+
+
 def unsupported_numbers(script: str, f: dict) -> list[str]:
     """Numbers the script states that the facts don't contain: grounds to reject it."""
-    allowed = set(re.findall(r"\d+", digest(f))) | {"100"}
+    allowed = set(NUMBER.findall(digest(f))) | {"100"}
     return sorted(set(re.findall(r"\d+", script)) - allowed)
 
 
