@@ -209,7 +209,7 @@ async function publicJourney(parts) {
         })
         .join("")}</div>`
     : `<p class="story-note">${record ? "This older recording has no claim-outcome classifications. Missing classifications are not evidence that all claims are supported." : "These are reference entries, not claim outcomes. A recorded caption must be evaluated before we can classify its statements."}</p>`;
-  $view.innerHTML = `<article class="journey-frame" data-scene="discover"><div class="story-topline"><a href="#/cases">← All imagery</a><span>${esc(mode)}</span></div><nav class="story-nav" aria-label="Guided story scenes"><ol>${STORY_SCENES.map((s, i) => `<li><a href="${href(s)}" data-scene-link="${s}"><span aria-hidden="true">0${i + 1}</span> ${STORY_NAMES[i]}</a></li>`).join("")}</ol><button class="story-motion" type="button" aria-pressed="false">Reduce motion</button><details class="story-audio"><summary>Audio</summary><div class="story-audio-panel"><p>Listen to the current scene. Audio stops when the scene changes.</p><div><button id="story-listen" type="button">Play scene</button><button id="story-pause" type="button" disabled>Pause</button><button id="story-stop" type="button" disabled>Stop</button><label>Reading speed<select id="story-speed"><option value="0.75">0.75×</option><option value="1">1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option></select></label></div><p id="story-audio-status"></p><progress id="story-audio-progress" max="1" value="0" aria-label="Scene reading progress"></progress></div></details></nav><div class="journey-body"><figure class="journey-stage" aria-label="The same input image throughout the story"><div class="journey-map"><img id="story-image" src="${displayImage}" alt="${esc(synthetic ? "Synthetic fixture input: generated imagery, not a photograph of a real place." : imageAlt(example))}" width="512" height="512" fetchpriority="high"><svg class="story-overlay" viewBox="0 0 512 512" aria-hidden="true"><g class="story-grid">${[1, 2].map((v) => `<path d="M${(v * 512) / 3} 0V512M0 ${(v * 512) / 3}H512"/>`).join("")}</g><g id="story-ref-cells"></g></svg></div><figcaption class="story-image-controls"><p><strong>${esc(synthetic ? "Synthetic fixture" : "NAIP aerial imagery")}</strong> · ${esc(example.chip.date)}</p><div><button type="button" id="story-expand">Expand full image ↗</button><label><input id="story-refs" type="checkbox"> Reference areas</label></div><p class="story-overlay-note">${record ? "Image bytes verified against recorded SHA256. References are frozen with this Run." : "Current Case references. Coarse grid areas, not detected object boundaries."}</p></figcaption></figure><div class="journey-scenes">
+  $view.innerHTML = `<article class="journey-frame" data-scene="discover"><div class="story-topline"><a href="#/cases">← All imagery</a><span>${esc(mode)}</span></div><nav class="story-nav" aria-label="Guided story scenes"><ol>${STORY_SCENES.map((s, i) => `<li><a href="${href(s)}" data-scene-link="${s}"><span aria-hidden="true">0${i + 1}</span> ${STORY_NAMES[i]}</a></li>`).join("")}</ol><button class="story-motion" type="button" aria-pressed="false">Reduce motion</button><details class="story-audio"><summary>Audio</summary><div class="story-audio-panel"><p>Listen to the current scene. Audio stops when the scene changes.</p><div><button id="story-listen" type="button">Play scene</button><button id="story-pause" type="button" disabled>Pause</button><button id="story-stop" type="button" disabled>Stop</button><label>Voice<select id="story-voice" aria-describedby="listen-voice-help"></select></label><label>Reading speed<select id="story-speed"><option value="0.75">0.75×</option><option value="1">1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option></select></label></div><p id="story-audio-status"></p><progress id="story-audio-progress" max="1" value="0" aria-label="Scene reading progress"></progress></div></details></nav><div class="journey-body"><figure class="journey-stage" aria-label="The same input image throughout the story"><div class="journey-map"><img id="story-image" src="${displayImage}" alt="${esc(synthetic ? "Synthetic fixture input: generated imagery, not a photograph of a real place." : imageAlt(example))}" width="512" height="512" fetchpriority="high"><svg class="story-overlay" viewBox="0 0 512 512" aria-hidden="true"><g class="story-grid">${[1, 2].map((v) => `<path d="M${(v * 512) / 3} 0V512M0 ${(v * 512) / 3}H512"/>`).join("")}</g><g id="story-ref-cells"></g></svg></div><figcaption class="story-image-controls"><p><strong>${esc(synthetic ? "Synthetic fixture" : "NAIP aerial imagery")}</strong> · ${esc(example.chip.date)}</p><div><button type="button" id="story-expand">Expand full image ↗</button><label><input id="story-refs" type="checkbox"> Reference areas</label></div><p class="story-overlay-note">${record ? "Image bytes verified against recorded SHA256. References are frozen with this Run." : "Current Case references. Coarse grid areas, not detected object boundaries."}</p></figcaption></figure><div class="journey-scenes">
 <section class="journey-scene" id="scene-discover" data-scene="discover" aria-labelledby="discover-title"><div class="scene-copy" data-listen><p class="scene-kicker">A Clayzer field story</p><h1 id="discover-title">How much can AI<br><em>really see?</em></h1><p>${scripted ? "This story uses an actual saved scripted recording. It demonstrates the software, not a vision model's accuracy." : "From above, a place becomes patterns. A description gives those patterns words. But what can we actually check?"}</p>${next("explore", "Explore how Clayzer works")}</div></section>
 <section class="journey-scene" id="scene-explore" data-scene="explore" aria-labelledby="explore-title"><div class="scene-copy" data-listen><p class="scene-kicker">Explore · the image comes first</p><h2 id="explore-title">Look at the place.<br>Before the words.</h2><p>${synthetic ? "This is the actual synthetic input from a saved recording. It is a generated fixture, not a photograph of a real place." : "Look for repeated shapes, access roads and the land around them. The image is evidence you can inspect for yourself."}</p><p>A nine-cell grid gives us shared words for position: north, centre, south. It does not detect anything.</p><p class="story-note">${esc(example.chip.source)} · ${esc(example.id)}${example.kind === "change" ? ". This story uses the later image; open the Case to compare both dates." : ""}</p>${next("describe", "Now read the description")}</div></section>
 <section class="journey-scene" id="scene-describe" data-scene="describe" aria-labelledby="describe-title"><div class="scene-copy" data-listen><p class="scene-kicker">Describe · words become claims</p><h2 id="describe-title">A description.<br>Not the final word.</h2>${record?.run.caption?.text ? `<p class="caption-kind">${scripted ? "RECORDED SCRIPTED CAPTION · NO VISION MODEL INVOKED" : "RECORDED CAPTION · VERIFIED INPUT IMAGE"}</p><blockquote>${esc(record.run.caption.text)}</blockquote><p>Keep the image in view. Which parts of those words can independent evidence answer?</p>` : `<p class="no-caption">No evaluated caption is attached to this image.</p><p>We checked the first repeat of up to eight recent complete experiments. This is not an exhaustive search. We will not make up a description or a score.</p>${demoHref ? `<a class="story-text-link" href="${demoHref}">Explore a saved recording →</a>` : '<a class="story-text-link" href="#/batches">Inspect saved experiments →</a>'}`}${notice ? `<p class="story-note">${esc(notice)}</p>` : ""}${next("verify", "Discover the evidence")}</div></section>
@@ -349,6 +349,21 @@ async function publicJourney(parts) {
             : "Play scene"
           : control.textContent;
     }
+    const storyVoice = document.getElementById("story-voice");
+    const pageVoice = document.getElementById("listen-voice");
+    const optionsDiffer =
+      storyVoice.options.length !== pageVoice.options.length ||
+      [...pageVoice.options].some(
+        (option, i) =>
+          storyVoice.options[i]?.value !== option.value ||
+          storyVoice.options[i]?.textContent !== option.textContent,
+      );
+    if (optionsDiffer)
+      storyVoice.replaceChildren(
+        ...[...pageVoice.options].map((option) => option.cloneNode(true)),
+      );
+    storyVoice.value = pageVoice.value;
+    storyVoice.disabled = pageVoice.disabled;
     document.getElementById("story-speed").value =
       document.getElementById("listen-speed").value;
     document.getElementById("story-speed").disabled =
@@ -371,6 +386,16 @@ async function publicJourney(parts) {
     "change",
     (e) => {
       const original = document.getElementById("listen-speed");
+      original.value = e.target.value;
+      original.dispatchEvent(new Event("change"));
+      syncAudio();
+    },
+    { signal },
+  );
+  document.getElementById("story-voice").addEventListener(
+    "change",
+    (e) => {
+      const original = document.getElementById("listen-voice");
       original.value = e.target.value;
       original.dispatchEvent(new Event("change"));
       syncAudio();
