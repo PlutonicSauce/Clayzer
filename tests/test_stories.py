@@ -121,7 +121,11 @@ def test_the_committed_pack_replays_every_story_offline(monkeypatch):
     gated = {s["id"]: s["gate"]["verdict"] for s in listed if s.get("gate")}
     assert gated == {"gate-rejects-vague-prompt": "fail"}
     # Results shows the accepted Baseline's scores, and the Baseline's Batch is in the pack.
-    baseline = app.get("/api/overview").json()["baseline"]
+    o = app.get("/api/overview").json()
+    baseline = o["baseline"]
+    # Its featured Captions are only ones the pack can draw: each Chip is served.
+    for sc in o["showcase"]:
+        assert app.get(f"/api/chips/{sc['chip']['id']}.png").status_code == 200, sc["case_id"]
     assert baseline and baseline["batch_id"] in [
         b["batch_id"] for b in app.get("/api/batches").json()
     ]
