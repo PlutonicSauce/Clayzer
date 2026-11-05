@@ -50,8 +50,9 @@ def test_the_repo_is_licensed_apache_2():
 @pytest.mark.parametrize(
     "what,pattern",
     [
-        # An AWS account id: twelve digits on their own (OSM and USGS ids are shorter).
-        ("account id", r"(?<![\d.])\d{12}(?![\d.])"),
+        # An AWS account id: twelve digits on their own (OSM and USGS ids are shorter). A Batch
+        # id's time, T<HHMMSS><microseconds>Z, is also twelve digits, so a T...Z run isn't one.
+        ("account id", r"(?<![\d.])(?<!T)\d{12}(?![\d.])|(?<![\d.])T?\d{12}(?![\d.Z])"),
         ("ARN with an account", r"arn:aws[a-z-]*:[a-z0-9-]+:[a-z0-9-]*:\d{12}:"),
         ("deployment hostname", (r"\b[a-z0-9]{8,}\.cloudfront\.net|[a-z0-9-]+\.elb\.amazonaws\.com"
                                  r"|[a-z0-9]+\.execute-api\.[a-z0-9-]+\.amazonaws\.com"

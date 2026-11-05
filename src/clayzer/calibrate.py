@@ -33,7 +33,7 @@ CHECK_LIMIT = 30  # reasoning_imagery_check judges the first 30 places
 def _present(case: dict) -> dict[str, set[str]]:
     """cell -> the classes some Reference Label of the Case covers there."""
     out: dict[str, set[str]] = {cell: set() for cell in GRID}
-    for label in case["reference_labels"]:
+    for label in (lb for lb in case["reference_labels"] if lb.get("count") != 0):
         for cell in label.get("cells") or [label["position"]]:
             out[cell].add(label["object"])
     return out

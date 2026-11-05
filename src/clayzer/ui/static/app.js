@@ -560,7 +560,8 @@ async function casesPage() {
     <div class="case-grid">${cases.map((c) => `<div class="case-card">
       <a href="#/cases/${encodeURIComponent(c.id)}"><img src="/api/chips/${encodeURIComponent(c.chip.id)}.png" alt="Chip ${esc(c.chip.id)}" loading="lazy"></a>
       <div class="body"><b><a href="#/cases/${encodeURIComponent(c.id)}">${esc(c.id)}</a></b><br><small class="mono">${c.kind === "change" ? `Chip Pair: NAIP ${esc(c.chips[0].date)} → ` : `${esc(c.chip.id)} · NAIP `}${esc(c.chip.date)} · ${esc(c.chip.source)}</small>
-      <ul>${c.labels.map((l) => `<li>${l.count !== null ? `${esc(l.count)} × ` : ""}${esc(l.object.replace(/_/g, " "))}
+      <ul>${c.labels.map((l) => l.count === 0 ? `<li>no ${esc(l.object.replace(/_/g, " "))} <small>(checked: ${esc(l.source)})</small></li>`
+        : `<li>${l.count !== null ? `${esc(l.count)} × ` : ""}${esc(l.object.replace(/_/g, " "))}
         at ${esc(l.position)}${l.change ? ` <small>(${esc(l.change)})</small>` : ""} <small>(${esc(l.source)})</small></li>`).join("") || "<li>no labels</li>"}</ul>
       <small>Built in ${f2(c.prep_seconds)} s</small></div></div>`).join("")}</div>`;
 }

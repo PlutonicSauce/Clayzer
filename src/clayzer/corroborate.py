@@ -114,7 +114,7 @@ def osm_in_chip(bbox, elements: list[dict]) -> dict:
 
 def compare(case: dict, osm: dict) -> dict:
     """USGS's labels against OSM's power mapping, for one Case."""
-    labels = {lb["object"]: lb for lb in case["reference_labels"]}
+    labels = {lb["object"]: lb for lb in case["reference_labels"] if lb.get("count") != 0}
     usgs_solar = "solar_array" in labels
     usgs_turbines = (labels.get("wind_turbine") or {}).get("count") or 0
     findings = []
