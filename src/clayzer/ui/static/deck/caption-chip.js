@@ -1,4 +1,4 @@
-// One real Caption on its Chip, for the problem slide. Case fixed-dev-uswtdb-3073564, Repeat 1 of
+// One real Caption on its Chip, for the problem and solution slides. Case fixed-dev-uswtdb-3073564, Repeat 1 of
 // Baseline 20261104T211847Z-dev74-base: Nova Pro said 18 turbines, all in the centre cell.
 //
 // Turbine positions are Chip pixels (512 x 512, from Chip.pixel), fetched 2026-11-04 from the USGS
@@ -19,10 +19,12 @@ const AGREED = [[98, 282], [237, 92], [354, 315], [2, 39], [277, 414], [471, 159
   [509, 116], [25, 377]];
 const DISPUTED = [316, 2];
 
-// `records` shows the turbines from the public records; `fixed` shows the goal, a Caption whose
-// cells match them. What the records identify is drawn on the objects; the Caption's Claim is
-// drawn on the cell it names, because Claims are cells, not boxes (ADR-0007).
-export function CaptionChip({ records = true, fixed = false }) {
+// `records` shows the 17 turbines both public records agree on; `dispute` adds the one they place
+// either side of the top edge (clayzer corroborate flagged it: wind agreed on 25 of 26 Cases);
+// `fixed` shows the goal, a Caption whose cells match them. What the records identify is drawn on
+// the objects; the Caption's Claim is drawn on the cell it names, because Claims are cells, not
+// boxes (ADR-0007).
+export function CaptionChip({ records = true, dispute = records, fixed = false }) {
   const xy = (cell) => { const i = CELLS.indexOf(cell); return [(i % 3) * C, Math.floor(i / 3) * C]; };
   return html`<figure class="ex-chip">
     <div class="ex-frame">
@@ -39,29 +41,17 @@ export function CaptionChip({ records = true, fixed = false }) {
               <text x=${1.5 * C} y=${2 * C - 23} text-anchor="middle">caption: all 18</text></g>`}
         <g class=${`records ${records ? "in" : ""}`}>
           ${AGREED.map(([x, y]) => html`<circle class="turbine" cx=${x} cy=${y} r="8" />`)}
+        </g>
+        <g class=${`records ${dispute ? "in" : ""}`}>
+          <circle class="disputed-ring" cx=${DISPUTED[0]} cy=${DISPUTED[1] + 4} r="30" />
           <circle class="turbine disputed" cx=${DISPUTED[0]} cy=${DISPUTED[1] + 4} r="9" />
         </g>
       </svg>
     </div>
     <figcaption class="ex-legend">
       <span><i class=${`sq claim ${fixed ? "ok" : ""}`}></i>where the caption puts the turbines</span>
-      ${records && html`<span><i class="dot rec"></i>a turbine in the public records</span>
-        <span><i class="dot disputed"></i>one the two records place 2 m apart</span>`}
+      ${records && html`<span><i class="dot rec"></i>a turbine both records agree on</span>`}
+      ${dispute && html`<span><i class="dot disputed"></i>the one they disagree on</span>`}
     </figcaption>
   </figure>`;
-}
-
-// A record that's wrong about the photo: Case fixed-dev-neg-1. OpenStreetMap maps this basin as
-// natural=water, water=reservoir (way 1258755568), and the photo shows it dry; the label is dropped
-// in fixtures/caption/cases/label-corrections.toml. Outline in Chip pixels, fetched 2026-11-04.
-const BASIN = "162,347 159,351 155,441 160,446 317,454 322,450 326,359 318,352";
-
-export function WrongRecordChip() {
-  return html`<div class="ex-frame wrong-record">
-    <img src="/api/chips/ca-neg-1-20220607.png" alt="Aerial photo of a warehouse, parking and a
-      square retention basin that is dry, with no water in it" />
-    <svg viewBox="0 0 512 512" aria-hidden="true">
-      <polygon class="osm-water" points=${BASIN} />
-    </svg>
-  </div>`;
 }

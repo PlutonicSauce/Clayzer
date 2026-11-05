@@ -8,7 +8,7 @@
 
 import { html } from "./html.js";
 import { ArchitectureDiagram, StoryArchitecture } from "./diagram.js";
-import { CaptionChip, WrongRecordChip } from "./caption-chip.js";
+import { CaptionChip } from "./caption-chip.js";
 import { ValueFlow } from "./value-flow.js";
 
 const Kicker = ({ children }) => html`<p class="kicker">${children}</p>`;
@@ -23,9 +23,9 @@ function Title() {
   </div>`;
 }
 
-// The problem only, in three presses: the Caption is wrong (the records' turbines appear), the
-// records can be wrong too (OSM's "reservoir" over a dry basin), and so we cross-check sources and
-// only bring in a person when they conflict or are too uncertain.
+// The problem only, in three presses on one photo: the Caption is wrong (the 17 turbines both
+// records agree on appear), the records disagree too (the 18th, either side of the top edge), and
+// so we cross-check sources and only bring in a person when they conflict or are too uncertain.
 function Problem({ step = 0 }) {
   const shown = step >= 1;
   return html`<div class="problem">
@@ -33,7 +33,7 @@ function Problem({ step = 0 }) {
     <h2>Today, every caption is a black box</h2>
     <div class="problem-grid">
       <div class="hook">
-        <${CaptionChip} records=${shown} />
+        <${CaptionChip} records=${shown} dispute=${step >= 2} />
         <div class="hook-side">
           <span class="hook-stamp">✗ Unchecked</span>
           <p class="hook-label">A real caption</p>
@@ -46,16 +46,15 @@ function Problem({ step = 0 }) {
       </div>
       <div class="stakes">
         <div class=${`wrong-card build ${step >= 2 ? "in" : ""}`}>
-          <${WrongRecordChip} />
-          <div>
-            <p class="wrong-head">The records can be wrong too</p>
-            <p>OpenStreetMap maps the blue outline as a reservoir. The photo shows a dry basin.</p>
-          </div>
+          <p class="wrong-head">The records disagree too</p>
+          <p><b>USGS</b> counts 17 turbines in this photo. <b>OpenStreetMap</b> counts 18: it puts
+            the gold one 2 m further in, inside the top edge. One of them is wrong.</p>
         </div>
         <div class=${`triage build ${step >= 3 ? "in" : ""}`}>
           <p class="triage-head">So we cross-check the sources</p>
           <p class="triage-row ok"><b>Sources agree</b><span>labelled automatically</span></p>
           <p class="triage-row ask"><b>Conflict, or too uncertain</b><span>only then, a person looks</span></p>
+          <p class="triage-foot">This conflict was flagged automatically. A person checked the photo: 18.</p>
         </div>
       </div>
     </div>
@@ -233,8 +232,8 @@ export const SLIDES = [
     spoken: "Clayzer, said KLAY-zer, rhymes with laser. A solution for producing captions you can trust, at scale.",
     notes: ["Say the name, KLAY-zer, then the one-line definition, and move on.", "4:00 total. T starts the timer, A reads a slide aloud."] },
   { title: "The problem", seconds: 35, component: Problem, steps: 3,
-    spoken: "New caption, who dis? That is how captions on Clay's imagery work today. Here is a real one: the model saw only this photo and said eighteen wind turbines, mostly in the centre. The public records put every turbine around the centre, not in it. But the records can be wrong too: OpenStreetMap calls this basin a reservoir, and it is dry. So we never trust one source. We cross-check them: when they agree, the label is automatic, and only when they conflict, or are too uncertain, does a person look.",
-    notes: ["Open with the label as a joke: \"New caption, who dis? That's how Clay's imagery works today: a caption shows up and nobody knows if it's legit.\"", "Press 1: the records' dots appear. The caption is wrong: count right, place wrong.", "Press 2: the records can be wrong too. OpenStreetMap maps this basin as a reservoir; the photo shows it dry.", "Press 3: we stay out of hand-labelling unless sources conflict or confidence is too low.", "If asked: cross-checking is built for solar and wind (USGS against OpenStreetMap). The basin was caught in our one-time audit by eye; a confidence threshold for labels is the plan, not built yet.", "The 3 × 3 grid is ours: the model sees the plain photo, and the prompt makes it name each object's place as one of 9 cells."] },
+    spoken: "New caption, who dis? That is how captions on Clay's imagery work today. Here is a real one: the model saw only this photo and said eighteen wind turbines, mostly in the centre. The public records put the turbines all around the centre, not in it. But the records disagree too: the government database counts seventeen, OpenStreetMap counts eighteen, because they put this turbine two metres apart, either side of the edge. So we never trust one source. We cross-check them: when they agree, the label is automatic, and only when they conflict, like here, does a person look.",
+    notes: ["Open with the label as a joke: \"New caption, who dis? That's how Clay's imagery works today: a caption shows up and nobody knows if it's legit.\"", "Press 1: the 17 turbines both records agree on. The caption is wrong: they're all around the centre.", "Press 2: the gold turbine. USGS puts it just outside the top edge, OpenStreetMap just inside, 2 m apart: 17 or 18.", "Press 3: we stay out of hand-labelling unless sources conflict or confidence is too low. This conflict was flagged automatically (wind agreed on 25 of 26 Cases); a person checked the photo and confirmed 18.", "If asked: the cross-check is built for solar and wind; a confidence threshold for labels is the plan, not built yet.", "The 3 × 3 grid is ours: the model sees the plain photo, and the prompt makes it name each object's place as one of 9 cells."] },
   { title: "Downstream value", seconds: 20, component: Downstream,
     spoken: "Now imagine those captions were checked. Imagery and public records go into Clayzer. We write each caption from the image alone and check every fact against the records. Only pairs that pass go on to Clay, which makes the imagery searchable in words.",
     notes: ["Left to right: public data, Clayzer (our part, the dashed box), Clay.", "The line to land: search results are only as good as the captions behind them.", "The Thailand flood search is an illustration: our Cases today are US solar, wind and land cover. Don't imply we have run it.", "The dashed loop back is planned, not built: say 'next'."] },
