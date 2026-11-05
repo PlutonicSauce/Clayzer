@@ -171,15 +171,16 @@ function Ontology({ step = 0 }) {
   </div>`;
 }
 
-// The AWS deployment, from diagram.js (infra/app.py, plus what caption-design.md §3.4 plans next).
+// The AWS deployment, from diagram.js (infra/app.py and infra/agentcore_app.py, the MCP servers in
+// src/clayzer/tools.py, plus what caption-design.md §3.4 plans next).
 function Aws() {
   return html`<div class="arch-slide">
     <${Kicker}>On AWS · the services we use<//>
-    <h2>One deploy command, all managed services</h2>
+    <h2>All managed services, deployed with CDK</h2>
     <${ArchitectureDiagram} />
     <div class="legend">
       <span><i class="live"></i> Deployed: this deck is served by it</span>
-      <span><i class="planned"></i> Planned next</span>
+      <span><i class="planned"></i> Planned next, or opt-in</span>
       <span>A role per service; the web app can only read its own part of the store</span>
     </div>
   </div>`;
@@ -306,8 +307,8 @@ export const SLIDES = [
     spoken: "Our caption harness also reads an ontology: a semantic layer of what things are, what they sit near, and what they are mistaken for. Without it, the captioner called greenhouses solar farms nine times in twelve. With it, it is warned before it writes, and every claim uses words we can check.",
     notes: ["Press 1: the photo pixelates into the ontology graph; each tag lands on its class.", "Press 2: why it helps. The badges 1, 2, 3 on the graph match the three benefits. The quoted lines are the real output of ontology.prompt_context for these classes.", "9 of 12 is measured: the Baseline, captioned without the guidance. The effect with it isn't measured yet: it's the next Batch the gate tests. Don't claim it fixed the greenhouses.", "Don't claim it's in the baseline: the guidance is a Batch option (ontology_context), off in the Baseline. Always on: the captioner may only name the ontology's 11 classes."] },
   { title: "On AWS", section: "Our Solution", seconds: 25, component: Aws,
-    spoken: "All of it runs on AWS, from one deploy command. Bedrock writes, judges and searches the captions, with Nova Pro, Claude Opus and Titan embeddings. Results live in S3, and the site runs on Fargate behind CloudFront. The dashed boxes are next: Step Functions to fan out, SageMaker for GPU cost, and AgentCore for the agentic captioner.",
-    notes: ["Solid boxes are running now: this deck comes from that Fargate task.", "One cdk deploy per account; nothing crosses accounts.", "Dashed boxes are next; lead into the scale slide: what it costs."] },
+    spoken: "All of it runs on AWS, deployed with CDK. Bedrock writes, judges and searches the captions. The agentic captioner runs on AgentCore, which holds its LGND sign-in and reaches two MCP servers: LGND Geo to check imagery, and RODA for AWS open data. Results live in S3, and the site runs on Fargate behind CloudFront. Next: Step Functions to fan out, and SageMaker for GPU cost.",
+    notes: ["Solid boxes are running now: this deck comes from that Fargate task.", "AgentCore is live: validated in us-west-2 on 2026-11-04, a verified Batch on 3 dev Cases with the LGND token from Identity. The Baseline ran locally with no tools, so don't tie its numbers to AgentCore.", "MCP servers are allowlisted: none may read an answer key (ADR-0006). RODA is pinned to 0.1.7; LGND is remote, so each Batch records the version it reports.", "Two CDK stacks per account, the web app and AgentCore; nothing crosses accounts. X-Ray spans are built but opt-in, because Transaction Search is account-wide: don't say they're on.", "Dashed boxes are next; lead into the scale slide: what it costs."] },
   { title: "Live demo", section: "Our Solution", seconds: 26, component: Demo,
     spoken: "Now the site. The overview shows the current baseline. A caption, with each claim marked supported or not, right on the image. The report, five criteria side by side, which can read itself aloud. And compare to baseline: the gate says better, worse, or inconclusive.",
     notes: ["Overview → a Caption on its grid → report and Listen → Compare.", "Keep the recorded Batch open as the offline fallback."] },
