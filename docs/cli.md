@@ -414,10 +414,28 @@ What to know:
   `AlreadyExists`. The configuration provider's diagnostic logs also expire after seven days.
   The ARM64 image uses a hashed telemetry dependency lock and contains Harness modules and
   ontology configuration; Cases, Chips, scorers and the web app are excluded.
-  Span export defaults off; the Batch's JSONL Trace is always complete. After an account owner
-  enables CloudWatch Transaction Search, deploy with `-c traces=true` to send OTLP spans to the
-  encrypted Runtime log group. This adds the scoped `logs:PutResourcePolicy` permission that
-  AgentCore requires. The stack does not change account-wide trace routing or indexing.
+  Span export defaults off; the Batch's JSONL Trace is always complete. Spans need CloudWatch
+  Transaction Search, which is account-wide, so it has its own stack,
+  [`infra/transaction_search_app.py`](../infra/transaction_search_app.py) (1% indexing; destroying
+  it turns Transaction Search off). Once the account owner agrees, from `infra`:
+  ```sh
+  npx --no-install cdk --app "uv run --group infra python transaction_search_app.py" deploy
+  ```
+  then deploy the Runtime with `-c traces=true` to send OTLP spans to the encrypted Runtime log
+  group (this adds the scoped `logs:PutResourcePolicy` permission AgentCore requires). CI does
+  both when the `aws` environment sets `AGENTCORE_TRACES=true`. The Runtime stack itself does not
+  change account-wide trace routing or indexing.
+  If Transaction Search is already on in the account, creating the stack fails. Adopt the
+  existing setting and its log resource policy instead (no change to the account), naming the
+  policy that already exists (`aws logs describe-resource-policies`):
+  ```sh
+  echo '{"TransactionSearch": {"AccountId": "<account-id>"},
+         "SpansPolicy": {"PolicyName": "<existing policy name>"}}' > /tmp/ts-mapping.json
+  npx --no-install cdk --app "uv run --group infra python transaction_search_app.py" \
+    import ClayzerTransactionSearch --resource-mapping /tmp/ts-mapping.json --version-reporting=false
+  ```
+  Pass `-c policy_name=<existing policy name>` to both `import` and later deploys if it is not
+  `ClayzerAgentCoreTransactionSearch`.
   Sending OTLP spans while the account's destination is still `XRay` returns HTTP 400, even
   with valid execution-role permissions.
 - **Tear down.** From `infra`, run
@@ -430,7 +448,7 @@ What to know:
   is not reusable by the recreated identity. Normal stack updates preserve the identity.
   Delete the provider only after confirming no remaining workload uses it.
   The KMS deletion waiting period is 30 days. CDK provider Lambda diagnostic log groups remain
-  with seven-day retention. Account Transaction Search settings remain; inspect any
+  with seven-day retention. Transaction Search stays on (it belongs to its own stack); inspect any
   AgentCore-created span-delivery resource policy before removing it, because it is outside
   CloudFormation ownership.
 
