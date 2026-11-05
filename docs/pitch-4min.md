@@ -72,15 +72,15 @@ before-and-after pairs, and drops the third when the check finds fish ponds, not
 the drafted Claims appear on the grid, three are struck (point at the south-west cell: a storage
 yard that looks like panels), the public records' cells light up, and the gate says FAIL. The
 step cards also carry what used to be its own solution slide: the ontology's words (step 1), the
-records' cross-check (step 3), and the region split (step 4).
+records' cross-check (step 3), and the self-improvement loop and region split (step 4).
 
 > Let's follow one real image. One: the model writes five claims from the image alone, in the
 > words of our ontology; more on that next. Two: each claim is checked against the imagery. That
 > solar array is a storage yard, so it's gone before the caption is written. Three: we score it
 > against public records it never saw, cross-checked, so a person only looks where they disagree:
-> right, but it missed the road. Four: every change faces a gate, tuned on one region and tested
-> on another. A vaguer prompt looked more correct, and failed. Only pairs that pass go out, to
-> Clay, LGND, or other apps.
+> right, but it missed the road. Four: a self-improvement loop. Every change runs three times per
+> image and faces a gate, tuned on one region and tested on another. A vaguer prompt looked more
+> correct, and failed. Only pairs that pass go out, to Clay, LGND, or other apps.
 
 ## 5. The ontology (1:54–2:16)
 
@@ -164,12 +164,12 @@ for questions.
 
 ## Rehearsal notes
 
-- At a calm 145 words a minute the whole script is about 580 words, 4:01: it fits, with a second
-  to find. Three slides run long and three have room. Slide 8 runs about 8 seconds over (104 words
-  against 35 seconds): give only the first and last price and the time line if you're behind.
-  Slide 3 runs about 4 over (64 words against 22 seconds; drop "No map layer, no GIS skills" if
-  you need it), and slide 4 about 2. Slide 2 has about 6 seconds spare, slide 9 about 5, and
-  slide 7 about 2, which the clicks will use.
+- At a calm 145 words a minute the whole script is about 590 words, 4:05, so it runs about 5
+  seconds over. Slide 8 runs about 8 seconds over (104 words against 35 seconds): give only the
+  first and last price and the time line if you're behind. Slide 4 runs about 6 over (116 words
+  against 42 seconds), and slide 3 about 4 (64 words against 22 seconds; drop "No map layer, no
+  GIS skills" if you need it). Slide 2 has about 6 seconds spare, slide 9 about 5, and slide 7
+  about 2, which the clicks will use.
 - Verify-then-write is part of the approach, but the Baseline ran without it. If asked whether
   77% includes it, say no: the Baseline is the plain captioner. In the 4-image test, every object
   it named was really there, and correctness rose from 0.53 to 0.65.
@@ -208,6 +208,8 @@ for questions.
   `uswtdb-3073564`. Don't present them as one photo.
 - If asked about the cross-check (slide 4, step 3): it's built for solar and wind, and wind
   records agreed on 25 of 26 Cases. A confidence threshold for labels is planned, not built.
+- The self-improvement loop (slide 4, step 4) is run by us today: we propose each change and the
+  gate decides. An agent that proposes changes from the failures is planned, not built.
 - If asked about the region split (slide 4, step 4): tuned on 74 Mojave images, tested once on
   61 Texas images it never saw; correctness held, 0.76 against 0.75 on dev.
 - Say "tune", not "train": we tune the captioner's prompt and checks.

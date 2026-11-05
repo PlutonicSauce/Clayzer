@@ -1,7 +1,7 @@
 // How it works, on one real Chip: Case fixed-dev-neg-1, Repeat 1 of Batch 20261104T124711Z-verify-2
 // (the verify-drops-invented-solar Story in demo/stories.toml). Each press is one of Clayzer's four
 // steps, and carries the points the old solution slide made: the ontology's vocabulary (step 1),
-// the records' cross-check (step 3), and the region split (step 4). 1: Nova Pro drafts five Claims
+// the records' cross-check (step 3), and the self-improvement loop and region split (step 4). 1: Nova Pro drafts five Claims
 // from the image alone. 2: LGND Geo's imagery check rejects
 // three of them at their cells (its reasons are quoted from the Trace), and the Caption is written
 // from the rest. 3: the Caption is scored against the Answer Key it never saw, the Case's current
@@ -100,10 +100,10 @@ export function ChipJourney({ step = 0 }) {
             and railroad are missing. <span class="jnum">correct 1.0 · coverage 0.25</span></p>
         </div>
         <div class=${`jstep build ${step >= 4 ? "in" : ""}`}>
-          <b>4 · Gate</b>
-          <p>Every change must beat the Baseline, tuned on one region and tested on another it
-            never saw. A vaguer prompt: correct 0.59 → 0.96, coverage 0.60 → 0.35.
-            <span class="jfail">FAIL</span></p>
+          <b>4 · Gate: the self-improvement loop</b>
+          <p>Every change runs 3× per image and is kept only if it beats the Baseline, tuned on one
+            region and tested on another it never saw. A vaguer prompt: correct 0.59 → 0.96,
+            coverage 0.60 → 0.35. <span class="jfail">FAIL</span></p>
         </div>
         <p class=${`journey-out build ${step >= 4 ? "in" : ""}`}>Only image + caption pairs that pass
           go out to Clay, LGND, or downstream apps.</p>
