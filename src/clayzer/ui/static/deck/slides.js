@@ -11,6 +11,7 @@ import { ArchitectureDiagram } from "./diagram.js";
 import { CaptionChip } from "./caption-chip.js";
 import { SolutionFlow } from "./value-flow.js";
 import { OntologyViz } from "./ontology-slide.js";
+import { LEVERS, LeverList, PotteryScale } from "./scale-pottery.js";
 
 const Kicker = ({ children }) => html`<p class="kicker">${children}</p>`;
 
@@ -214,36 +215,23 @@ function ExampleSearch() {
   </div>`;
 }
 
-// Per 1,000 Captions and for Clay's ~70M training chips; docs/scale-napkin-math.md has the sums.
-const LEVERS = [
-  ["Nova Pro, on-demand", 2.59, "$181K", "measured"],
-  ["+ Bedrock batch inference", 1.30, "$91K", "published"],
-  ["+ Nova Lite first, 20% escalated to Pro", 0.36, "$25K", "assumed"],
-  ["+ 256 px where the class is still visible", 0.28, "$20K", "assumed"],
-  ["+ Caption 1 in 5, reuse via Clay embeddings", 0.056, "$3.9K", "assumed"],
-];
-
-function Scale() {
-  return html`<div>
+// Same pot, less clay (scale-pottery.js): each press applies one cost lever, and the bricks of
+// clay it saves fall away while the pot, the job at the same quality bar, stays full.
+function Scale({ step = 0 }) {
+  return html`<div class="scale-slide">
     <${Kicker}>At Clay's scale<//>
     <h2>46× cheaper to caption Clay's 70M chips</h2>
-    <div class="scale">
-      <div class="magnitude">
-        <p><b>70M</b> chips in Clay v1.5, a stratified sample: ~5% of MGRS tiles, at most 6 dates
-          per place</p>
-        <p><b>86M</b> Chips in one NAIP pass over CONUS</p>
-        <p><b>~13B</b> in the Sentinel-2 archive over land</p>
-      </div>
-      <div class="ladder">
-        ${LEVERS.map(([name, per1k, total, basis]) => html`<div class="lever">
-          <span class="name">${name}</span>
-          <span class="bar"><i style=${`width: ${Math.max(1.5, (per1k / 2.59) * 100)}%`}></i></span>
-          <span class="total">${total}</span>
-          <span class=${`basis ${basis}`}>${basis}</span>
-        </div>`)}
-        <p class="judge">Scoring: an Opus judge on every Caption would cost <b>$1.1M</b>, 6× the
-          captions. Grounding needs no model call, so ours is <b>$5.5K</b> with Opus on a 1%
-          sample.</p>
+    <p class="scale-sizes"><b>70M</b> chips in Clay v1.5, a ~5% sample · <b>86M</b> in one NAIP
+      pass · <b>~13B</b> in the Sentinel-2 archive</p>
+    <div class="scale-grid">
+      <${PotteryScale} step=${step} />
+      <div>
+        <p class="pot-head">Same pot, less clay. Each technique is kept only if the gate says
+          quality holds.</p>
+        <${LeverList} step=${step} />
+        <p class=${`judge build ${step >= LEVERS.length - 1 ? "in" : ""}`}>Scoring: an Opus judge
+          on every Caption would cost <b>$1.1M</b>. Grounding needs no model call:
+          <b>$5.5K</b> with Opus on a 1% sample.</p>
       </div>
     </div>
     <p class="source">Measured: 2,559 tokens and 2.9 s per Caption (dev63, 189 Captions). Prices:
@@ -316,9 +304,10 @@ export const SLIDES = [
   { title: "Live demo", section: "Our Solution", seconds: 26, component: Demo,
     spoken: "Now the site. The overview shows the current baseline. A caption, with each claim marked supported or not, right on the image. The report, five criteria side by side, which can read itself aloud. And compare to baseline: the gate says better, worse, or inconclusive.",
     notes: ["Overview → a Caption on its grid → report and Listen → Compare.", "Keep the recorded Batch open as the offline fallback."] },
-  { title: "At Clay's scale", section: "Scale", seconds: 20, component: Scale,
+  { title: "At Clay's scale", section: "Scale", seconds: 20, component: Scale, steps: 4,
     spoken: "What does this cost at Clay's scale? Clay's own training set is seventy million chips, and that is only a five percent sample of the world. Captioning all of it with our current model would cost about one hundred and eighty thousand dollars. Batch pricing halves that. A cheap model first, with only the hard images sent to the strong one, smaller images where objects are still visible, and reusing captions for look-alike chips bring it to about four thousand dollars, forty-six times cheaper. Checking matters too: a large model judging every caption would cost over a million dollars, but our checks against open data need no model at all.",
-    notes: ["Clay itself is a ~5% sample; the archives are 100× bigger, so cost per Caption decides what gets captioned.",
+    notes: ["Press → once per technique as you name it (4 presses): the bricks it saves fall away, and the pot stays full. One brick is $10K.",
+      "Clay itself is a ~5% sample; the archives are 100× bigger, so cost per Caption decides what gets captioned.",
       "Batch is a published 50%; the green 'assumed' rows are hypotheses our gate can test, which is the point.",
       "Land the judge line: scoring with a big model costs more than captioning, and our grounding is free."] },
   { title: "Thank you", seconds: 16, component: Next,
