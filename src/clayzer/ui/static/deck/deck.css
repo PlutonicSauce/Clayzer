@@ -130,8 +130,6 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
    the wheel is the job at the same quality bar. Bricks a press saves fall away, top first; the
    drip and the wheel loop; going back snaps the bricks back. */
 .scale-slide h2 { margin-bottom: 8px; }
-.scale-sizes { margin: 0 0 14px; font-size: 21px; color: var(--muted); }
-.scale-sizes b { color: var(--ink); }
 .scale-grid { display: grid; grid-template-columns: 760px 1fr; gap: 34px; align-items: start; }
 .pottery { width: 760px; height: 513px; font-family: system-ui, sans-serif; }
 .pottery .pot-label { font-size: 17px; font-weight: 700; letter-spacing: .1em; fill: var(--muted); }
@@ -162,22 +160,39 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
   animation: pot-spin 1.2s linear infinite; }
 @keyframes pot-spin { to { stroke-dashoffset: -88; } }
 
-.pot-head { margin: 4px 0 14px; font-size: 20px; line-height: 1.4; color: #4a4240; }
 .pot-levers { margin: 0; padding: 0; list-style: none; }
-.pot-lever { display: grid; grid-template-columns: 1fr 104px 118px; gap: 12px; align-items: center;
-  padding: 10px 14px; margin-bottom: 8px; border-radius: 12px; background: var(--data);
+.pot-lever { display: grid; grid-template-columns: 1fr 90px 120px; gap: 12px; align-items: center;
+  padding: 8px 14px; margin-bottom: 7px; border-radius: 12px; background: var(--data);
   border: 1px solid var(--data-line); }
-.pot-lever b { display: block; font-size: 21px; }
+.pot-lever b { display: block; font-size: 20px; }
 .pot-lever span { font-size: 16px; color: #4a4240; }
 .pot-lever.now { background: var(--captions); border-color: var(--decision); }
-.pot-total { text-align: right; }
-.pot-total b { color: var(--ink); font-variant-numeric: tabular-nums; }
-.pot-total span { font-size: 14px; }
+.pot-lever .pot-total { text-align: right; font-size: 22px; font-variant-numeric: tabular-nums; }
 .pot-lever .basis { font-size: 13px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
   color: var(--muted); }
 .pot-lever .basis.assumed { color: var(--ok); }
-.judge { margin-top: 12px; padding: 12px 16px; border-radius: 12px; font-size: 19px; line-height: 1.4;
-  background: var(--evaluation); border: 2px solid var(--evaluation-line); }
+/* The scale stats as three Chips: a real Chip, darkened, behind the 3 × 3 grid, the count on top. */
+.scale-side { display: flex; flex-direction: column; height: 100%; }
+.chip-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 14px; }
+.chip-stat { position: relative; margin: 0; aspect-ratio: 1.45; border-radius: 10px; overflow: hidden;
+  display: flex; flex-direction: column; justify-content: flex-end; padding: 10px 12px;
+  background-size: cover; background-position: center; color: #fffdfb;
+  box-shadow: inset 0 0 0 2px rgba(255, 253, 251, .25); }
+.chip-stat::before { content: ""; position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(14, 13, 12, .15) 0%, rgba(14, 13, 12, .78) 100%),
+    linear-gradient(to right, transparent 33%, rgba(255, 253, 251, .35) 33%, rgba(255, 253, 251, .35) calc(33% + 1.5px),
+      transparent calc(33% + 1.5px), transparent 66%, rgba(255, 253, 251, .35) 66%,
+      rgba(255, 253, 251, .35) calc(66% + 1.5px), transparent calc(66% + 1.5px)),
+    linear-gradient(to bottom, transparent 33%, rgba(255, 253, 251, .35) 33%, rgba(255, 253, 251, .35) calc(33% + 1.5px),
+      transparent calc(33% + 1.5px), transparent 66%, rgba(255, 253, 251, .35) 66%,
+      rgba(255, 253, 251, .35) calc(66% + 1.5px), transparent calc(66% + 1.5px)); }
+.chip-stat > * { position: relative; }
+.chip-stat b { font-size: 44px; line-height: 1; font-weight: 800; letter-spacing: -.02em; }
+.chip-stat figcaption { margin-top: 4px; font-size: 16px; font-weight: 600; line-height: 1.25; }
+.chip-stat figcaption span { display: block; font-weight: 400; opacity: .8; }
+.scale-notes { margin: auto 0 0; padding: 0 0 0 18px; font-size: 14.5px; line-height: 1.4;
+  color: var(--muted); }
+.scale-notes li { margin-bottom: 3px; }
 @media (prefers-reduced-motion: reduce) {
   .pottery .drip, .pottery .wheel-spin { animation: none; }
   .pottery .drip { opacity: 0; }

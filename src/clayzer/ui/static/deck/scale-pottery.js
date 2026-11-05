@@ -78,11 +78,29 @@ export function PotteryScale({ step = 0 }) {
 
 export function LeverList({ step = 0 }) {
   return html`<ol class="pot-levers">
-    ${LEVERS.map(([pottery, technique, per1k, total, basis], k) => html`<li
+    ${LEVERS.map(([pottery, technique, , total, basis], k) => html`<li
         class=${`pot-lever build ${k <= step ? "in" : ""} ${k === step ? "now" : ""}`}>
       <div><b>${pottery}</b><span>${technique}</span></div>
-      <div class="pot-total"><b>${money(total)}</b><span>$${per1k.toFixed(per1k < 0.1 ? 3 : 2)} / 1,000</span></div>
+      <b class="pot-total">${money(total)}</b>
       <span class=${`basis ${basis}`}>${BASIS[basis]}</span>
     </li>`)}
   </ol>`;
+}
+
+// How big "at scale" is, as three Chips: a real dev Chip each, behind the 3 × 3 grid every Claim
+// is placed on, with the count on top. Figures: Clay v1.5's training set (a ~5% stratified
+// sample), one NAIP pass over CONUS, and the Sentinel-2 archive over land (scale-napkin-math.md).
+const SIZES = [
+  ["70M", "chips in Clay v1.5", "a ~5% sample", "ca-uswtdb-3073564-20220702"],
+  ["86M", "in one NAIP pass", "over CONUS", "ca-uspvdb-400565-20220702"],
+  ["~13B", "in the Sentinel-2", "archive, over land", "ca-neg-6-20220703"],
+];
+
+export function ChipStats() {
+  return html`<div class="chip-stats">
+    ${SIZES.map(([n, what, note, chip]) => html`<figure class="chip-stat"
+        style=${`background-image: url("/api/chips/${chip}.png")`}>
+      <b>${n}</b><figcaption>${what}<span>${note}</span></figcaption>
+    </figure>`)}
+  </div>`;
 }

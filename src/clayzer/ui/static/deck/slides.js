@@ -11,7 +11,7 @@ import { ArchitectureDiagram } from "./diagram.js";
 import { CaptionChip } from "./caption-chip.js";
 import { SolutionFlow } from "./value-flow.js";
 import { OntologyViz } from "./ontology-slide.js";
-import { LEVERS, LeverList, PotteryScale } from "./scale-pottery.js";
+import { ChipStats, LeverList, PotteryScale } from "./scale-pottery.js";
 
 const Kicker = ({ children }) => html`<p class="kicker">${children}</p>`;
 
@@ -220,22 +220,24 @@ function ExampleSearch() {
 function Scale({ step = 0 }) {
   return html`<div class="scale-slide">
     <${Kicker}>At Clay's scale<//>
-    <h2>46× cheaper to caption Clay's 70M chips</h2>
-    <p class="scale-sizes"><b>70M</b> chips in Clay v1.5, a ~5% sample · <b>86M</b> in one NAIP
-      pass · <b>~13B</b> in the Sentinel-2 archive</p>
+    <h2>How it scales: 46× cheaper per chip</h2>
     <div class="scale-grid">
       <${PotteryScale} step=${step} />
-      <div>
-        <p class="pot-head">Same pot, less clay. Each technique is kept only if the gate says
-          quality holds.</p>
+      <div class="scale-side">
+        <${ChipStats} />
         <${LeverList} step=${step} />
-        <p class=${`judge build ${step >= LEVERS.length - 1 ? "in" : ""}`}>Scoring: an Opus judge
-          on every Caption would cost <b>$1.1M</b>. Grounding needs no model call:
-          <b>$5.5K</b> with Opus on a 1% sample.</p>
+        <ul class="scale-notes">
+          <li>Measured: 2,559 tokens and 2.9 s per Caption (dev63, 189 Captions), at AWS list
+            prices, us-east-1.</li>
+          <li>Cost is from tokens, not the GPU time and GPU count and size the Vision document asks
+            for: hosted Bedrock doesn't report them. A SageMaker GPU run is next.</li>
+          <li>"Assumed" rows are the next Batches to run, each kept only if the gate says quality
+            holds.</li>
+          <li>Scoring: an Opus judge on every Caption would cost $1.1M; grounding needs no model,
+            so ours is $5.5K with Opus on a 1% sample.</li>
+        </ul>
       </div>
     </div>
-    <p class="source">Measured: 2,559 tokens and 2.9 s per Caption (dev63, 189 Captions). Prices:
-      AWS Price List, us-east-1. "Assumed" rows are the next Batches to run.</p>
   </div>`;
 }
 
