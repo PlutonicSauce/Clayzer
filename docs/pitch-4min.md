@@ -55,12 +55,15 @@ Three presses.
 
 ## 3. Example search (0:45–1:13)
 
-**On screen:** the flood-search video, looping. No presses.
+**On screen:** the paddy-search video, played once; it holds on the end card. No presses. It
+searches for rice fields near Bangkok that became buildings since 2011, shows three
+before-and-after pairs, and drops the third when the check finds fish ponds, not roofs.
 
 > Why does this matter? Trusted captions make satellite imagery searchable in plain words. Ask
-> about the economic impact of flooding in Bangkok and access to aid, and you get the images
-> whose checked captions match: flooded streets, a market under water, a relief site, and the
-> route to reach it. Search results are only as good as the captions behind them.
+> which rice fields near Bangkok became buildings since the 2011 flood, and you get matching
+> before-and-after images. No map layer, no GIS skills. Fish ponds can pass for buildings, so we
+> check every caption. Then anyone can ask questions like this, about homes, harvests and jobs,
+> and trust the answers.
 
 ## 4. How it works (1:13–1:43)
 
@@ -146,6 +149,10 @@ in another tab as the offline fallback.
   Runs average 0.80 correct, so don't call the site perfect.
 - The example search is illustrative: our Cases today are US solar, wind and land cover. Don't
   imply we have run that search.
+- If asked why not just look at the latest image: that works when you know where to look. This
+  search is for when you don't: the change is slow, a few fields a year, nobody keeps a layer of
+  it, and it only shows across dates. That building on the floodplain made 2011 worse is reported
+  but not checked by us; don't quote it as a figure.
 - On the problem slide, if asked: the cross-check is built for solar and wind. A confidence
   threshold for labels is planned, not built.
 - Say "tune", not "train": we tune the captioner's prompt and checks.
