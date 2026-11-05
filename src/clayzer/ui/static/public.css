@@ -278,6 +278,11 @@ nav#nav {
   display: flex;
   flex-direction: column;
   font-size: 0.8rem;
+  max-width: 100%;
+  min-width: 0;
+}
+.listen-controls #listen-voice {
+  max-width: min(100%, 18rem);
 }
 .listen-controls select {
   min-height: 48px;

@@ -11,6 +11,7 @@ import { ArchitectureDiagram } from "./diagram.js";
 import { CaptionChip } from "./caption-chip.js";
 import { ChipJourney } from "./chip-journey.js";
 import { OntologyViz } from "./ontology-slide.js";
+import { ChipStats, LeverList, PotteryScale } from "./scale-pottery.js";
 
 const Kicker = ({ children }) => html`<p class="kicker">${children}</p>`;
 
@@ -213,40 +214,29 @@ function ExampleSearch() {
   </div>`;
 }
 
-// Per 1,000 Captions and for Clay's ~70M training chips; docs/scale-napkin-math.md has the sums.
-const LEVERS = [
-  ["Nova Pro, on-demand", 2.59, "$181K", "measured"],
-  ["+ Bedrock batch inference", 1.30, "$91K", "published"],
-  ["+ Nova Lite first, 20% escalated to Pro", 0.36, "$25K", "assumed"],
-  ["+ 256 px where the class is still visible", 0.28, "$20K", "assumed"],
-  ["+ Caption 1 in 5, reuse via Clay embeddings", 0.056, "$3.9K", "assumed"],
-];
-
-function Scale() {
-  return html`<div>
+// Same pot, less clay (scale-pottery.js): each press applies one cost lever, and the bricks of
+// clay it saves fall away while the pot, the job at the same quality bar, stays full.
+function Scale({ step = 0 }) {
+  return html`<div class="scale-slide">
     <${Kicker}>At Clay's scale<//>
-    <h2>46× cheaper to caption Clay's 70M chips</h2>
-    <div class="scale">
-      <div class="magnitude">
-        <p><b>70M</b> chips in Clay v1.5, a stratified sample: ~5% of MGRS tiles, at most 6 dates
-          per place</p>
-        <p><b>86M</b> Chips in one NAIP pass over CONUS</p>
-        <p><b>~13B</b> in the Sentinel-2 archive over land</p>
-      </div>
-      <div class="ladder">
-        ${LEVERS.map(([name, per1k, total, basis]) => html`<div class="lever">
-          <span class="name">${name}</span>
-          <span class="bar"><i style=${`width: ${Math.max(1.5, (per1k / 2.59) * 100)}%`}></i></span>
-          <span class="total">${total}</span>
-          <span class=${`basis ${basis}`}>${basis}</span>
-        </div>`)}
-        <p class="judge">Scoring: an Opus judge on every Caption would cost <b>$1.1M</b>, 6× the
-          captions. Grounding needs no model call, so ours is <b>$5.5K</b> with Opus on a 1%
-          sample.</p>
+    <h2>How it scales</h2>
+    <div class="scale-grid">
+      <${PotteryScale} step=${step} />
+      <div class="scale-side">
+        <${ChipStats} />
+        <${LeverList} step=${step} />
+        <ul class="scale-notes">
+          <li>Measured: 2,559 tokens and 2.9 s per Caption (dev63, 189 Captions), at AWS list
+            prices, us-east-1.</li>
+          <li>Cost is from tokens, not the GPU time and GPU count and size the Vision document asks
+            for: hosted Bedrock doesn't report them. A SageMaker GPU run is next.</li>
+          <li>"Assumed" rows are the next Batches to run, each kept only if the gate says quality
+            holds.</li>
+          <li>Scoring: an Opus judge on every Caption would cost $1.1M; grounding needs no model,
+            so ours is $5.5K with Opus on a 1% sample.</li>
+        </ul>
       </div>
     </div>
-    <p class="source">Measured: 2,559 tokens and 2.9 s per Caption (dev63, 189 Captions). Prices:
-      AWS Price List, us-east-1. "Assumed" rows are the next Batches to run.</p>
   </div>`;
 }
 
@@ -315,11 +305,17 @@ export const SLIDES = [
   { title: "Live demo", section: "Our Solution", seconds: 26, component: Demo,
     spoken: "Now the site. The overview shows the current baseline. A caption, with each claim marked supported or not, right on the image. The report, five criteria side by side, which can read itself aloud. And compare to baseline: the gate says better, worse, or inconclusive.",
     notes: ["Overview → a Caption on its grid → report and Listen → Compare.", "Keep the recorded Batch open as the offline fallback."] },
-  { title: "At Clay's scale", section: "Scale", seconds: 20, component: Scale,
-    spoken: "What does this cost at Clay's scale? Clay's own training set is seventy million chips, and that is only a five percent sample of the world. Captioning all of it with our current model would cost about one hundred and eighty thousand dollars. Batch pricing halves that. A cheap model first, with only the hard images sent to the strong one, smaller images where objects are still visible, and reusing captions for look-alike chips bring it to about four thousand dollars, forty-six times cheaper. Checking matters too: a large model judging every caption would cost over a million dollars, but our checks against open data need no model at all.",
-    notes: ["Clay itself is a ~5% sample; the archives are 100× bigger, so cost per Caption decides what gets captioned.",
-      "Batch is a published 50%; the green 'assumed' rows are hypotheses our gate can test, which is the point.",
-      "Land the judge line: scoring with a big model costs more than captioning, and our grounding is free."] },
+  { title: "At Clay's scale", section: "Scale", seconds: 20, component: Scale, steps: 4,
+    spoken: "What does this cost at Clay's scale? Clay's own training set is seventy million chips, and that is only a five percent sample of the world. Captioning all of it with our current model would cost about one hundred and eighty thousand dollars. Batch pricing halves that. A cheap model first, with only the hard images sent to the strong one, smaller images where objects are still visible, and reusing captions for look-alike chips bring it to about four thousand dollars, forty-six times cheaper. Time scales too: one at a time it would take six years, but captions run in parallel, so it's days.",
+    notes: ["Press → once per technique as you name it (4 presses). The bricks it saves fall away; one brick is $10K. On each press the clay drops onto the quality bar and the gate catches it: every cut is tested, and the gate stops quality going lower.",
+      "If \"chip\" needs a word: one small square tile of a big aerial or satellite image, like the three on screen. It's Clay's own term (the v1.5 spec: \"70 million … chips\").",
+      "Clay itself is a ~5% sample; the archives are 100× bigger, so cost per caption decides what gets captioned.",
+      "The $181K is our measured $0.0026 per caption (2,559 tokens, Nova Pro, AWS list price) × Clay's ~70M chips. Ours are 512 px NAIP chips; Clay's are 256 px and from several sensors, so it's likely on the high side, and radar chips may not caption well. Neither is measured.",
+      "Quality, if asked: batch changes only billing and turnaround, so the output is the same. The three green 'assumed' rows are hypotheses: each becomes a gated run, kept only if no score drops beyond the Baseline's run-to-run spread. Say \"$3.9K is the best case if all three pass\".",
+      "Cost is from tokens, not the GPU time and GPU size the Vision document asks for (footnote): hosted Bedrock doesn't report them, so a SageMaker GPU run is next.",
+      "Time: 2.9 s per caption is measured; 6.4 years one at a time. 'Days' assumes about 1,000 in parallel (about 2.3 days), which we haven't been granted or tested: the Bedrock quota sets it.",
+      "If asked about scoring: an Opus judge on every caption would cost $1.1M; our grounding needs no model (footnote).",
+      "The script runs about 43 s against a 20 s budget: keep it brisk, or give only the first and last price."] },
   { title: "Thank you", seconds: 16, component: Next,
     spoken: "Thank you. You can see it live on our site, and read every line of the code on GitHub. Our ask is Clay's real caption set and its rubric weights. And any slide here reads itself aloud.",
     notes: ["Point at the two links; leave this slide up for questions.", "Close on the ask: Clay's real caption set and its rubric weights.", "Mention Listen (A) as the accessibility point."] },

@@ -27,7 +27,7 @@ T starts the deck's timer; the notes panel warns when a slide runs long.
 
 ## 1. Clayzer (0:00–0:10)
 
-**On screen:** the title. No presses.
+**On screen:** the title, with the date in its first line (2026 NOV 5). No presses.
 
 > Clayzer, said KLAY-zer. It comes from glaze, the finish a potter fires onto clay. A solution
 > for producing captions you can trust, at scale.
@@ -131,15 +131,34 @@ in another tab as the offline fallback.
 
 ## 9. At Clay's scale (3:24–3:44)
 
-**On screen:** the cost ladder. No presses.
+**On screen:** "How it scales". A pot on a turning potter's wheel, filled above a dashed quality
+bar, stands for the job: Clay's 70M chips captioned to the same quality. Beside it, bricks of
+clay are the estimated cost, one brick per $10K. Across the top right, three chip tiles: 70M
+(Clay v1.5), 86M (one NAIP pass), ~13B (Sentinel-2). Below them, one row per technique. Four
+presses, one per technique as you name it: the bricks it saves fall away, the clay drops onto
+the quality bar, and the gate catches it.
 
 > What does this cost at Clay's scale? Clay's own training set is seventy million chips, and that
 > is only a five percent sample of the world. Captioning all of it with our current model would
-> cost about one hundred and eighty thousand dollars. Batch pricing halves that. A cheap model
-> first, with only the hard images sent to the strong one, smaller images where objects are
-> still visible, and reusing captions for look-alike chips bring it to about four thousand
-> dollars, forty-six times cheaper. Checking matters too: a large model judging every caption
-> would cost over a million dollars, but our checks against open data need no model at all.
+> cost about one hundred and eighty thousand dollars.
+
+*Press 1: fire a full kiln, $91K.*
+
+> Batch pricing halves that.
+
+*Press 2: rough out on a cheap wheel, $25K.*
+
+> A cheap model first, with only the hard images sent to the strong one,
+
+*Press 3: thinner walls where they hold, $20K.*
+
+> smaller images where objects are still visible,
+
+*Press 4: cast from a mould, $3.9K.*
+
+> and reusing captions for look-alike chips bring it to about four thousand dollars, forty-six
+> times cheaper. Time scales too: one at a time it would take six years, but captions run in
+> parallel, so it's days.
 
 ## 10. Thank you (3:44–4:00)
 
@@ -153,9 +172,9 @@ for questions.
 
 ## Rehearsal notes
 
-- At a calm 145 words a minute the whole script is about 650 words, 4:30, so it runs about 30
-  seconds over. Slide 9 is most of it: about 110 words, 46 seconds against a 20-second budget.
-  Rehearse it fast, or cut it to the first three sentences and the judge line. Slide 2 runs
+- At a calm 145 words a minute the whole script is about 660 words, 4:32, so it runs about 32
+  seconds over. Slide 9 is most of it: about 104 words, 43 seconds against a 20-second budget.
+  Rehearse it fast, or give only the first and last price and the time line. Slide 2 runs
   about 6 seconds long, slide 3 about 5 (65 words against 22 seconds; drop "No map layer, no GIS
   skills" if you need it), and slide 7 about 2. Slide 8 has about 7 seconds spare, which the
   clicks will use.
@@ -172,6 +191,19 @@ for questions.
   greenhouses. The guidance is a Batch option, off in the Baseline.
 - AgentCore is live, but the Baseline ran locally with no tools: don't tie its numbers to
   AgentCore. X-Ray spans are built but opt-in, so don't say they're on.
+- On slide 9, if "chip" needs a word: one small square tile of a big aerial or satellite image,
+  like the three on screen. It's Clay's own term (their v1.5 spec: "70 million … chips").
+- Slide 9's $181K is our measured $0.0026 per caption (2,559 tokens, Nova Pro, AWS list price)
+  × Clay's ~70M chips. Ours are 512 px NAIP chips; Clay's are 256 px and from several sensors, so
+  it's likely on the high side, and radar chips may not caption well. Neither is measured.
+- Slide 9's quality, if asked: batch pricing changes only billing and turnaround, so the output
+  is the same. The three "assumed" rows are hypotheses: each becomes a gated run, kept only if no
+  score drops beyond the Baseline's run-to-run spread. Say "$3.9K is the best case if all three
+  pass". The gate catching the clay on each press shows the mechanism, not a result.
+- Slide 9's time: 2.9 s per caption is measured; 6.4 years one at a time. "Days" assumes about
+  1,000 in parallel (about 2.3 days), which we haven't been granted or tested: the Bedrock quota
+  sets it. The judge cost ($1.1M for Opus on every caption, against our $5.5K) is in the slide's
+  footnote: use it only if asked.
 - The example search video runs 22 s, the slide's whole budget, and holds on its end card.
 - The example search is illustrative: our Cases today are US solar, wind and land cover. Don't
   imply we have run that search.
@@ -233,7 +265,8 @@ unless a line says otherwise. Each item gives the gap, then an answer to give.
 - An open VLM on a SageMaker GPU (`gpu-vlm`) is blocked on GPU quota.
 - Opus 5.5 ran as a second captioner. Its scores are flagged as self-graded, because the judge
   is Opus too.
-- The scale slide is in dollars, which the brief says not to use.
+- The scale slide is in dollars, which the brief says not to use. Its footnote says so: cost
+  is from tokens, not GPU time and size. It does show time: 2.9 s per caption, measured.
 - *Answer:* cost records are ready for GPU-seconds, and verified claims per GPU-second is a
   metric already, but we have no GPU numbers yet.
 

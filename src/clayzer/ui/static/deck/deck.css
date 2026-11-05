@@ -126,21 +126,98 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
   border-radius: 4px; border: 2px solid #6b6461; }
 .legend i.planned { border-style: dashed; border-color: #a59d99; }
 
-/* Scale slide: magnitude on the left, the cost ladder on the right. */
-.scale { display: grid; grid-template-columns: 0.75fr 1.6fr; gap: 56px; align-items: start; }
-.magnitude p { font-size: 22px; line-height: 1.4; color: var(--muted); margin-bottom: 26px; }
-.magnitude b { display: block; font-size: 52px; line-height: 1.05; color: var(--ink); }
-.lever { display: grid; grid-template-columns: 430px 1fr 96px 104px; align-items: center; gap: 16px;
-  padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 22px; }
-.lever .bar { height: 22px; background: var(--data); border-radius: 4px; }
-.lever .bar i { display: block; height: 100%; border-radius: 4px; background: var(--decision); }
-.lever .total { font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
-.lever .basis { font-size: 15px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+/* Scale slide: same pot, less clay (scale-pottery.js). Bricks of clay are the cost; the pot on
+   the wheel is the job at the same quality bar. Bricks a press saves fall away, top first; the
+   drip and the wheel loop; going back snaps the bricks back. */
+.scale-slide h2 { margin-bottom: 8px; }
+.scale-grid { display: grid; grid-template-columns: 760px 1fr; gap: 34px; align-items: start; }
+.pottery { width: 760px; height: 513px; font-family: system-ui, sans-serif; }
+.pottery .pot-label { font-size: 17px; font-weight: 700; letter-spacing: .1em; fill: var(--muted); }
+.pottery .pot-cost { font-size: 62px; font-weight: 800; fill: var(--decision); opacity: 0;
+  transition: opacity .35s ease; font-variant-numeric: tabular-nums; }
+.pottery .pot-cost.on { opacity: 1; }
+.pottery .pot-unit { font-size: 16px; fill: var(--muted); }
+.pottery .pot-time { font-size: 26px; font-weight: 800; fill: var(--ink); }
+.pottery .pot-time-sub { font-size: 17px; fill: #4a4240; }
+.pottery .brick { fill: #b06a4f; stroke: #8a4a33; stroke-width: 1.5; transform-box: fill-box;
+  transform-origin: left center; transform: scaleX(var(--s)); }
+.pottery .brick.gone { opacity: 0; transform: translateY(46px) rotate(8deg) scaleX(var(--s));
+  transition: opacity .5s ease-in var(--d), transform .6s ease-in var(--d); }
+.pottery .chute { fill: none; stroke: #c98b6f; stroke-width: 10; stroke-linecap: round; opacity: .55; }
+.pottery .drip { transform-box: fill-box; transform-origin: center; fill: #b06a4f; animation: pot-drip 1.5s cubic-bezier(.5, 0, 1, 1) infinite;
+  animation-delay: calc(var(--k) * .5s); opacity: 0; }
+@keyframes pot-drip {
+  0% { transform: translateY(0) scale(.6); opacity: 0; }
+  15% { opacity: 1; transform: translateY(8px) scale(1); }
+  85% { opacity: 1; }
+  100% { transform: translateY(112px) scale(.8, 1.2); opacity: 0; }
+}
+.pottery .pot { fill: none; stroke: #8a5b0e; stroke-width: 5; stroke-linejoin: round; }
+.pottery .pot-clay { fill: #c98b6f; }
+.pottery .quality { stroke: var(--ok); stroke-width: 3.5; stroke-dasharray: 10 7; }
+.pottery .gate-post { fill: var(--ok); }
+.pottery .gate-label { font-size: 15px; fill: var(--ok); }
+/* Each press: the clay drops to the bar, the gate catches it and flashes, and the clay springs
+   back above it. Keyed on the step in scale-pottery.js, so it replays on every press. */
+.pottery .pot-clay.dip { animation: pot-dip 1.1s cubic-bezier(.3, 0, .2, 1) .15s both; }
+@keyframes pot-dip {
+  0% { transform: translateY(0); }
+  35% { transform: translateY(38px); }
+  45% { transform: translateY(34px); }
+  100% { transform: translateY(0); }
+}
+.pottery .gate.hit .quality { animation: gate-hit 1.1s ease .15s both; }
+.pottery .gate.hit .gate-post { animation: gate-post 1.1s ease .15s both; transform-box: fill-box;
+  transform-origin: center; }
+@keyframes gate-hit { 0%, 25% { stroke-width: 3.5; } 38% { stroke-width: 8; stroke-dasharray: none; } 70%, 100% { stroke-width: 3.5; } }
+@keyframes gate-post { 0%, 25% { transform: none; } 38% { transform: scaleY(1.35); } 70%, 100% { transform: none; } }
+.pottery .quality-label { font-size: 17px; font-weight: 700; fill: var(--ok); }
+.pottery .wheel rect { fill: #6b6461; }
+.pottery .wheel-top { fill: #cebeb5; }
+.pottery .wheel-spin { fill: none; stroke: #8a7a63; stroke-width: 3; stroke-dasharray: 26 18;
+  animation: pot-spin 1.2s linear infinite; }
+@keyframes pot-spin { to { stroke-dashoffset: -88; } }
+
+.pot-levers { margin: 0; padding: 0; list-style: none; }
+.pot-lever { display: grid; grid-template-columns: 1fr 90px 120px; gap: 12px; align-items: center;
+  padding: 8px 14px; margin-bottom: 7px; border-radius: 12px; background: var(--data);
+  border: 1px solid var(--data-line); }
+.pot-lever b { display: block; font-size: 20px; }
+.pot-lever span { font-size: 16px; color: #4a4240; }
+.pot-lever.now { background: var(--captions); border-color: var(--decision); }
+.pot-lever .pot-total { text-align: right; font-size: 22px; font-variant-numeric: tabular-nums; }
+.pot-lever .basis { font-size: 13px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
   color: var(--muted); }
-.lever .basis.assumed { color: var(--ok); }
-.lever:last-of-type .total { color: var(--decision); }
-.judge { margin-top: 24px; padding: 16px 20px; border-radius: 12px; font-size: 22px; line-height: 1.4;
-  background: var(--evaluation); border: 2px solid var(--evaluation-line); }
+.pot-lever .basis.assumed { color: var(--ok); }
+/* The scale stats as three Chips: a real Chip, darkened, behind the 3 × 3 grid, the count on top. */
+.scale-side { display: flex; flex-direction: column; height: 100%; }
+.chip-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 14px; }
+.chip-stat { position: relative; margin: 0; aspect-ratio: 1.45; border-radius: 10px; overflow: hidden;
+  display: flex; flex-direction: column; justify-content: flex-end; padding: 10px 12px;
+  background-size: cover; background-position: center; color: #fffdfb;
+  box-shadow: inset 0 0 0 2px rgba(255, 253, 251, .25); }
+.chip-stat::before { content: ""; position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(14, 13, 12, .15) 0%, rgba(14, 13, 12, .78) 100%),
+    linear-gradient(to right, transparent 33%, rgba(255, 253, 251, .35) 33%, rgba(255, 253, 251, .35) calc(33% + 1.5px),
+      transparent calc(33% + 1.5px), transparent 66%, rgba(255, 253, 251, .35) 66%,
+      rgba(255, 253, 251, .35) calc(66% + 1.5px), transparent calc(66% + 1.5px)),
+    linear-gradient(to bottom, transparent 33%, rgba(255, 253, 251, .35) 33%, rgba(255, 253, 251, .35) calc(33% + 1.5px),
+      transparent calc(33% + 1.5px), transparent 66%, rgba(255, 253, 251, .35) 66%,
+      rgba(255, 253, 251, .35) calc(66% + 1.5px), transparent calc(66% + 1.5px)); }
+.chip-stat > * { position: relative; }
+.chip-def { grid-column: 1 / -1; margin: 0; font-size: 16px; color: var(--muted); }
+.chip-def b { color: var(--ink); }
+.chip-stat b { font-size: 44px; line-height: 1; font-weight: 800; letter-spacing: -.02em; }
+.chip-stat figcaption { margin-top: 4px; font-size: 16px; font-weight: 600; line-height: 1.25; }
+.chip-stat figcaption span { display: block; font-weight: 400; opacity: .8; }
+.scale-notes { margin: auto 0 0; padding: 0 0 0 18px; font-size: 14.5px; line-height: 1.4;
+  color: var(--muted); }
+.scale-notes li { margin-bottom: 3px; }
+@media (prefers-reduced-motion: reduce) {
+  .pottery .drip, .pottery .wheel-spin, .pottery .pot-clay.dip, .pottery .gate.hit * { animation: none; }
+  .pottery .drip { opacity: 0; }
+  .pottery .brick.gone, .pottery .pot-cost { transition: none; }
+}
 
 /* Presenter notes, over the bottom of the window (N). */
 .notes { position: fixed; left: 0; right: 0; bottom: 0; max-height: 40vh; overflow: auto;

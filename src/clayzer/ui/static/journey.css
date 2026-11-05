@@ -793,6 +793,11 @@ html[data-motion="off"] *::after {
 .story-audio-panel label {
   display: grid;
   font-size: 0.7rem;
+  max-width: 100%;
+  min-width: 0;
+}
+.story-audio-panel #story-voice {
+  max-width: min(100%, 18rem);
 }
 .story-audio-panel progress {
   width: 100%;

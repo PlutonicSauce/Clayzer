@@ -6,6 +6,9 @@
   const pause = document.getElementById("listen-pause");
   const stop = document.getElementById("listen-stop");
   const speed = document.getElementById("listen-speed");
+  const voiceChoice = document.getElementById("listen-voice");
+  let voices = [],
+    voiceWasChosen = false;
   let generation = 0,
     chunks = [],
     index = 0,
@@ -44,11 +47,44 @@
   if (!synth || !window.SpeechSynthesisUtterance) {
     play.disabled = true;
     speed.disabled = true;
+    voiceChoice.disabled = true;
     update(
       "Audio reading is unavailable in this browser. Read the page text below.",
     );
     return;
   }
+  const voiceKey = (voice) => voice.voiceURI || `${voice.name}:${voice.lang}`;
+  const refreshVoices = () => {
+    const previous = voiceChoice.value;
+    voices = synth
+      .getVoices()
+      .filter((voice) => /^en(?:-|$)/i.test(voice.lang));
+    const defaultOption = new Option("Browser default", "");
+    voiceChoice.replaceChildren(defaultOption);
+    for (const voice of voices) {
+      const local = voice.localService ? "" : " · browser service";
+      voiceChoice.add(
+        new Option(`${voice.name} · ${voice.lang}${local}`, voiceKey(voice)),
+      );
+    }
+    if (
+      voiceWasChosen &&
+      (previous === "" || voices.some((voice) => voiceKey(voice) === previous))
+    ) {
+      voiceChoice.value = previous;
+    } else {
+      voiceWasChosen = false;
+      const british = voices.filter(
+        (voice) => /^en-GB$/i.test(voice.lang) && voice.localService,
+      );
+      const preferred =
+        british.find((voice) => /enhanced|premium|natural/i.test(voice.name)) ||
+        british[0];
+      voiceChoice.value = preferred ? voiceKey(preferred) : "";
+    }
+  };
+  refreshVoices();
+  synth.addEventListener?.("voiceschanged", refreshVoices);
   const speak = (token) => {
     if (token !== generation || !active) return;
     if (index >= chunks.length) {
@@ -59,10 +95,11 @@
     const utterance = new SpeechSynthesisUtterance(chunks[index]);
     utterance.lang = document.documentElement.lang || "en";
     utterance.rate = Number(speed.value);
-    const voice = synth
-      .getVoices()
-      .find((v) => v.lang.startsWith("en") && v.localService);
-    if (voice) utterance.voice = voice;
+    const voice = voices.find((v) => voiceKey(v) === voiceChoice.value);
+    if (voice) {
+      utterance.voice = voice;
+      utterance.lang = voice.lang;
+    }
     utterance.onend = () => {
       if (token === generation) {
         index++;
@@ -115,20 +152,25 @@
     update(paused ? "Paused." : "Reading the page summary.");
   });
   stop.addEventListener("click", cancel);
-  speed.addEventListener("change", () => {
+  const restartForSettings = () => {
     if (active) {
       const wasPaused = paused;
       generation++;
       synth.cancel();
       paused = false;
-      update("Reading at the selected speed.");
+      update("Reading with the selected settings.");
       speak(generation);
       if (wasPaused) {
         synth.pause();
         paused = true;
-        update("Paused at the selected speed.");
+        update("Paused with the selected settings.");
       }
     }
+  };
+  speed.addEventListener("change", restartForSettings);
+  voiceChoice.addEventListener("change", () => {
+    voiceWasChosen = true;
+    restartForSettings();
   });
   window.addEventListener("hashchange", cancel);
   window.addEventListener("pagehide", cancel);
