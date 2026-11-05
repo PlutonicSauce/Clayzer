@@ -47,8 +47,8 @@ function TrustIcon({ name }) {
 function Problem({ step = 0 }) {
   const trusted = step > TRUST.length;
   return html`<div class="problem">
-    <${Kicker}>The problem<//>
-    <h2>Nobody has checked Clay's captions</h2>
+    <${Kicker}>The problem · our answer<//>
+    <h2>From black box to captions you can trust</h2>
     <div class="problem-grid">
       <div class=${`hook ${trusted ? "trusted" : ""}`}>
         <${CaptionChip} records=${step >= 1} fixed=${trusted} />
@@ -170,7 +170,7 @@ export const SLIDES = [
     spoken: "Clayzer. Give us your caption set, and we tell you how much of it you can trust.",
     notes: ["One line, then move on.", "4:00 total. T starts the timer, A reads a slide aloud."] },
   { title: "The problem", seconds: 50, component: Problem, steps: 4,
-    spoken: "Nobody has checked the captions on Clay's imagery. Here is a real one: the model saw only this photo and said eighteen wind turbines, mostly in the centre. So how do we make captions you can trust? First, we enrich the inputs: these dots are the public records, cross-checked by code, and they show the turbines are all around the centre, not in it. Second, we tune on one region and test on another it never saw. Third, a self-improvement loop that keeps only the changes that beat the baseline. The result: a caption that matches what is really there.",
+    spoken: "Today, a caption on Clay's imagery is a black box: nobody has checked it. Here is a real one: the model saw only this photo and said eighteen wind turbines, mostly in the centre. So how do we make captions you can trust? First, we enrich the inputs: these dots are the public records, cross-checked by code, and they show the turbines are all around the centre, not in it. Second, we tune on one region and test on another it never saw. Third, a self-improvement loop that keeps only the changes that beat the baseline. The result: a caption that matches what is really there.",
     notes: ["Every image is cut into a 3 × 3 grid, so a caption's \"where\" is a cell we can check. The amber box is where the caption put the turbines.", "Press → for each point as you say it. Press 1 also draws the records' dots on the photo; press 4 turns the caption green.", "Count right, place wrong: the caption said 18 (right) in the centre (wrong).", "Say 'tune', not 'train': we tune the captioner's prompt and checks, we don't train a model.", "Labels are automatic; a person only looks where the two records disagree (the gold dot, 2 m apart)."] },
   { title: "How it works", seconds: 40, component: Architecture,
     spoken: "Here is the whole journey. One aerial image comes in on the left. A model on AWS writes a caption. Before each statement is kept, we check it against the imagery. We score it against open map data the model never saw. A gate decides whether it is good enough. What comes out is a verdict you can trust, and the same path works for one image or a million.",
