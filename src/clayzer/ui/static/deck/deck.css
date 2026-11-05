@@ -260,7 +260,6 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 /* The problem slide: an untrusted caption on the left, the three ways we earn trust building in
    on the right (one per press), and the caption turning trusted on the last press. */
 .problem h2 { margin-bottom: 30px; }
-.problem-grid { display: grid; grid-template-columns: 560px 1fr; gap: 56px; align-items: start; }
 .problem .hook { position: relative; align-self: stretch; transition: background-color .5s ease; }
 .problem .hook.trusted { background: var(--evaluation); }
 .problem .hook.trusted blockquote { border-left-color: var(--ok); }
@@ -284,26 +283,18 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .ex-frame .records.in { opacity: 1; }
 .ex-frame .claim.ok { fill: rgba(47, 107, 58, .14); stroke: #6fbf7e; }
 .ex-legend .sq.claim.ok { border-color: #2f6b3a; background: rgba(47, 107, 58, .16); }
-.problem .problem-grid { grid-template-columns: 790px 1fr; gap: 44px; }
 .problem .hook { display: grid; grid-template-columns: 400px 1fr; gap: 26px; align-items: start;
   padding: 24px; }
 .problem .ex-frame { width: 400px; height: 400px; }
 .problem .ex-legend { flex-direction: column; gap: 2px; font-size: 15px; }
-.hook-side { display: flex; flex-direction: column; align-items: flex-start; }
 .problem .hook-stamp { position: static; margin-bottom: 18px; }
 .problem .hook .hook-label { margin: 0 0 8px; }
 .problem .hook blockquote { margin: 0 0 14px; font-size: 22px; }
-.hook-note { margin: 0; font-size: 19px; line-height: 1.4; color: #4a4240; }
 .problem .trust-item { padding: 14px 18px; grid-template-columns: 52px 1fr; gap: 14px; }
 .problem .trust-item b { font-size: 24px; }
 .problem .trust-item p { font-size: 18px; }
 .problem .trust-icon { width: 46px; height: 46px; }
 @media (prefers-reduced-motion: reduce) { .ex-frame .records { transition: none; } }
-
-/* Problem slide (problem only): the Chip card, and two short lines on what's at stake. */
-.stakes { display: flex; flex-direction: column; gap: 34px; padding-top: 30px; }
-.stakes p { margin: 0; font-size: 30px; line-height: 1.35; color: #3e3a39; }
-.stakes b { color: var(--decision); }
 
 /* Solution slide: the same Chip on the left, the five ways we earn trust building in. */
 .trust-grid { display: grid; grid-template-columns: 430px 1fr; gap: 40px; align-items: start; }
@@ -319,21 +310,6 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .trust-slide .trust-item p { font-size: 17px; line-height: 1.35; }
 .trust-slide .trust-icon { width: 42px; height: 42px; }
 
-/* Problem slide, right column: the records disagreeing about this photo, then the triage rule. */
-.problem .stakes { gap: 22px; padding-top: 0; }
-.wrong-card { padding: 20px 22px; border-radius: 14px; background: var(--data); border: 1px solid var(--data-line); }
-.stakes .wrong-card p { margin: 0; font-size: 19px; line-height: 1.4; color: #4a4240; }
-.stakes .wrong-card .wrong-head { margin-bottom: 8px; font-size: 22px; font-weight: 800; color: var(--decision); }
-.triage { padding: 16px 18px; border-radius: 14px; border: 1px solid var(--line); }
-.triage p { margin: 0; }
-.stakes .triage-head { margin-bottom: 12px; font-size: 22px; font-weight: 800; color: var(--ink); }
-.stakes .triage-row { display: flex; justify-content: space-between; gap: 14px; padding: 10px 14px;
-  border-radius: 10px; font-size: 19px; margin-bottom: 8px !important; }
-.triage-row.ok { background: var(--evaluation); }
-.triage-row.ask { background: var(--delivery); }
-.triage-row span { color: #4a4240; }
-.stakes .wrong-card p { font-size: 21px; }
-.stakes .triage-foot { margin-top: 6px; font-size: 17px; color: var(--muted); }
 .ex-frame .disputed-ring { fill: none; stroke: #f2c14e; stroke-width: 5; stroke-dasharray: 7 5; }
 
 /* Section breadcrumb across the top of each slide: where we are in the story. */
@@ -510,3 +486,76 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .journey-strip li.arrow.lit path { fill: var(--decision); }
 .journey-strip li.io.out.lit { border-style: solid; border-color: var(--decision); color: var(--decision);
   background: var(--delivery); }
+
+/* The problem slide (problem-slide.js), on the 1600 x 900 stage: the photo with labelled overlays
+   on the left; how the caption was made on top right, then the two records side by side. */
+.problem-statement h2 { margin-bottom: 22px; }
+.pz { flex: 1; display: grid; grid-template-columns: 520px 1fr; gap: 40px; align-items: start; }
+.pz-left { display: flex; flex-direction: column; gap: 12px; }
+.pz-photo { position: relative; width: 520px; height: 520px; border-radius: 12px; overflow: hidden; }
+.pz-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pz-photo svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.pz-grid line { stroke: #fffdfb; stroke-opacity: .7; stroke-width: 1.3; stroke-dasharray: 6 5; }
+.pz-claim { fill: rgba(138, 91, 14, .18); stroke: #f2a93b; stroke-width: 5; }
+.pz-turbine { fill: #fffdfb; stroke: #252323; stroke-width: 3; }
+.pz-cross { fill: none; stroke: #9a4a35; stroke-width: 9; stroke-linecap: round; }
+.pz-tag line { stroke-width: 3; }
+.pz-tag text { font: 700 17px system-ui, sans-serif; fill: #fffdfb; text-anchor: middle; }
+.pz-tag.cap rect { fill: #8a5b0e; } .pz-tag.cap line { stroke: #f2a93b; }
+.pz-tag.rec rect { fill: #9a4a35; } .pz-tag.rec line { stroke: #9a4a35; }
+.pz-tag.gap rect { fill: #252323; }
+.pz-target { fill: none; stroke: #f2c14e; stroke-width: 4; stroke-dasharray: 5 4; }
+.pz-lead { stroke: #fffdfb; stroke-width: 3; }
+.pz-loupe-ring { fill: none; stroke: #fffdfb; stroke-width: 6; filter: drop-shadow(0 4px 10px rgba(0, 0, 0, .35)); }
+.pz-edge { stroke: #252323; stroke-width: 2.5; stroke-dasharray: 7 5; }
+.pz-outside { font: 600 13px system-ui, sans-serif; fill: #6b6461; text-anchor: middle; }
+.pz-pin { stroke: #fffdfb; stroke-width: 3; }
+.pz-pin.usgs { fill: #3f5866; } .pz-pin.osm { fill: #2f6b3a; }
+.pz-pin.ghost { fill: none; stroke: #3f5866; stroke-width: 5; stroke-dasharray: 7 5; }
+.pz-pin-label { font: 800 15px system-ui, sans-serif; paint-order: stroke; stroke: #fffdfb; stroke-width: 4px; }
+.pz-pin-label.usgs { fill: #3f5866; text-anchor: end; } .pz-pin-label.osm { fill: #2f6b3a; }
+.pz-verdict { display: flex; gap: 10px; }
+.pz-verdict span { padding: 6px 16px; border-radius: 999px; font-size: 20px; font-weight: 800; }
+.pz-verdict .ok { background: var(--evaluation); color: var(--ok); }
+.pz-verdict .bad { background: var(--captions); color: var(--decision); }
+
+.pz-right { display: flex; flex-direction: column; gap: 16px; }
+.pz-flow { display: grid; grid-template-columns: 1fr auto .75fr auto 1.25fr; align-items: stretch; gap: 8px; }
+.pz-step { position: relative; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); }
+.pz-step p { margin: 0; font-size: 16px; line-height: 1.35; color: #4a4240; }
+.pz-step .pz-k { margin-bottom: 5px; font-size: 13px; font-weight: 800; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--muted); }
+.pz-step.prompt { background: var(--data); border-color: var(--data-line); }
+.pz-step.prompt p:last-child { font-family: ui-monospace, Menlo, monospace; font-size: 14px; }
+.pz-step.model { background: var(--platform); border-color: var(--platform-line); }
+.pz-step.model .pz-k { color: var(--ink); font-size: 16px; }
+.pz-step.caption { background: var(--captions); border-color: var(--captions-line); padding-bottom: 46px; }
+.pz-step.caption p:last-child { font-style: italic; font-size: 17px; color: var(--ink); }
+.pz-stamp { position: absolute; left: 14px; bottom: 12px; padding: 3px 12px; border-radius: 999px;
+  background: var(--decision); color: #fffdfb; font-size: 15px; font-weight: 800; }
+.pz-arrow { align-self: center; font-size: 26px; font-weight: 700; color: var(--muted); }
+
+.pz-head { margin: 0 0 10px; font-size: 21px; font-weight: 800; }
+.pz-foot { margin: 8px 0 0; font-size: 15px; line-height: 1.4; color: #4a4240; }
+.pz-compare { padding: 14px 18px; border-radius: 14px; background: var(--data); border: 1px solid var(--data-line); }
+.pz-compare .pz-head { color: var(--decision); }
+.pz-vs { display: flex; align-items: center; justify-content: center; gap: 22px; }
+.pz-loupe { width: 170px; height: 200px; flex: none; overflow: visible; }
+.pz-loupe-cap { font: 800 17px system-ui, sans-serif; fill: #252323; text-anchor: middle; }
+.pz-record { margin: 0; }
+.pz-mini { position: relative; width: 150px; height: 162px; }
+.pz-mini img { position: absolute; left: 0; top: 11.7px; width: 150px; height: 150px; border-radius: 6px; opacity: .85; }
+.pz-mini svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.pz-mini-edge { fill: none; stroke: #6b6461; stroke-width: 3; }
+.pz-mini .pz-target { stroke-width: 9; stroke-dasharray: 14 10; }
+.pz-where { font: 800 54px system-ui, sans-serif; paint-order: stroke; stroke: #fffdfb; stroke-width: 12px; }
+.pz-where.usgs { fill: #3f5866; } .pz-where.osm { fill: #2f6b3a; }
+.pz-record figcaption { display: flex; align-items: baseline; justify-content: space-between; margin-top: 4px; }
+.pz-record b { font-size: 16px; } .pz-record b.usgs { color: #3f5866; } .pz-record b.osm { color: #2f6b3a; }
+.pz-count { font-size: 36px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.pz-ne { font-size: 52px; font-weight: 800; color: var(--decision); }
+
+.pz-build { opacity: 0; transition: opacity .5s ease, transform .5s ease; }
+.pz-build.in { opacity: 1; }
+div.pz-build { transform: translateY(14px); } div.pz-build.in { transform: none; }
+@media (prefers-reduced-motion: reduce) { .pz-build { transition: none; } }

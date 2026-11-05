@@ -8,16 +8,16 @@
 
 import { html } from "./html.js";
 
-const CHIP = "/api/chips/ca-uswtdb-3073564-20220702.png";
+export const CHIP = "/api/chips/ca-uswtdb-3073564-20220702.png";
 const C = 512 / 3;
 const CELLS = ["north_west", "north", "north_east", "west", "centre", "east", "south_west", "south",
   "south_east"];
 
 // The 17 turbines both records place inside the Chip (USGS positions), and the one they disagree on.
-const AGREED = [[98, 282], [237, 92], [354, 315], [2, 39], [277, 414], [471, 159], [167, 187],
+export const AGREED = [[98, 282], [237, 92], [354, 315], [2, 39], [277, 414], [471, 159], [167, 187],
   [431, 207], [312, 363], [393, 264], [132, 233], [281, 46], [238, 465], [57, 326], [203, 143],
   [509, 116], [25, 377]];
-const DISPUTED = [316, 2];
+export const DISPUTED = [316, 2];
 
 // `records` shows the 17 turbines both public records agree on; `dispute` adds the one they place
 // either side of the top edge (clayzer corroborate flagged it: wind agreed on 25 of 26 Cases);

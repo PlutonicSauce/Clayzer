@@ -12,6 +12,7 @@ import { CaptionChip } from "./caption-chip.js";
 import { ChipJourney } from "./chip-journey.js";
 import { OntologyViz } from "./ontology-slide.js";
 import { ChipStats, LeverList, PotteryScale } from "./scale-pottery.js";
+import { ProblemViz } from "./problem-slide.js";
 
 const Kicker = ({ children }) => html`<p class="kicker">${children}</p>`;
 
@@ -29,37 +30,10 @@ function Title() {
 // records agree on appear), the records disagree too (the 18th, either side of the top edge), and
 // so we cross-check sources and only bring in a person when they conflict or are too uncertain.
 function Problem({ step = 0 }) {
-  const shown = step >= 1;
-  return html`<div class="problem">
+  return html`<div class="problem-statement">
     <${Kicker}>New caption, who dis?<//>
-    <h2>Today, every caption is a black box</h2>
-    <div class="problem-grid">
-      <div class="hook">
-        <${CaptionChip} records=${shown} dispute=${step >= 2} />
-        <div class="hook-side">
-          <span class="hook-stamp">✗ Unchecked</span>
-          <p class="hook-label">A real caption</p>
-          <blockquote>“18 wind turbines, primarily in the center and eastern parts of the
-            image.”</blockquote>
-          <p class="hook-note">${shown
-            ? "Count right, place wrong: the records put every turbine around the centre."
-            : "Nova Pro saw only the photo. We ask it to name each object's place as one of our 9 grid cells, so \u201cwhere\u201d can be checked."}</p>
-        </div>
-      </div>
-      <div class="stakes">
-        <div class=${`wrong-card build ${step >= 2 ? "in" : ""}`}>
-          <p class="wrong-head">The records disagree too</p>
-          <p><b>USGS</b> counts 17 turbines in this photo. <b>OpenStreetMap</b> counts 18: it puts
-            the gold one 2 m further in, inside the top edge. One of them is wrong.</p>
-        </div>
-        <div class=${`triage build ${step >= 3 ? "in" : ""}`}>
-          <p class="triage-head">So we cross-check the sources</p>
-          <p class="triage-row ok"><b>Sources agree</b><span>labelled automatically</span></p>
-          <p class="triage-row ask"><b>Conflict, or too uncertain</b><span>only then, a person looks</span></p>
-          <p class="triage-foot">This conflict was flagged automatically. A person checked the photo: 18.</p>
-        </div>
-      </div>
-    </div>
+    <h2>Trusted, never verified</h2>
+    <${ProblemViz} step=${step} />
   </div>`;
 }
 
@@ -71,7 +45,7 @@ const TRUST = [
   { icon: "check", title: "Verify, then write",
     text: "Each fact is checked against imagery at its grid cell before the caption is written. In testing, every object it named was really there." },
   { icon: "layers", title: "Hidden answer keys",
-    text: "Public records (USGS, OpenStreetMap), cross-checked by code, grade every fact. The captioner never sees them, so a good score is earned." },
+    text: "Public records (USGS, OpenStreetMap), cross-checked by code, grade every fact: where they agree, labels are automatic; where they conflict, a person looks. The captioner never sees them." },
   { icon: "tag", title: "One shared vocabulary",
     text: "About 20 object classes with their look-alikes and minimum sizes, so “building” for a greenhouse earns partial credit, not zero." },
   { icon: "split", title: "Tune on one region, test on another",
@@ -95,7 +69,7 @@ function Trust({ step = 0 }) {
   const trusted = step > TRUST.length;
   return html`<div class="problem trust-slide">
     <${Kicker}>Our solution<//>
-    <h2>From black box to captions you can trust</h2>
+    <h2>Trust, but verify</h2>
     <div class="trust-grid">
       <div class=${`hook ${trusted ? "trusted" : ""}`}>
         <${CaptionChip} fixed=${trusted} />
@@ -284,9 +258,9 @@ export const SLIDES = [
   { title: "Clayzer", seconds: 10, theme: "dark", component: Title,
     spoken: "Clayzer, said KLAY-zer. It comes from glaze, the finish a potter fires onto clay. A solution for producing captions you can trust, at scale.",
     notes: ["Say the name, KLAY-zer, then the one-line definition, and move on.", "4:00 total. T starts the timer, A reads a slide aloud."] },
-  { title: "The problem", section: "Problem Statement", seconds: 35, component: Problem, steps: 3,
-    spoken: "New caption, who dis? That is how captions on Clay's imagery work today. Here is a real one: the model saw only this photo and said eighteen wind turbines, mostly in the centre. The public records put the turbines all around the centre, not in it. But the records disagree too: the government database counts seventeen, OpenStreetMap counts eighteen, because they put this turbine two metres apart, either side of the edge. So we never trust one source. We cross-check them: when they agree, the label is automatic, and only when they conflict, like here, does a person look.",
-    notes: ["Open with the label as a joke: \"New caption, who dis? That's how Clay's imagery works today: a caption shows up and nobody knows if it's legit.\"", "Press 1: the 17 turbines both records agree on. The caption is wrong: they're all around the centre.", "Press 2: the gold turbine. USGS puts it just outside the top edge, OpenStreetMap just inside, 2 m apart: 17 or 18.", "Press 3: we stay out of hand-labelling unless sources conflict or confidence is too low. This conflict was flagged automatically (wind agreed on 25 of 26 Cases); a person checked the photo and confirmed 18.", "If asked: the cross-check is built for solar and wind; a confidence threshold for labels is the plan, not built yet.", "The 3 × 3 grid is ours: the model sees the plain photo, and the prompt makes it name each object's place as one of 9 cells."] },
+  { title: "The problem", section: "Problem Statement", seconds: 35, component: Problem, steps: 2,
+    spoken: "New caption, who dis? That is how captions on Clay's imagery work today. Here is a real one: we gave a vision-language model one photo and a simple prompt, and it said a large solar array, three times out of three. These are white roofs. So check it against the public records? They disagree too: on this wind farm, the government database counts seventeen turbines and OpenStreetMap counts eighteen, because they put one turbine two metres apart, either side of the edge.",
+    notes: ["Open with the label as a joke: \"New caption, who dis? That's how Clay's imagery works today: a caption shows up and nobody knows if it's legit.\"", "Case lookalike-neg-110: rows of white roofs. Nova Pro said a large solar array in the north-east, in all 3 Repeats of the Baseline. USPVDB has no solar there, checked by eye.", "Press 1: the claim crossed out: white roofs, no panels, the same answer 3 times in 3.", "Press 2: the records disagree too. A different Case, the wind farm uswtdb-3073564: USGS puts one turbine just outside the photo, OpenStreetMap just inside, 2 m apart, so 17 or 18. Checked live against both.", "If asked: the cross-check (agree: automatic; conflict: a person) is on the solution slide.", "The 3 × 3 grid is ours: the prompt makes the model name each object's place as one of 9 cells."] },
   { title: "Example search", section: "Value Unlock", seconds: 22, component: ExampleSearch,
     spoken: "Why does this matter? Trusted captions make satellite imagery searchable in plain words. Ask which rice fields near Bangkok became buildings since the 2011 flood, and you get matching before-and-after images. No map layer, no GIS skills. Fish ponds can pass for buildings, so we check every caption. Then anyone can ask questions like this, about homes, harvests and jobs, and trust the answers.",
     notes: ["Let the video play; it runs 22 s and holds on the end card. To replay it, leave the slide and come back.", "The line to land: anyone can ask the Earth a question, and checked captions make the answers trustworthy.", "Why text search and not just the latest image: you don't know where to look, no layer exists for it, and the change is slow, a few fields a year, so it only shows across dates.", "Look-alikes: fish ponds and flooded paddies look the same from above; that is what our look-alike vocabulary is for.", "Illustrative, not real results: our Cases today are US solar, wind and land cover. Don't imply we have run this search."] },
@@ -294,7 +268,7 @@ export const SLIDES = [
     spoken: "Let's follow one real image. One: the model writes five claims from the image alone. Two: each claim is checked against the imagery. That solar array is a storage yard, so it's gone before the caption is written. Three: we score it against public records it never saw: right, but it missed the road. Four: every change faces a gate. A vaguer prompt looked more correct, and failed. Only pairs that pass go out, to Clay, LGND, or other apps.",
     notes: ["One press per step; the strip at the top lights the step you're on.", "Press 2 is the moment: point at the south-west cell, the storage yard that looks like panels.", "Real Runs: verify-2 neg-1 Repeat 1, and the vague-prompt gate (demo/stories.toml)."] },
   { title: "Our solution", section: "Our Solution", seconds: 34, component: Trust, steps: 6,
-    spoken: "Here is how we make captions you can trust. We verify, then write: each fact is checked against the imagery before the caption is written. The answer keys are public records, cross-checked by code, that the captioner never sees. One shared vocabulary of objects and their look-alikes. We tune on one region and test on another it never saw. And a self-improvement loop keeps only the changes that beat the baseline. The result: a caption that matches what is really there.",
+    spoken: "Here is how we make captions you can trust. We verify, then write: each fact is checked against the imagery before the caption is written. The answer keys are public records, cross-checked by code: where they agree, labels are automatic, and only where they conflict does a person look. The captioner never sees them. One shared vocabulary of objects and their look-alikes. We tune on one region and test on another it never saw. And a self-improvement loop keeps only the changes that beat the baseline. The result: a caption that matches what is really there.",
     notes: ["Press → for each point as you say it (5 presses); the 6th turns the caption green.", "Verify-then-write: in the 4-image test, every object it named was really there, and correctness rose 0.53 → 0.65. Don't claim it's in the baseline: the gate kept it out because coverage dropped.", "Say 'tune', not 'train': we tune the captioner's prompt and checks.", "Labels are automatic; a person only looks where the two records disagree."] },
   { title: "The ontology", section: "Our Solution", seconds: 22, component: Ontology, steps: 2,
     spoken: "Our caption harness also reads an ontology: a semantic layer of what things are, what they sit near, and what they are mistaken for. Without it, the captioner called greenhouses solar farms nine times in twelve. With it, it is warned before it writes, and every claim uses words we can check.",

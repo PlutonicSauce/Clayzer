@@ -34,25 +34,26 @@ T starts the deck's timer; the notes panel warns when a slide runs long.
 
 ## 2. The problem (0:10–0:45)
 
-**On screen:** one wind-farm photo, `fixed-dev-uswtdb-3073564`, and its real caption.
-Three presses.
+**On screen:** a photo of rows of white roofs (`fixed-dev-lookalike-neg-110`), and beside it how
+its caption was made: the real prompt, Nova Pro shown only the photo, and its caption, stamped
+unchecked. A line on the photo ties "Caption: a solar array" to the north-east cell it names.
+Two presses.
 
-> New caption, who dis? That is how captions on Clay's imagery work today. Here is a real one:
-> the model saw only this photo and said eighteen wind turbines, mostly in the centre.
+> New caption, who dis? That is how captions on Clay's imagery work today. Here is a real one: we
+> gave a vision-language model one photo and a simple prompt, and it said a large solar array,
+> three times out of three.
 
-*Press 1: the 17 turbines both records agree on.*
+*Press 1: the claim crossed out, "Actually: white roofs", and "Same answer 3 times in 3".*
 
-> The public records put the turbines all around the centre, not in it.
+> These are white roofs.
 
-*Press 2: the gold turbine at the top edge.*
+*Press 2: the records disagree too: a loupe on a wind-farm turbine at the photo's edge (USGS pin
+just outside, OSM pin just inside, 2 m apart), and the two records side by side, USGS 17 ≠
+OpenStreetMap 18.*
 
-> But the records disagree too: the government database counts seventeen, OpenStreetMap counts
-> eighteen, because they put this turbine two metres apart, either side of the edge.
-
-*Press 3: the triage card.*
-
-> So we never trust one source. We cross-check them: when they agree, the label is automatic,
-> and only when they conflict, like here, does a person look.
+> So check it against the public records? They disagree too: on this wind farm, the government
+> database counts seventeen turbines and OpenStreetMap counts eighteen, because they put one
+> turbine two metres apart, either side of the edge.
 
 ## 3. Example search (0:45–1:07)
 
@@ -80,12 +81,13 @@ yard that looks like panels), the public records' cells light up, and the gate s
 
 ## 5. Our solution (1:37–2:11)
 
-**On screen:** the same photo and caption, with five points beside it. One press per point as
-you say it, and a sixth that turns the caption green.
+**On screen:** the wind farm from slide 2's records comparison, with five points beside it. One
+press per point as you say it, and a sixth that turns its caption green.
 
 > Here is how we make captions you can trust. We verify, then write: each fact is checked
 > against the imagery before the caption is written. The answer keys are public records,
-> cross-checked by code, that the captioner never sees. One shared vocabulary of objects and
+> cross-checked by code: where they agree, labels are automatic, and only where they conflict
+> does a person look. The captioner never sees them. One shared vocabulary of objects and
 > their look-alikes. We tune on one region and test on another it never saw. And a
 > self-improvement loop keeps only the changes that beat the baseline. The result: a caption
 > that matches what is really there.
@@ -172,12 +174,12 @@ for questions.
 
 ## Rehearsal notes
 
-- At a calm 145 words a minute the whole script is about 660 words, 4:32, so it runs about 32
+- At a calm 145 words a minute the whole script is about 645 words, 4:27, so it runs about 27
   seconds over. Slide 9 is most of it: about 104 words, 43 seconds against a 20-second budget.
-  Rehearse it fast, or give only the first and last price and the time line. Slide 2 runs
-  about 6 seconds long, slide 3 about 5 (65 words against 22 seconds; drop "No map layer, no GIS
-  skills" if you need it), and slide 7 about 2. Slide 8 has about 7 seconds spare, which the
-  clicks will use.
+  Rehearse it fast, or give only the first and last price and the time line. Slide 5 runs about
+  6 seconds long (it now carries the cross-check rule), slide 3 about 5 (65 words against 22
+  seconds; drop "No map layer, no GIS skills" if you need it), and slide 7 about 2. Slide 2 fits
+  its 35 seconds. Slide 8 has about 7 seconds spare, which the clicks will use.
 - Verify-then-write is part of the approach, but the Baseline ran without it. If asked whether
   77% includes it, say no: the Baseline is the plain captioner. In the 4-image test, every object
   it named was really there, and correctness rose from 0.53 to 0.65.
@@ -211,8 +213,11 @@ for questions.
   search is for when you don't: the change is slow, a few fields a year, nobody keeps a layer of
   it, and it only shows across dates. That building on the floodplain made 2011 worse is reported
   but not checked by us; don't quote it as a figure.
-- On the problem slide, if asked: the cross-check is built for solar and wind. A confidence
-  threshold for labels is planned, not built.
+- On the problem slide, the solar caption and the turbine records are two different Cases: the
+  white roofs are `lookalike-neg-110` (3 of 3 Repeats said solar), the 17 or 18 turbines are
+  `uswtdb-3073564`. Don't present them as one photo.
+- If asked about the cross-check: it's built for solar and wind. A confidence threshold for labels
+  is planned, not built.
 - Say "tune", not "train": we tune the captioner's prompt and checks.
 - Before the pitch, check that the Listen button is on the deployed site and that the MP3 exists
   for the Batch you'll open.
