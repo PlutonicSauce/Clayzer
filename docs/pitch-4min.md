@@ -167,8 +167,8 @@ the quality bar, and the gate catches it.
 **On screen:** the closing slide, with links to the live site and the repository. Leave it up
 for questions.
 
-> Thank you. You can see it live on our site, and read every line of the code on GitHub. Our ask
-> is Clay's real caption set and its rubric weights. And any slide here reads itself aloud.
+> Thank you. You can see it live on our site, and read every line of the code on GitHub. And any
+> slide here reads itself aloud.
 
 ---
 
