@@ -59,6 +59,8 @@ p { margin: 0 0 18px; }
 .slide.dark .kicker { color: var(--captions-line); }
 .slide.dark ~ .pageno { color: rgba(255, 253, 251, .6); }
 .title-slide { justify-content: center; max-width: 1000px; }
+.title-slide .pron { margin-top: 22px; font-size: 30px; color: rgba(255, 253, 251, .7); }
+.title-slide .pron span { margin-right: 14px; color: var(--captions-line); }
 .title-slide .lede { margin-top: 34px; font-size: 38px; line-height: 1.4; color: rgba(255, 253, 251, .88); }
 .title-slide .team { margin-top: 40px; font-size: 22px; color: rgba(255, 253, 251, .6); }
 .title-slide .access-note { margin-top: 18px; font-size: 20px; color: rgba(255, 253, 251, .7); }
@@ -239,3 +241,20 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .trust-slide .trust-item b { font-size: 22px; margin: 0 0 3px; }
 .trust-slide .trust-item p { font-size: 17px; line-height: 1.35; }
 .trust-slide .trust-icon { width: 42px; height: 42px; }
+
+/* Problem slide, right column: a record that's wrong about its photo, then the triage rule. */
+.problem .stakes { gap: 22px; padding-top: 0; }
+.wrong-card { display: grid; grid-template-columns: 250px 1fr; gap: 18px; align-items: center;
+  padding: 16px; border-radius: 14px; background: var(--data); border: 1px solid var(--data-line); }
+.wrong-card .ex-frame { width: 250px; height: 250px; }
+.stakes .wrong-card p { margin: 0; font-size: 19px; line-height: 1.4; color: #4a4240; }
+.stakes .wrong-card .wrong-head { margin-bottom: 8px; font-size: 22px; font-weight: 800; color: var(--decision); }
+.ex-frame .osm-water { fill: rgba(78, 140, 196, .35); stroke: #4e8cc4; stroke-width: 5; }
+.triage { padding: 16px 18px; border-radius: 14px; border: 1px solid var(--line); }
+.triage p { margin: 0; }
+.stakes .triage-head { margin-bottom: 12px; font-size: 22px; font-weight: 800; color: var(--ink); }
+.stakes .triage-row { display: flex; justify-content: space-between; gap: 14px; padding: 10px 14px;
+  border-radius: 10px; font-size: 19px; margin-bottom: 8px !important; }
+.triage-row.ok { background: var(--evaluation); }
+.triage-row.ask { background: var(--delivery); }
+.triage-row span { color: #4a4240; }

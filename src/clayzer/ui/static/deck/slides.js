@@ -8,7 +8,7 @@
 
 import { html } from "./html.js";
 import { ArchitectureDiagram, StoryArchitecture } from "./diagram.js";
-import { CaptionChip } from "./caption-chip.js";
+import { CaptionChip, WrongRecordChip } from "./caption-chip.js";
 import { ValueFlow } from "./value-flow.js";
 
 const Kicker = ({ children }) => html`<p class="kicker">${children}</p>`;
@@ -17,14 +17,15 @@ function Title() {
   return html`<div class="title-slide">
     <${Kicker}>Clay Earth Dataset Foundry · Caption track<//>
     <h1>Clayzer</h1>
-    <p class="lede">Give us your caption set, and we tell you how much of it you can trust, where
-      it fails, and what it costs to make better.</p>
+    <p class="pron"><span>/ˈkleɪ.zər/</span> KLAY-zer, rhymes with laser · <i>noun</i></p>
+    <p class="lede">A solution for producing captions you can trust, at scale.</p>
     <p class="team">Team Clayzer · Clay Earth Dataset Foundry hackathon · November 4th, 2026</p>
   </div>`;
 }
 
-// The problem only: a real Caption on its Chip, stamped Unchecked. One press draws the public
-// records' turbines on the photo, showing the Caption put them in the wrong place.
+// The problem only, in three presses: the Caption is wrong (the records' turbines appear), the
+// records can be wrong too (OSM's "reservoir" over a dry basin), and so we cross-check sources and
+// only bring in a person when they conflict or are too uncertain.
 function Problem({ step = 0 }) {
   const shown = step >= 1;
   return html`<div class="problem">
@@ -44,10 +45,18 @@ function Problem({ step = 0 }) {
         </div>
       </div>
       <div class="stakes">
-        <p class=${`build ${shown ? "in" : ""}`}><b>Plausible isn't true.</b> It reads well, and
-          it's wrong.</p>
-        <p class=${`build ${shown ? "in" : ""}`}><b>70M</b> chips in Clay's training set alone. No
-          one can check them by hand.</p>
+        <div class=${`wrong-card build ${step >= 2 ? "in" : ""}`}>
+          <${WrongRecordChip} />
+          <div>
+            <p class="wrong-head">The records can be wrong too</p>
+            <p>OpenStreetMap maps the blue outline as a reservoir. The photo shows a dry basin.</p>
+          </div>
+        </div>
+        <div class=${`triage build ${step >= 3 ? "in" : ""}`}>
+          <p class="triage-head">So we cross-check the sources</p>
+          <p class="triage-row ok"><b>Sources agree</b><span>labelled automatically</span></p>
+          <p class="triage-row ask"><b>Conflict, or too uncertain</b><span>only then, a person looks</span></p>
+        </div>
       </div>
     </div>
   </div>`;
@@ -221,18 +230,18 @@ function Next() {
 // the live demo, and the close.
 export const SLIDES = [
   { title: "Clayzer", seconds: 10, theme: "dark", component: Title,
-    spoken: "Clayzer. Give us your caption set, and we tell you how much of it you can trust.",
-    notes: ["One line, then move on.", "4:00 total. T starts the timer, A reads a slide aloud."] },
-  { title: "The problem", seconds: 25, component: Problem, steps: 1,
-    spoken: "New caption, who dis? That is how captions on Clay's imagery work today. Here is a real one: the model saw only this photo and said eighteen wind turbines, mostly in the centre. The public records put every turbine around the centre, not in it. Plausible, and wrong, and Clay has seventy million images like this. Nobody can check them by hand.",
-    notes: ["Open with the label as a joke: \"New caption, who dis? That's how Clay's imagery works today: a caption shows up and nobody knows if it's legit.\"", "The 3 × 3 grid is ours, not the image's: the model sees the plain photo, and our prompt makes it name each object's place as one of 9 cells, so \"where\" is checkable. The dashed lines are drawn for the audience. The amber box is the cell the caption picked.", "Press → once: the records' dots appear, and the two lines on the right.", "Problem only here: the fixes come on the solution slide."] },
+    spoken: "Clayzer, said KLAY-zer, rhymes with laser. A solution for producing captions you can trust, at scale.",
+    notes: ["Say the name, KLAY-zer, then the one-line definition, and move on.", "4:00 total. T starts the timer, A reads a slide aloud."] },
+  { title: "The problem", seconds: 35, component: Problem, steps: 3,
+    spoken: "New caption, who dis? That is how captions on Clay's imagery work today. Here is a real one: the model saw only this photo and said eighteen wind turbines, mostly in the centre. The public records put every turbine around the centre, not in it. But the records can be wrong too: OpenStreetMap calls this basin a reservoir, and it is dry. So we never trust one source. We cross-check them: when they agree, the label is automatic, and only when they conflict, or are too uncertain, does a person look.",
+    notes: ["Open with the label as a joke: \"New caption, who dis? That's how Clay's imagery works today: a caption shows up and nobody knows if it's legit.\"", "Press 1: the records' dots appear. The caption is wrong: count right, place wrong.", "Press 2: the records can be wrong too. OpenStreetMap maps this basin as a reservoir; the photo shows it dry.", "Press 3: we stay out of hand-labelling unless sources conflict or confidence is too low.", "If asked: cross-checking is built for solar and wind (USGS against OpenStreetMap). The basin was caught in our one-time audit by eye; a confidence threshold for labels is the plan, not built yet.", "The 3 × 3 grid is ours: the model sees the plain photo, and the prompt makes it name each object's place as one of 9 cells."] },
   { title: "Downstream value", seconds: 20, component: Downstream,
     spoken: "Now imagine those captions were checked. Imagery and public records go into Clayzer. We write each caption from the image alone and check every fact against the records. Only pairs that pass go on to Clay, which makes the imagery searchable in words.",
     notes: ["Left to right: public data, Clayzer (our part, the dashed box), Clay.", "The line to land: search results are only as good as the captions behind them.", "The Thailand flood search is an illustration: our Cases today are US solar, wind and land cover. Don't imply we have run it.", "The dashed loop back is planned, not built: say 'next'."] },
   { title: "Example search", seconds: 18, component: ExampleSearch,
     spoken: "Here is what that looks like. Ask in plain words, like the economic impact of flooding in Bangkok and access to aid, and you get the images whose checked captions match: flooded streets, a market under water, a relief site, and the route to reach it.",
     notes: ["Let the video play; it loops every 16 s.", "Illustrative, not real results: don't imply we have run this search."] },
-  { title: "How it works", seconds: 25, component: Architecture,
+  { title: "How it works", seconds: 20, component: Architecture,
     spoken: "Here is the whole journey. One aerial image comes in on the left. A model on AWS writes a caption. Before each statement is kept, we check it against the imagery. We score it against open map data the model never saw. A gate decides whether it is good enough. What comes out is a verdict you can trust, and the same path works for one image or a million.",
     notes: ["One image in on the left, a verdict out on the right.", "Point at each numbered stop. End on: same path scales to millions."] },
   { title: "Our solution", seconds: 40, component: Trust, steps: 6,
@@ -246,7 +255,7 @@ export const SLIDES = [
     notes: ["Clay itself is a ~5% sample; the archives are 100× bigger, so cost per Caption decides what gets captioned.",
       "Batch is a published 50%; the green 'assumed' rows are hypotheses our gate can test, which is the point.",
       "Land the judge line: scoring with a big model costs more than captioning, and our grounding is free."] },
-  { title: "Live demo", seconds: 37, component: Demo,
+  { title: "Live demo", seconds: 32, component: Demo,
     spoken: "Now the site. The overview shows the current baseline. A caption, with each claim marked supported or not, right on the image. The report, five criteria side by side, which can read itself aloud. And compare to baseline: the gate says better, worse, or inconclusive.",
     notes: ["Overview → a Caption on its grid → report and Listen → Compare.", "Keep the recorded Batch open as the offline fallback."] },
   { title: "What it means for Clay", seconds: 20, theme: "dark", component: Next,

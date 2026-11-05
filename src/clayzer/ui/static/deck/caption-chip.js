@@ -50,3 +50,18 @@ export function CaptionChip({ records = true, fixed = false }) {
     </figcaption>
   </figure>`;
 }
+
+// A record that's wrong about the photo: Case fixed-dev-neg-1. OpenStreetMap maps this basin as
+// natural=water, water=reservoir (way 1258755568), and the photo shows it dry; the label is dropped
+// in fixtures/caption/cases/label-corrections.toml. Outline in Chip pixels, fetched 2026-11-04.
+const BASIN = "162,347 159,351 155,441 160,446 317,454 322,450 326,359 318,352";
+
+export function WrongRecordChip() {
+  return html`<div class="ex-frame wrong-record">
+    <img src="/api/chips/ca-neg-1-20220607.png" alt="Aerial photo of a warehouse, parking and a
+      square retention basin that is dry, with no water in it" />
+    <svg viewBox="0 0 512 512" aria-hidden="true">
+      <polygon class="osm-water" points=${BASIN} />
+    </svg>
+  </div>`;
+}
