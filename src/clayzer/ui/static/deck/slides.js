@@ -16,12 +16,11 @@ const Kicker = ({ children }) => html`<p class="kicker">${children}</p>`;
 
 function Title() {
   return html`<div class="title-slide">
-    <${Kicker}>Clay Earth Dataset Foundry · Caption track<//>
+    <${Kicker}>Clay Earth Dataset Foundry · Caption track · 2026 NOV 5<//>
     <h1>Clayzer</h1>
     <p class="pron"><span>/ˈkleɪ.zər/</span> <i>noun</i> · from glaze, the finish a potter fires
       onto clay</p>
     <p class="lede">A solution for producing captions you can trust, at scale.</p>
-    <p class="team">Team Clayzer · Clay Earth Dataset Foundry hackathon · November 4th, 2026</p>
   </div>`;
 }
 
