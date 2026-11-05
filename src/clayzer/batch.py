@@ -841,7 +841,10 @@ def rescore(batch_id: str, store) -> dict:
     )
     store.put(_key(batch_id, "results.jsonl"), to_jsonl(b["results"]), NDJSON)
     summary = summarize(cfg, b["cases"], b["results"], b["retrieval"])
-    summary["stopped"] = (b["summary"] or {}).get("stopped")
+    old = b["summary"] or {}
+    summary["stopped"] = old.get("stopped")
+    if old.get("replayed_from"):  # a replayed Batch stays marked as one
+        summary["replayed_from"] = old["replayed_from"]
     summary["rescored"] = datetime.now(UTC).isoformat(timespec="seconds")
     store.put(_key(batch_id, "summary.json"), (json.dumps(summary, indent=2) + "\n").encode(), JSON)
     write_reports(store, batch_id)

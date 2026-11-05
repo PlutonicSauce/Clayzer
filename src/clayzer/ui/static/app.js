@@ -7,6 +7,7 @@ let GLOSSARY = {};
 // Bumped on every navigation; a page that finishes loading after the user has moved on
 // must not overwrite the newer page.
 let SEQ = 0;
+let DID_RENDER = false;
 const stale = (me) => me !== SEQ;
 
 const esc = (s) =>
@@ -18,7 +19,7 @@ const api = async (path, opts) => {
   return r.json();
 };
 const badge = (score) => {
-  if (score === null || score === undefined) return '<span class="badge b-na">—</span>';
+  if (score === null || score === undefined) return '<span class="badge b-na">Not measured</span>';
   const cls = score >= 0.99 ? "b-ok" : score >= 0.5 ? "b-warn" : "b-bad";
   return `<span class="badge ${cls}">${f2(score)}</span>`;
 };
@@ -550,27 +551,11 @@ async function tasksPage(focusId) {
   }
 }
 
-async function casesPage() {
-  const me = SEQ;
-  const cases = await api("/api/cases");
-  if (stale(me)) return;
-  $view.innerHTML = `<h1>Cases</h1>
-    <p>The development ${term("Case")} set in the store (${cases.length}). Each Chip's ${term("Reference Label", "Reference Labels")}
-    are what grounding checks Claims against; the Harness never sees them (ADR-0006).</p>
-    ${cases.length ? "" : '<p class="empty">No Cases yet: <code>uv run clayzer case uspvdb &lt;site-id&gt;</code></p>'}
-    ${cases.length ? '<p class="sub">Click a Chip to open it large, with its labels on the grid and zoom.</p>' : ""}
-    <div class="case-grid">${cases.map((c) => `<div class="case-card">
-      <a href="#/cases/${encodeURIComponent(c.id)}"><img src="/api/chips/${encodeURIComponent(c.chip.id)}.png" alt="Chip ${esc(c.chip.id)}" loading="lazy"></a>
-      <div class="body"><b><a href="#/cases/${encodeURIComponent(c.id)}">${esc(c.id)}</a></b><br><small class="mono">${c.kind === "change" ? `Chip Pair: NAIP ${esc(c.chips[0].date)} → ` : `${esc(c.chip.id)} · NAIP `}${esc(c.chip.date)} · ${esc(c.chip.source)}</small>
-      <ul>${c.labels.map((l) => l.count === 0 ? `<li>no ${esc(l.object.replace(/_/g, " "))} <small>(checked: ${esc(l.source)})</small></li>`
-        : `<li>${l.count !== null ? `${esc(l.count)} × ` : ""}${esc(l.object.replace(/_/g, " "))}
-        at ${esc(l.position)}${l.change ? ` <small>(${esc(l.change)})</small>` : ""} <small>(${esc(l.source)})</small></li>`).join("") || "<li>no labels</li>"}</ul>
-      <small>Built in ${f2(c.prep_seconds)} s</small></div></div>`).join("")}</div>`;
-}
+async function casesPage() { await publicGallery(); }
 
 // ── One Case, large: for checking its Reference Labels by eye ────────────────────────
 
-const VIEW = { zoom: 1, grid: true, labels: true };
+const VIEW = { zoom: 1, grid: false, labels: false };
 
 function caseFigure(c) {
   const C = 512 / 3;
@@ -591,7 +576,7 @@ function caseFigure(c) {
   }).join("");
   const grid = VIEW.grid ? [1, 2].map((k) => `<line x1="${k * C}" y1="0" x2="${k * C}" y2="512"/><line x1="0" y1="${k * C}" x2="512" y2="${k * C}"/>`).join("") : "";
   return `<div class="chip-fig${VIEW.zoom > 1 ? " zoomed" : ""}" style="width:${VIEW.zoom * 100}%">
-    <img src="/api/chips/${encodeURIComponent(c.chip.id)}.png" alt="Aerial image ${esc(c.chip.id)}">
+    <img src="/api/chips/${encodeURIComponent(c.chip.id)}.png" alt="${esc(imageAlt(c))}">
     <svg viewBox="0 0 512 512" aria-hidden="true"><g class="grid">${grid}</g><g>${refs}</g>${pills}</svg></div>`;
 }
 
@@ -614,36 +599,36 @@ async function casePage(id) {
     document.getElementById("t-grid").checked = VIEW.grid;
     document.getElementById("t-labels").checked = VIEW.labels;
   };
-  $view.innerHTML = `<p><a href="#/cases">← Cases</a> · ${i + 1} of ${cases.length} ·
+  const caseHTML = `<p><a href="#/cases">← Cases</a> · ${i + 1} of ${cases.length} ·
       <a href="#/cases/${encodeURIComponent(prev)}">← previous</a> · <a href="#/cases/${encodeURIComponent(next)}">next →</a></p>
-    <h1>${esc(c.id)}</h1>
+    <header class="page-head" data-listen><p class="eyebrow">${esc(imageCategory(c))} · NAIP ${esc(c.chip.date)}</p><h1>${esc(imageCategory(c))},<br>up close.</h1><p class="case-identity mono">${esc(c.id)}</p><p class="lede">Inspect the image and its independent reference information.</p><a class="case-story-link" href="#/journey/${encodeURIComponent(c.id)}/explore">Explore this place as a guided story ↗</a><p>This page shows references, not a generated caption. <a href="#/batches">Check saved experiments for evaluated captions</a>.</p><p>The optional grid divides the image into nine named areas, from north west to south east. The reference list is its text equivalent.</p></header>
     <div class="case-view">
       <div>
         <div class="case-tools">
           <span>Zoom ${[1, 2, 4].map((z) => `<button type="button" class="btn secondary" data-zoom="${z}">${z}×</button>`).join("")}</span>
           <label><input type="checkbox" id="t-grid"> grid</label>
           <label><input type="checkbox" id="t-labels"> labels</label>
-          <small>Keys: ← → Case · + − zoom · g grid · l labels</small>
+          <small>Focus image viewer for keys: ← → example · + − zoom · g grid · l labels</small>
         </div>
-        <div class="case-zoom" id="case-zoom"><div id="case-fig"></div></div>
+        <div class="case-zoom" id="case-zoom" tabindex="0" role="region" aria-label="Aerial image viewer. Arrow keys select examples; plus and minus zoom; g toggles grid; l toggles reference overlays."><div id="case-fig"></div></div>
         <p class="legend-row"><span><i class="dot good"></i>USGS label</span> <span><i class="dot near"></i>OpenStreetMap label</span>
           <span><i class="sq"></i>cells the label covers</span></p>
       </div>
       <div>
-        <h3>Reference Labels</h3>
+        <h2>Independent reference information</h2>
         <ul>${c.labels.map((l) => `<li>${l.count !== null ? `${esc(l.count)} × ` : ""}${esc(l.object.replace(/_/g, " "))}
           at ${esc(l.position)}${(l.cells || []).length > 1 ? ` <small>(covers ${l.cells.map((x) => esc(x.replace(/_/g, " "))).join(", ")})</small>` : ""}
-          ${l.change ? ` <small>(${esc(l.change)})</small>` : ""} <small>· ${esc(l.source)}</small></li>`).join("") || "<li>no labels: nothing mapped here</li>"}</ul>
-        <h3>${c.kind === "change" ? "Chip Pair" : "Chip"}</h3>
+          ${l.change ? ` <small>(${esc(l.change)})</small>` : ""} <small>· ${esc(l.source)}</small></li>`).join("") || "<li>No reference entries recorded. This does not prove that objects are absent.</li>"}</ul>
+        <h2>${c.kind === "change" ? "Images over time" : "Image details"}</h2>
         ${c.kind === "change" ? `<p class="sub">A ${term("Change Case")}: the labels are drawn on the later Chip (above); the earlier one is below.</p>
         <img class="chip-earlier" src="/api/chips/${encodeURIComponent(c.chips[0].id)}.png" alt="Earlier aerial image ${esc(c.chips[0].id)}" style="width:100%">
         <p class="mono">Earlier: ${esc(c.chips[0].id)}<br>NAIP ${esc(c.chips[0].date)} · ${esc(c.chips[0].source)}</p>` : ""}
         <p class="mono">${c.kind === "change" ? "Later: " : ""}${esc(c.chip.id)}<br>NAIP ${esc(c.chip.date)} · ${esc(c.chip.source)}<br>${lat}, ${lon}</p>
-        <h3>Check it elsewhere</h3>
+        <h2>Check it elsewhere</h2>
         <p>Current imagery and maps at the Chip's centre (they may be newer than ${esc(c.chip.date.slice(0, 4))}):<br>
           <a href="https://www.google.com/maps/@${lat},${lon},400m/data=!3m1!1e3" target="_blank" rel="noopener">Google satellite</a> ·
           <a href="https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=17/${lat}/${lon}" target="_blank" rel="noopener">OpenStreetMap</a></p>
-        <h3>What to look for</h3>
+        <h2>What to look for</h2>
         <ul class="sub"><li>Is each label really there, in the cell it names?</li>
           <li>Solar and wind counts: are the panels built and the turbines still standing?</li>
           <li>Water: is there water, or a dry wash or lake bed?</li>
@@ -651,16 +636,21 @@ async function casePage(id) {
           <li>Anything obvious with no label (buildings, roads, fields)?</li></ul>
       </div>
     </div>`;
-  draw();
-  document.querySelectorAll("[data-zoom]").forEach((b) => b.addEventListener("click", () => { VIEW.zoom = +b.dataset.zoom; draw(); }));
-  document.getElementById("t-grid").addEventListener("change", (ev) => { VIEW.grid = ev.target.checked; draw(); });
-  document.getElementById("t-labels").addEventListener("change", (ev) => { VIEW.labels = ev.target.checked; draw(); });
-  CASE_KEYS = { prev, next, draw };
+  await presentCaseView(() => {
+    if (stale(me)) return;
+    $view.innerHTML = caseHTML;
+    if (c.kind === "change" && c.chips.length > 1) mountChangeComparison(c);
+    draw();
+    document.querySelectorAll("[data-zoom]").forEach((b) => b.addEventListener("click", () => { VIEW.zoom = +b.dataset.zoom; draw(); }));
+    document.getElementById("t-grid").addEventListener("change", (ev) => { VIEW.grid = ev.target.checked; draw(); });
+    document.getElementById("t-labels").addEventListener("change", (ev) => { VIEW.labels = ev.target.checked; draw(); });
+    CASE_KEYS = { prev, next, draw };
+  });
 }
 
 let CASE_KEYS = null;
 document.addEventListener("keydown", (ev) => {
-  if (!CASE_KEYS || !location.hash.startsWith("#/cases/") || ev.target.matches("input, textarea, select")) return;
+  if (!CASE_KEYS || !document.activeElement.closest(".case-zoom") || !location.hash.startsWith("#/cases/") || ev.target.closest("input, textarea, select, button, a, summary, [contenteditable]") || ev.altKey || ev.ctrlKey || ev.metaKey) return;
   const zooms = [1, 2, 4];
   if (ev.key === "ArrowLeft") location.hash = `#/cases/${encodeURIComponent(CASE_KEYS.prev)}`;
   else if (ev.key === "ArrowRight") location.hash = `#/cases/${encodeURIComponent(CASE_KEYS.next)}`;
@@ -703,12 +693,13 @@ async function datasetsPage(id) {
   if (stale(me)) return;
   if (id) {
     const safe = encodeURIComponent(id);
-    $view.innerHTML = `<p><a href="#/datasets">← Dataset cards</a> · <a href="/api/datasets/${safe}/dataset-card.json">JSON</a> · <a href="/api/datasets/${safe}/output-score.html" target="_blank" rel="noopener">Output Score report</a></p>
-      <iframe sandbox="" title="Dataset card ${esc(id)}" src="/api/datasets/${safe}/dataset-card.html" style="width:100%;height:80vh;border:1px solid var(--line)"></iframe>`;
+    const card = await api(`/api/datasets/${safe}/dataset-card.json`);
+    if (stale(me)) return;
+    const number = (v) => typeof v === "number" ? esc(v) : "Not recorded";
+    $view.innerHTML = `<p><a href="#/datasets">← Dataset cards</a></p>${pageHead("A collection, in context", esc(card.dataset?.name || id), "Understand where these captions came from, what was measured and where the evidence stops.")}<section class="dataset-ledger" data-listen><div><p class="eyebrow">Collection record</p><h2>${number(card.counts?.captions)} captions</h2><dl><dt>Source</dt><dd>${esc(card.dataset?.source || "Not recorded")}</dd><dt>Split</dt><dd>${esc(card.dataset?.split || "Not recorded")}</dd><dt>Scorer</dt><dd>${esc(card.scorer_version || "Not recorded")}</dd></dl></div><div><p class="eyebrow">Descriptive diagnostics</p><dl><dt>Exact duplicate captions</dt><dd>${number(card.duplication?.exact_duplicate_captions)}</dd><dt>Observed unique image identities</dt><dd>${number(card.counts?.unique_images_observed)}</dd><dt>Average length in words</dt><dd>${number(card.length_words?.mean)}</dd></dl><p>Descriptive counts do not establish model accuracy. Scorer versions, references and sampling must be compatible before comparing evaluations.</p></div></section><div class="actions"><a class="btn" href="/api/datasets/${safe}/output-score.html" target="_blank" rel="noopener">Inspect Output Score ↗</a><a class="btn secondary" href="/api/datasets/${safe}/dataset-card.json">Download original JSON</a></div><h2>The complete recorded card</h2><p>The original artifact follows, including definitions, sampling details and limitations.</p><iframe sandbox="" class="report" title="Dataset card ${esc(id)}" src="/api/datasets/${safe}/dataset-card.html"></iframe>`;
     return;
   }
-  $view.innerHTML = `<h1>Dataset cards</h1><p>Imported caption sets with descriptive diagnostics and separate Output Scores.</p>
-    ${cards.length ? `<ul>${cards.map((c) => `<li><a href="#/datasets/${encodeURIComponent(c.id)}">${esc(c.name || c.id)}</a> · ${esc(c.captions)} captions · ${esc(c.scorer_version)}</li>`).join("")}</ul>` : '<p>No imported cards in this store. Save an offline evaluation under <code>data/datasets/&lt;set-id&gt;/</code> (see docs/report-handoff.md).</p>'}`;
+  $view.innerHTML = `${pageHead("Know the collection", "Every dataset has a story.", "Imported caption collections, with their sources, descriptive diagnostics and separate Output Scores.")}<div class="dataset-grid">${cards.map((c,i)=>`<article class="dataset-card"><span class="dataset-index" aria-hidden="true">${String(i+1).padStart(2,"0")}</span><p class="eyebrow">Recorded collection</p><h2><a href="#/datasets/${encodeURIComponent(c.id)}">${esc(c.name || c.id)}</a></h2><p><strong>${esc(c.captions)}</strong> captions · ${esc(c.scorer_version)}</p><p>Inspect source, sampling, duplication and measurement limits before interpreting the scores.</p><a class="text-link" href="#/datasets/${encodeURIComponent(c.id)}">Open the dataset card →</a></article>`).join("")}</div>${cards.length ? "" : '<div class="empty"><h2>No imported collections yet</h2><p>Dataset cards appear when an offline caption evaluation is saved in this store. <a href="#/developer">See the developer tools</a>.</p></div>'}${evidenceNote()}`;
 }
 
 async function batchesPage() {
@@ -716,9 +707,9 @@ async function batchesPage() {
   const [list, jobs] = await Promise.all([api("/api/batches"), api("/api/jobs")]);
   if (stale(me)) return;
   const running = jobs.filter((j) => j.state === "running");
-  $view.innerHTML = `<h1>Batches</h1>
-    <p>Every ${term("Batch")} in the store, newest first. Tick two to compare them; open one to see its
-    report and its regression gate against the ${term("Baseline")}.</p>
+  $view.innerHTML = `<h1>Results</h1><p class="lede" data-listen>Each evaluation experiment (Batch) records descriptions, evidence and separate scores. Open a report to understand what happened. Synthetic recordings demonstrate software behavior, not real model accuracy.</p>
+    ${experimentCards(list)}
+    <p class="sub">Measurements remain separate and use their recorded scoring versions. Open each report before comparing experiments.</p>
     ${CONFIG.allow_launch ? `<div class="launch"><b>Run a Batch</b> on every Case in the store
       (${esc(CONFIG.caption_model)}, judged by ${esc(CONFIG.judge_model)}).<br>
       <label>Repeats <input id="repeats" type="number" min="1" max="10" value="3" style="width:60px"></label>
@@ -726,17 +717,19 @@ async function batchesPage() {
       <label><input id="judge" type="checkbox" checked> Judge fidelity</label>
       <button class="btn" id="go" ${running.length ? "disabled" : ""}>Run</button>
       <div id="joblog"></div></div>`
-      : `<p class="sub">Read-only. Start the app with <code>--allow-launch</code> to run Batches from here; or <code>uv run clayzer batch</code>.</p>`}
-    <p><button class="btn secondary" id="cmp" disabled>Compare the two ticked</button></p>
+      : `<p class="sub">You are viewing saved experiments. New AI calls are disabled in this read-only view.</p>`}
+    <details class="experiment-technical"><summary>Compare experiments and inspect technical measurements</summary>
+    <p>Select two saved experiments for comparison with their recorded settings.</p>
+    <p><button class="btn secondary" id="cmp" disabled>Compare the two selected experiments</button></p>
     <table><tr><th></th><th>Batch</th><th>Size</th><th class="num">Correctness</th><th class="num">Coverage</th><th class="num">Fidelity</th>
       <th class="num">Retrieval</th><th>Runs</th><th>Captioner</th></tr>
-    ${list.map((b) => `<tr><td><input type="checkbox" class="pick" value="${esc(b.batch_id)}"></td>
-      <td><a href="#/batches/${esc(b.batch_id)}">${esc(b.batch_id)}</a>${b.complete ? "" : ' <span class="badge b-warn">incomplete</span>'}</td>
+    ${list.map((b) => `<tr><td><input type="checkbox" class="pick" value="${esc(b.batch_id)}" aria-label="Select experiment ${esc(b.batch_id)}"></td>
+      <td><a href="#/batches/${esc(b.batch_id)}">${esc(b.label || b.batch_id)}</a>${b.complete ? "" : ' <span class="badge b-warn">incomplete</span>'}</td>
       <td>${b.cases} × ${b.repeats}</td><td class="num">${badge(b.correctness)}</td><td class="num">${badge(b.coverage)}</td><td class="num">${badge(b.fidelity)}</td>
       <td class="num">${badge(b.retrieval?.mean)}</td>
       <td><small>${b.runs ? `${b.runs.ok} ok · ${b.runs.harness_faults} HF · ${b.runs.sandbox_failures} SF` : "running"}</small></td>
       <td><small class="mono">${esc(b.caption_model)} · prompt ${esc(b.prompt_sha)}</small>${b.self_graded ? ' <span class="badge b-warn" title="The captioner is also the Judge, so Fidelity is a model rating its own work">self-graded</span>' : ""}</td></tr>`).join("")}
-    </table>${list.length ? "" : '<p class="empty">No Batches yet.</p>'}`;
+    </table></details>${list.length ? "" : '<p class="empty">No saved experiments yet. <a href="#/cases">Explore the reference imagery</a> while evaluation results are unavailable.</p>'}`;
 
   const picks = () => [...document.querySelectorAll(".pick:checked")].map((x) => x.value);
   document.querySelectorAll(".pick").forEach((x) => x.addEventListener("change", () => {
@@ -863,7 +856,7 @@ async function batchPage(id, section) {
     const l = await api(`/api/batches/${encodeURIComponent(id)}/listen`);
     const by = l.source === "model" ? `written by ${esc(l.model)} from the facts` : "written by code from the facts";
     listenHtml = `<h2>Listen</h2>
-      <audio controls preload="none" src="/api/batches/${encodeURIComponent(id)}/listen.mp3"></audio>
+      <audio controls aria-label="Recorded Batch summary" preload="none" src="/api/batches/${encodeURIComponent(id)}/listen.mp3"></audio>
       <p class="sub">A spoken summary of this result, ${by}, read by Amazon Polly (${esc(l.voice)}).
         Made ${esc(l.created)} against Baseline ${esc(l.baseline_id || "none")}.</p>
       <details><summary>Transcript</summary><p>${esc(l.text)}</p></details>`;
@@ -872,7 +865,7 @@ async function batchPage(id, section) {
   }
   if (stale(me)) return;
   const c = b.config;
-  $view.innerHTML = `<p><a href="#/batches">← Batches</a></p><h1>${esc(c.batch_id)}</h1>
+  $view.innerHTML = `<p><a href="#/batches">← Results</a></p><header class="page-head" data-listen><p class="eyebrow">Saved evaluation experiment</p><h1>${esc((c.label || "Evaluation experiment").replace(/[-_]+/g, " "))}</h1><p>${esc(c.case_ids.length)} image examples, ${esc(c.repeats)} repeats. This report retains its recorded scoring version; incompatible measurements do not establish improvement.</p></header>
     <p class="sub">${c.case_ids.length} Cases × ${c.repeats} Repeats · ${esc(c.caption_model)} · prompt
     <code>${esc(c.prompt_sha)}</code> (${esc(c.prompt_source)}) · Judge ${esc(c.judge_model || "off")}${b.self_graded ? ' <span class="badge b-warn" title="The captioner is also the Judge, so Fidelity is a model rating its own work">self-graded</span>' : ""} · Cases
     <code>${esc(c.cases_sha)}</code> · <a href="#/batches/${esc(id)}/provenance">full provenance</a></p>
@@ -893,8 +886,8 @@ async function runPage(batchId, caseId, repeat) {
   const [r, p] = await Promise.all([api(`${src}.json`), api(`${src}/provenance`)]);
   if (stale(me)) return;
   const k = p.case;
-  $view.innerHTML = `<p><a href="#/batches/${esc(batchId)}">← Batch ${esc(batchId)}</a></p>
-    <h1>Run ${esc(r.run_id)}</h1>
+  $view.innerHTML = `<p><a href="#/batches/${esc(batchId)}">← Back to experiment</a></p>
+    <h1>Evaluation report</h1><p class="mono">${esc(r.run_id)}</p><a class="case-story-link" href="#/journey-run/${encodeURIComponent(batchId)}/${encodeURIComponent(caseId)}/${encodeURIComponent(repeat)}/describe">Follow this recording as a guided story ↗</a>${runStory(r)}
     <p class="sub">${esc((r.summary || {}).verdict || r.status)} ·
       <a href="${src}.html" target="_blank" rel="noopener">open on its own</a> ·
       <a href="${src}.json" target="_blank" rel="noopener">as JSON</a></p>
@@ -1033,7 +1026,7 @@ async function sourcesPage() {
   document.getElementById("use").addEventListener("change", (e) => { state.status = e.target.value; render(); });
   document.querySelectorAll("[data-to]").forEach((a) => a.addEventListener("click", (e) => {
     e.preventDefault();
-    document.getElementById(`src-${a.dataset.to}`)?.scrollIntoView({ behavior: "smooth" });
+    document.getElementById(`src-${a.dataset.to}`)?.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
   }));
   render();
 }
@@ -1263,8 +1256,12 @@ async function ontologyPage(focus) {
         <div id="onto-graph" class="onto-graph-scroll onto-mermaid"><p class="sub">Loading diagram…</p></div>
         <aside id="onto-node-detail" class="onto-node-detail"><p class="sub">Pick a box to see its details.</p></aside>
       </div>
+      <details class="onto-class-list"><summary>Browse classes as text</summary>
+        <ul>${ont.classes.map(c => `<li><button type="button" class="onto-class-button" data-class="${esc(c.id)}">${esc(c.name)}</button></li>`).join("")}</ul></details>
       <p class="sub onto-legend">★ = scored against an answer key · colour = top-level group ·
         <b class="onto-near-key">⤏ dashed</b> = typically found near · ontology v${esc(ont.version)}.</p>`;
+    host.querySelectorAll(".onto-class-button").forEach(button =>
+      button.addEventListener("click", () => showNode(button.dataset.class)));
     const draw = async () => {
       const box = document.getElementById("onto-graph");
       if (!box) return;
@@ -1281,6 +1278,16 @@ async function ontologyPage(focus) {
         if (stale(me) || !document.getElementById("onto-graph")) return;
         box.innerHTML = svg;
         bindFunctions?.(box);
+        box.querySelectorAll(".node.clickable").forEach(node => {
+          node.setAttribute("role", "button");
+          node.setAttribute("tabindex", "0");
+          node.setAttribute("aria-label", node.textContent.trim());
+          node.addEventListener("keydown", event => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault(); node.dispatchEvent(new MouseEvent("click", {bubbles: true}));
+            }
+          });
+        });
       } catch (e) {
         box.innerHTML = `<p class="empty">Couldn't render the diagram: ${esc(e.message || e)}</p>`;
       }
@@ -1378,14 +1385,14 @@ async function ontologyPage(focus) {
           a real example you can explore, and how the caption-writer uses it.</p>
       </div>
     </section>
-    <ol class="onto-wz-steps" role="tablist">
+    <ol class="onto-wz-steps" aria-label="Ontology walkthrough steps">
       ${STEPS.map((s, i) => `<li><button type="button" class="onto-wz-dot" data-i="${i}">
         <span class="onto-wz-num">${i + 1}</span><span class="onto-wz-label">${esc(s.title)}</span>
       </button></li>`).join("")}
     </ol>
     <div id="onto-panel" class="onto-panel" aria-live="polite"></div>
     <nav class="onto-wz-pager">
-      <button type="button" class="btn secondary" id="onto-prev">←</button>
+      <button type="button" class="btn secondary" id="onto-prev" aria-label="Previous walkthrough step">←</button>
       <span id="onto-wz-at" class="sub"></span>
       <button type="button" class="btn" id="onto-next">Next →</button>
     </nav>
@@ -1399,7 +1406,7 @@ async function ontologyPage(focus) {
   const next = document.getElementById("onto-next");
   const show = (i) => {
     cur = Math.max(0, Math.min(STEPS.length - 1, i));
-    dots.forEach((d, k) => { d.classList.toggle("active", k === cur); d.classList.toggle("done", k < cur); });
+    dots.forEach((d, k) => { d.classList.toggle("active", k === cur); d.classList.toggle("done", k < cur); if (k === cur) d.setAttribute("aria-current", "step"); else d.removeAttribute("aria-current"); });
     prev.disabled = cur === 0;
     next.textContent = cur === STEPS.length - 1 ? "Done ✓" : `Next: ${STEPS[cur + 1].title} →`;
     document.getElementById("onto-wz-at").textContent = `Step ${cur + 1} of ${STEPS.length}`;
@@ -1417,11 +1424,21 @@ async function ontologyPage(focus) {
 
 async function route() {
   const me = ++SEQ;
-  const parts = (location.hash.replace(/^#\/?/, "") || "").split("/").map(decodeURIComponent);
+  let parts;
+  try { parts = (location.hash.replace(/^#\/?/, "") || "").split("/").map(decodeURIComponent); } catch { parts = ["invalid"]; }
   const page = parts[0] || "";
+  if (ACTIVE_STORY?.accepts(parts) && ACTIVE_STORY.navigate(parts)) return;
+  disposeStory();
+  window.cancelPageSpeech?.();
+  const preserveGallery = page === "cases" && parts[1] && document.getElementById("image-gallery");
+  if (preserveGallery) {
+    GALLERY_MEMORY.y = scrollY;
+    const selected = [...document.querySelectorAll(".gallery-image")].find((a) => a.getAttribute("href") === `#/cases/${encodeURIComponent(parts[1])}`);
+    selected?.querySelector("img")?.setAttribute("data-story-shared", "true");
+  }
   document.querySelectorAll("#nav a").forEach((a) => {
     const target = a.getAttribute("href").replace(/^#\/?/, "");
-    a.toggleAttribute("aria-current", target === page || (page === "compare" && target === "batches"));
+    a.toggleAttribute("aria-current", target === page || (["compare", "runs"].includes(page) && target === "batches"));
     if (a.hasAttribute("aria-current")) a.setAttribute("aria-current", "page");
   });
   const devMenu = document.getElementById("dev-menu");
@@ -1429,10 +1446,16 @@ async function route() {
     devMenu.classList.toggle("has-current", !!devMenu.querySelector('a[aria-current="page"]'));
     devMenu.removeAttribute("open");
   }
-  $view.innerHTML = '<p class="sub">Loading…</p>';
+  $view.setAttribute("aria-busy", "true");
+  document.getElementById("route-status").textContent = "Loading page";
+  if (!preserveGallery) $view.innerHTML = '<p class="sub">Loading…</p>';
   try {
-    if (page === "") await overview();
-    else if (page === "how") await howPage(parts[1]);
+    if (page === "") await publicHome();
+    else if (page === "journey" || page === "journey-run") await publicJourney(parts);
+    else if (page === "how") { if (parts[1]) await howPage(parts[1]); else await publicHow(); }
+    else if (page === "about") await publicAbout();
+    else if (page === "developer") publicDeveloper();
+    else if (page === "overview") await overview();
     else if (page === "ontology") await ontologyPage(parts[1]);
     else if (page === "tasks") await tasksPage(parts[1]);
     else if (page === "cases" && parts[1]) await casePage(parts[1]);
@@ -1445,12 +1468,36 @@ async function route() {
     else if (page === "runs") await runPage(parts[1], parts[2], parts[3] || "1");
     else if (page === "sources") await sourcesPage();
     else if (page === "concepts") await conceptsPage();
-    else $view.innerHTML = '<p class="empty">No such page.</p>';
+    else $view.innerHTML = '<h1>Page not found</h1><p><a href="#/">Return home</a> or <a href="#/cases">explore imagery</a>.</p>';
   } catch (e) {
-    if (!stale(me)) $view.innerHTML = `<p class="empty">Couldn't load this page: ${esc(e.message)}</p>`;
+    if (!stale(me)) $view.innerHTML = `<h1>We could not load this page</h1><p role="alert">${esc(e.message)}</p><p><a href="#/">Return home</a> or reload to try again.</p>`;
+  }
+  if (!stale(me)) {
+    $view.removeAttribute("aria-busy");
+    enhancePage();
+    const title = $view.querySelector("h1")?.textContent || "Clayzer";
+    document.title = `${title} · Clayzer`;
+    document.getElementById("route-status").textContent = "";
+    if (DID_RENDER) $view.focus({preventScroll:true});
+    DID_RENDER = true;
+    window.scrollTo({top:page === "cases" && !parts[1] ? GALLERY_MEMORY.y : 0, behavior:"auto"});
+    ACTIVE_STORY?.start();
+    document.getElementById("nav-toggle").setAttribute("aria-expanded", "false");
+    document.getElementById("nav").classList.remove("is-open");
   }
 }
 
+document.getElementById("nav-toggle").addEventListener("click", () => {
+  const toggle = document.getElementById("nav-toggle");
+  const open = toggle.getAttribute("aria-expanded") !== "true";
+  toggle.setAttribute("aria-expanded", String(open));
+  document.getElementById("nav").classList.toggle("is-open", open);
+});
+document.addEventListener("keydown", e => {
+  if(e.key === "Escape" && document.getElementById("nav-toggle").getAttribute("aria-expanded") === "true") {
+    document.getElementById("nav-toggle").click(); document.getElementById("nav-toggle").focus();
+  }
+});
 // The For Dev Team menu closes on a click elsewhere or on Escape.
 document.addEventListener("click", (e) => {
   const menu = document.getElementById("dev-menu");
@@ -1465,9 +1512,14 @@ document.addEventListener("keydown", (e) => {
 });
 
 (async () => {
-  CONFIG = await api("/api/config");
+  try { CONFIG = await api("/api/config");
   document.getElementById("store").textContent = `store: ${CONFIG.store}`;
   GLOSSARY = Object.fromEntries((await api("/api/glossary")).map((t) => [t.term, t]));
   window.addEventListener("hashchange", route);
   route();
+  } catch (e) {
+    window.addEventListener("hashchange", route);
+    CONFIG = {allow_launch:false};
+    $view.innerHTML = `<h1>Connection unavailable</h1><p role="alert">${esc(e.message)}</p><p>Check your connection and reload. <a href="#/about">Read about Clayzer</a>.</p>`;
+  }
 })();

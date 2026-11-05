@@ -273,3 +273,18 @@ def test_docs_are_served_and_nothing_else_is(client):
     ):
         assert c.get(bad).status_code == 404, bad
     assert c.get("/docs", follow_redirects=False).status_code in (302, 307)
+
+
+def test_legacy_report_presentation_preserves_stored_evidence(client, tmp_path):
+    c, bid = client
+    path = tmp_path / "batches" / bid / "report.html"
+    original = path.read_bytes()
+    raw_url = f"/api/batches/{bid}/runs/{SOLAR['id']}--r1.json"
+    raw_before = c.get(raw_url).json()
+    response = c.get(f"/api/batches/{bid}/report.html")
+    assert response.status_code == 200
+    assert "--paper: #f8f7f2" in response.text
+    assert 'tabindex="0"' in response.text
+    assert path.read_bytes() == original
+    # Existing machine-readable evidence remains identical.
+    assert c.get(raw_url).json() == raw_before
