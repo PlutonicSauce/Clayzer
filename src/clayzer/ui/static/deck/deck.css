@@ -476,8 +476,16 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
   text-transform: uppercase; color: var(--muted); }
 .pz-step.prompt { background: var(--data); border-color: var(--data-line); }
 .pz-step.prompt p:last-child { font-family: ui-monospace, Menlo, monospace; font-size: 14px; }
-.pz-step.model { background: var(--platform); border-color: var(--platform-line); }
-.pz-step.model .pz-k { color: var(--ink); font-size: 16px; }
+.pz-step.model { background: var(--delivery); border-color: var(--delivery-line); }
+.pz-step.model { display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 4px; padding: 8px 10px; text-align: center; }
+.pz-step.model p { font-size: 14px; line-height: 1.3; }
+.pz-bot { width: 150px; height: 132px; overflow: visible; }
+.pz-bot-eyes { transform-box: fill-box; transform-origin: center; animation: pz-blink 4s infinite; }
+.pz-bot-antenna { animation: pz-bob 2.4s ease-in-out infinite; }
+@keyframes pz-blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(.1); } }
+@keyframes pz-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+@media (prefers-reduced-motion: reduce) { .pz-bot-eyes, .pz-bot-antenna { animation: none; } }
 .pz-step.caption { background: var(--captions); border-color: var(--captions-line); padding-bottom: 46px; }
 .pz-step.caption p:last-child { font-style: italic; font-size: 17px; color: var(--ink); }
 .pz-stamp { position: absolute; left: 14px; bottom: 12px; padding: 3px 12px; border-radius: 999px;
@@ -491,6 +499,8 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .pz-vs { display: flex; align-items: center; justify-content: center; gap: 22px; }
 .pz-loupe { width: 170px; height: 200px; flex: none; overflow: visible; }
 .pz-loupe-cap { font: 800 17px system-ui, sans-serif; fill: #252323; text-anchor: middle; }
+.pz-photo-tag rect { fill: #3f5866; } .pz-photo-tag text { font: 800 14px system-ui, sans-serif; fill: #fffdfb; text-anchor: middle; }
+.pz-switch { color: var(--ink); font-weight: 700; }
 .pz-record { margin: 0; }
 .pz-mini { position: relative; width: 150px; height: 162px; }
 .pz-mini img { position: absolute; left: 0; top: 11.7px; width: 150px; height: 150px; border-radius: 6px; opacity: .85; }
