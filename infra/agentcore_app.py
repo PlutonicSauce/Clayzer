@@ -347,6 +347,17 @@ class AgentCoreStack(cdk.Stack):
             description="Prints the inbound client secret for CLAYZER_AGENTCORE_INBOUND_CLIENT_SECRET")  # fmt: skip
 
 
+def traces_flag(value) -> bool:
+    """Read `-c traces=...`, refusing anything that is not clearly on or off: a typo must not
+    silently deploy with span export turned off."""
+    text = str(value if value is not None else "false").strip().lower()
+    if text in {"true", "1", "yes", "on"}:
+        return True
+    if text in {"false", "0", "no", "off", ""}:
+        return False
+    raise SystemExit(f"traces must be true or false, not {value!r}")
+
+
 def main() -> None:
     app = cdk.App()
     ctx = app.node.try_get_context
@@ -359,7 +370,7 @@ def main() -> None:
         user=ctx("user") or os.environ.get("CLAYZER_AGENTCORE_USER_ID", "clayzer-team"),
         models=[m.strip() for m in models.split(",") if m.strip()] if models else None,
         return_url=ctx("return_url") or DEFAULT_RETURN_URL,
-        traces=str(ctx("traces") or "false").lower() == "true",
+        traces=traces_flag(ctx("traces")),
         build=ctx("build") or git_build(),
         env=cdk.Environment(
             account=os.environ.get("CDK_DEFAULT_ACCOUNT"),

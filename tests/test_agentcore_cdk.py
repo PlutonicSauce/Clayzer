@@ -31,10 +31,11 @@ def synthesised(tmp_path_factory):
     return Template.from_stack(stack), app.synth(), module
 
 
-def statements(template: Template) -> list[dict]:
+def statements(template: Template, runtime: bool = True) -> list[dict]:
+    """The Runtime role's statements, or (runtime=False) every other policy's: the CDK helpers'."""
     out = []
     for name, policy in template.find_resources("AWS::IAM::Policy").items():
-        if name.startswith("RuntimeRole"):
+        if name.startswith("RuntimeRole") == runtime:
             out += policy["Properties"]["PolicyDocument"]["Statement"]
     return out
 
@@ -113,6 +114,19 @@ def test_the_role_cannot_reach_the_store_or_anything_broad(synthesised):
             assert s["Condition"] == {"StringEquals": {"cloudwatch:namespace": "bedrock-agentcore"}}
 
 
+def test_the_deploy_helpers_get_nothing_broad_either(synthesised):
+    template, _, _ = synthesised
+    helpers = statements(template, runtime=False)
+    assert helpers  # the log-configuration custom resources exist
+    for s in helpers:
+        actions = as_list(s["Action"])
+        assert not {a for a in actions if a.endswith("*")}
+        assert not {a for a in actions if a.startswith(("s3:", "iam:", "bedrock"))}
+        if "*" in as_list(s["Resource"]):
+            # CDK's LogRetention provider takes no resource scope; it may only set retention.
+            assert set(actions) <= {"logs:PutRetentionPolicy", "logs:DeleteRetentionPolicy"}
+
+
 def test_the_role_may_call_only_the_named_models_and_fetch_only_the_lgnd_token(synthesised):
     template, _, _ = synthesised
     blob = json.dumps(statements(template))
@@ -181,3 +195,16 @@ def test_options_change_the_names_and_models(tmp_path):
             ),
         },
     )
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [(None, False), ("false", False), ("True", True), ("1", True), ("yes", True), (True, True)],
+)
+def test_the_traces_flag_reads_common_spellings(value, expected):
+    assert load_app_module().traces_flag(value) is expected
+
+
+def test_the_traces_flag_refuses_a_typo():
+    with pytest.raises(SystemExit):
+        load_app_module().traces_flag("ture")
