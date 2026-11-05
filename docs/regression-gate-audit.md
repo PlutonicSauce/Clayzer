@@ -35,22 +35,25 @@ uv run --extra ui --extra tools pytest \
 
 ## Limits that a green suite does not remove
 
-1. **The acceptance rule is a heuristic.** It allows a drop up to the larger of 0.05 and the
+1. **The original acceptance rule is a heuristic.** Without `--policy`, it allows a drop up to the larger of 0.05 and the
    Baseline's sample standard deviation. One test demonstrates that 0.80 to 0.60 passes with
    a Baseline Spread of 0.30. This follows the existing rule; it is not evidence that such a
-   drop is acceptable for the intended use.
-2. **Successive promotions can drift downward.** Another test shows five successive drops of
-   0.04 each passing against the previous result, accumulating a drop of 0.20. A fixed anchor,
-   a maximum allowed loss and absolute minimum quality levels are policy choices still needed.
-3. **No quality floor or improvement requirement.** An unchanged poor captioner can pass.
+   drop is acceptable for the intended use. The explicit policy now caps the allowed drop
+   at 0.05; choosing an appropriate margin remains a team decision.
+2. **Successive promotions can drift downward without an anchor.** Another test shows five successive drops of
+   0.04 each passing against the previous result, accumulating a drop of 0.20.
+   The supplied policy pins a separate reference and checks every candidate against it.
+   Tests cover a first small loss being kept and a second cumulative loss being rejected.
+3. **Quality floors and improvement are configurable.** They are not enabled in the supplied
+   policy, so an unchanged poor captioner can still pass unless the team selects floors.
    `--accept` means the user chose to keep a passing candidate; it does not prove improvement.
 4. **Model accuracy is unverified here.** The fake Judge and captions check plumbing. These
    tests do not validate the real Judge, Reference Labels, imagery alignment, the proposed
    coverage prompt, or benefits to Clay v2 training. Classes with no Answer Key remain unscored.
-5. **Coverage is limited to the Cases evaluated.** The committed Baseline now has 63 Cases,
-   but its older export omitted per-Run Workflow Scores, preventing verification of those
-   means. Re-accept it from a complete source Batch. The current development fixtures have
-   not been evaluated in this offline task. Held-out geographical Cases must remain separate
+5. **Coverage is limited to the Cases evaluated.** The updated committed Baseline has 74 Cases
+   and complete Workflow Score samples. Its self-comparison passes the policy, including the
+   pinned reference. This task reuses that recorded evidence without calling real models.
+   Held-out geographical Cases must remain separate
    from prompt tuning, with independently checked examples of omissions and hallucinations.
 6. **Files remain editable.** Consistency checks detect stale or mismatched artifacts, not
    coordinated fabrication of all scores, hashes and summaries. Git commit plus a dirty flag

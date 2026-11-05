@@ -698,24 +698,89 @@ refs = [
 [[task]]
 id = "prompt-loop"
 step = "gate"
-title = "Improve the caption prompt through the loop: one change per Batch, gated"
+title = "Run and record single-change prompt experiments with guarded acceptance"
 area = "Captioning"
 tier = "Must"
-status = "doing"
-notes = "Local implementation ready: clayzer experiment records each labelled, single-change development Batch with a hypothesis, gate result and comparison as JSON and Markdown; --accept promotes only a passing, comparable candidate. Offline tests cover keep, reject and incomplete attempts. prompts/coverage-v1.txt is an untested candidate. Real development Batches, measured prompt improvement and accepted results still pending; see docs/regression-gate.md."
-closes = ["CAP-01", "CAP-06"]
-start = "uv run clayzer batch --prompt <file> --label <change>; clayzer gate"
+status = "done"
+completion_scope = "implementation"
+notes = "Done 2026-11-05: the manual experiment workflow is implemented and tested offline. Each labelled, single-change Batch records its hypothesis, comparison and keep/reject/inconclusive decision as JSON and Markdown; --accept promotes only passing, comparable evidence. Real prompt improvement is tracked separately in prompt-improvement-validation; this completion does not claim a better captioner."
+closes = []
+start = "uv run clayzer experiment <batch-id> --policy policies/regression-gate.json --hypothesis <change>"
 after = ["grounding-fix", "gate-rule"]
-context = "With scoring settled, improve the caption prompt one change at a time: write a prompt file, run a Batch with `--prompt`, compare it with the Baseline, and keep it only if the regression gate passes. Log each attempt in the PR, kept or rejected. The Proposer automates this later."
+context = "The software workflow for step 9: evaluate one captioner change at a time, save every attempt, and guard Baseline promotion. Offline tests prove the control flow. Measuring and keeping an actual improvement remains a separate evaluation task."
 done_when = [
-  "Each prompt change is its own labelled Batch",
-  "Kept changes become the new Baseline",
-  "A log of every attempt and its result",
+  "Each change is its own labelled Batch with a hypothesis",
+  "A passing comparable candidate can become the Baseline, while rejected or incomplete candidates cannot",
+  "Every attempt has a saved JSON and Markdown decision, with recovery after a failed log write",
 ]
 refs = [
-  "docs/cli.md (The evaluation loop)",
-  "src/clayzer/harness.py (PROMPT)",
-  "src/clayzer/gate.py",
+  "docs/regression-gate.md",
+  "src/clayzer/experiments.py",
+  "tests/test_experiments.py",
+]
+see_it = "CLI: clayzer experiment <batch-id> --policy policies/regression-gate.json --hypothesis <change>; the printed JSON and Markdown logs record the decision."
+changes = [
+  "src/clayzer/experiments.py: record one-change decisions and guard promotion, including policy and anchor evidence",
+  "src/clayzer/cli.py: gate and experiment expose --policy; experiment supports guarded --accept",
+  "tests/test_experiments.py: pass, reject, incomplete, promotion, logging and recovery checks",
+]
+
+[[task]]
+id = "gate-policy"
+step = "gate"
+title = "Bound score losses and check a pinned regression reference"
+area = "Evaluation"
+tier = "Must"
+status = "done"
+completion_scope = "implementation"
+closes = ["CAP-15"]
+start = "uv run clayzer gate <batch-id> --policy policies/regression-gate.json"
+notes = "Done 2026-11-05: an explicit versioned policy caps allowed drops at 0.05, checks a SHA-256-pinned 74-Case reference, and supports optional quality floors and an improvement requirement. Offline tests cover noisy baselines, cumulative drift, invalid policies and reference changes. The newer Output Score Baseline does not pass against the older frozen reference; reviewing a new reference remains in prompt-improvement-validation."
+after = ["gate-rule"]
+context = "Prevent noise or successive small promotions from relaxing the acceptance rule. Freeze the reference independently of the working Baseline, refuse changed evidence, and record exactly which policy was applied. Implementation completion does not approve a new reference or establish real caption quality."
+done_when = [
+  "A noisy Baseline cannot exceed the explicit maximum allowed score drop",
+  "Every candidate is also checked against the pinned reference so cumulative losses are detected",
+  "Quality floors, invalid policies, missing evidence and reference changes fail closed",
+  "Experiment records include the exact policy, reference configuration and snapshot",
+]
+refs = [
+  "docs/regression-gate.md",
+  "src/clayzer/gate_policy.py",
+  "tests/test_gate_policy.py",
+]
+see_it = "CLI: clayzer gate <batch-id> --policy policies/regression-gate.json. The report includes the policy, reference and per-score checks."
+changes = [
+  "src/clayzer/gate.py: enforce bounded drops, quality floors, optional improvement and pinned reference comparisons",
+  "src/clayzer/gate_policy.py: validate versioned JSON policy fields and refuse malformed rules",
+  "policies/regression-gate.json: explicit maximum drop and reference snapshot",
+  "baselines/regression-anchor/README.md: document the frozen score-only reference and review process",
+  "tests/test_gate_policy.py: offline rejection, drift, floor, reference and CLI checks",
+]
+
+[[task]]
+id = "prompt-improvement-validation"
+step = "gate"
+title = "Measure and accept a real prompt improvement with a reviewed reference"
+area = "Captioning"
+tier = "Must"
+status = "todo"
+completion_scope = "follow-up"
+closes = ["CAP-01", "CAP-06"]
+start = "docs/regression-gate.md (First real experiment)"
+notes = "Pending: review the frozen reference after the Output Score, rubric, ontology and label changes; choose justified quality floors, run real development controls and one-change candidates, and record measured outcomes. No paid model evaluation was authorized in the local implementation task. prompts/coverage-v1.txt remains untested."
+after = ["prompt-loop", "gate-policy"]
+context = "This retains the original prompt-improvement requirement separately from its completed software implementation. Offline tests prove mechanics, not improved captions. Use development Cases only and leave Texas held out; do not replace the fixed reference just to obtain a passing gate."
+done_when = [
+  "The reference and policy are reviewed for the current measurement configuration",
+  "A real unchanged control passes and a deliberately degraded real candidate is rejected",
+  "Each prompt change has a labelled Batch, hypothesis and logged gate outcome",
+  "At least one measured prompt improvement is reviewed and accepted without regressing required scores",
+]
+refs = [
+  "docs/regression-gate.md",
+  "docs/regression-gate-audit.md",
+  "prompts/coverage-v1.txt",
 ]
 
 [[task]]
@@ -873,7 +938,7 @@ tier = "Could"
 status = "todo"
 closes = ["AWS-10"]
 start = "docs/caption-design.md §2.2 (AWS-10)"
-after = ["prompt-loop"]
+after = ["prompt-improvement-validation"]
 context = "Batch inference is cheaper and higher-throughput for large, non-interactive caption runs (CAP-12 throughput). Use it only after the prompt is settled, since it gives up per-call Traces in real time."
 done_when = [
   "A large caption run through Bedrock batch inference",
@@ -1315,6 +1380,7 @@ title = "Proposer: an agent that reads a failure digest and proposes one change 
 area = "Evaluation"
 tier = "Should"
 status = "todo"
+completion_scope = "follow-up"
 closes = []
 start = "clayzer improve --iterations N: propose, Batch, gate, keep or roll back, log to an experiment ledger"
 notes = "Saved for later (2026-11-04). Turns the measured loop into a self-improving one. The Texas test region is never shown to it."

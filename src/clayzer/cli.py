@@ -306,6 +306,9 @@ def main(argv: list[str] | None = None) -> int:
     g.add_argument("--baseline", default="default")
     g.add_argument("--tolerance", type=float, default=None)
     g.add_argument("--max-token-increase", type=float, default=None, help="0.5 = +50%%")
+    g.add_argument(
+        "--policy", type=Path, help="versioned JSON rules: bounded drops, floors, anchor"
+    )
 
     li = sub.add_parser("listen", help="a spoken summary of a Batch's result, saved as an MP3")
     li.add_argument("batch_id")
@@ -322,6 +325,7 @@ def main(argv: list[str] | None = None) -> int:
     ex.add_argument("--baseline", default="default")
     ex.add_argument("--tolerance", type=float, default=None)
     ex.add_argument("--max-token-increase", type=float, default=None, help="0.5 = +50%%")
+    ex.add_argument("--policy", type=Path, help="enforce and record a versioned gate policy")
     ex.add_argument("--accept", action="store_true", help="keep a passing, comparable candidate")
     recovery = sub.add_parser("experiment-recover", help="recover a kept log after a store failure")
     recovery.add_argument("--baseline", default="default")
@@ -719,14 +723,18 @@ def main(argv: list[str] | None = None) -> int:
 
     if a.cmd == "gate":
         from clayzer.batch import load
-        from clayzer.gate import DEFAULT_TOLERANCE, gate, load_baseline, render_gate
+        from clayzer.gate import DEFAULT_TOLERANCE, gate, load_baseline, policy_anchor, render_gate
+        from clayzer.gate_policy import load_policy
 
         try:
+            policy = load_policy(a.policy)
             result = gate(
                 load_baseline(settings.baselines_dir, a.baseline),
                 load(store, a.batch_id),
                 DEFAULT_TOLERANCE if a.tolerance is None else a.tolerance,
                 a.max_token_increase,
+                policy=policy,
+                anchor=policy_anchor(policy, settings.baselines_dir),
             )
         except (ValueError, FileNotFoundError) as e:
             p.error(str(e))
@@ -766,6 +774,7 @@ def main(argv: list[str] | None = None) -> int:
         from clayzer.batch import load
         from clayzer.experiments import record_experiment
         from clayzer.gate import DEFAULT_TOLERANCE, render_gate
+        from clayzer.gate_policy import load_policy
 
         try:
             result, record = record_experiment(
@@ -777,6 +786,7 @@ def main(argv: list[str] | None = None) -> int:
                 accept=a.accept,
                 tolerance=DEFAULT_TOLERANCE if a.tolerance is None else a.tolerance,
                 max_token_increase=a.max_token_increase,
+                policy=load_policy(a.policy),
             )
         except (ValueError, OSError) as e:
             p.error(str(e))

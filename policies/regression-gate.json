@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "max_allowed_drop": 0.05,
+  "minimum_scores": {},
+  "require_improvement": false,
+  "anchor": "regression-anchor",
+  "anchor_snapshot": "78a50084abc38e61f15097dc1c17eb59d077be0e2ed1151334714e84c36c5cdc"
+}

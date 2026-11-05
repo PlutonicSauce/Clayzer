@@ -26,6 +26,7 @@ from typing import Literal
 from clayzer import baseline_files
 from clayzer.batch import SANDBOX_FAILURE, BatchConfig, config_from
 from clayzer.gate_evidence import METRIC_PATHS, number, validate_rows, validate_summary
+from clayzer.gate_policy import GatePolicy
 from clayzer.provenance import RECORDED_SINCE, self_graded
 
 Verdict = Literal["pass", "fail", "inconclusive"]
@@ -290,6 +291,8 @@ class GateResult:
     checks: list[Check]
     reasons: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    policy: dict | None = None
+    anchor_id: str | None = None
 
     @property
     def exit_code(self) -> int:
@@ -314,12 +317,14 @@ def _status(baseline, candidate, allowed) -> str:
     return "improved" if delta > allowed else "ok"
 
 
-def _check(case_id, metric, b: dict | None, c: dict | None, tolerance) -> Check:
+def _check(case_id, metric, b: dict | None, c: dict | None, tolerance, maximum_drop=None) -> Check:
     bm, cm = (b or {}).get("mean"), (c or {}).get("mean")
     spread = (b or {}).get("spread")
     for label, value in (("Baseline", bm), ("candidate", cm), ("Spread", spread)):
         number(value, f"{case_id} {metric} {label}", upper=1)
     allowed = max(tolerance, spread or 0.0)  # the Baseline's Spread only
+    if maximum_drop is not None:
+        allowed = min(allowed, maximum_drop)
     if c is None and bm is not None:
         status = "missing"
     else:
@@ -337,12 +342,13 @@ def _validate_options(tolerance, max_token_increase):
         raise ValueError("tolerance must be a finite, non-negative number")
 
 
-def _score_checks(bs, cs, tolerance):
+def _score_checks(bs, cs, tolerance, maximum_drop=None):
     checks = []
     for case_id, b in bs["cases"].items():
         c = cs["cases"].get(case_id) or {}
         checks.extend(
-            _check(case_id, metric, b.get(metric), c.get(metric), tolerance) for metric in METRICS
+            _check(case_id, metric, b.get(metric), c.get(metric), tolerance, maximum_drop)
+            for metric in METRICS
         )
     checks.append(
         _check(
@@ -351,6 +357,7 @@ def _score_checks(bs, cs, tolerance):
             bs["batch"]["retrieval_mrr"],
             cs["batch"]["retrieval_mrr"],
             tolerance,
+            maximum_drop,
         )
     )
     return checks
@@ -487,11 +494,12 @@ def _gate_warnings(baseline, candidate, token_change, cost_regressed):
     return warnings
 
 
-def gate(
+def _gate(
     baseline: dict,
     candidate: dict,
     tolerance: float = DEFAULT_TOLERANCE,
     max_token_increase: float | None = None,
+    maximum_drop: float | None = None,
 ) -> GateResult:
     """Compare stored evidence; a token cap (0.5 = +50%) makes excess usage fail."""
     _validate_options(tolerance, max_token_increase)
@@ -510,7 +518,7 @@ def gate(
             [],
             ["candidate has no summary; finish or resume its Batch, then gate again"],
         )
-    checks = _score_checks(bs, cs, tolerance)
+    checks = _score_checks(bs, cs, tolerance, maximum_drop)
     reasons = _regression_reasons(checks, bs, cs)
     token_change, unknown_cost, cost_reason = _token_assessment(
         baseline, candidate, max_token_increase
@@ -534,6 +542,104 @@ def gate(
     )
 
 
+def policy_anchor(policy: GatePolicy | None, root: Path) -> dict | None:
+    """Read the pinned reference without ever promoting or changing it."""
+    if policy is None or policy.anchor is None:
+        return None
+    policy.validate()
+    anchor = load_baseline(root, policy.anchor)
+    _validate_anchor(policy, anchor)
+    return anchor
+
+
+def _validate_anchor(policy, anchor):
+    if policy.anchor is not None and (
+        anchor is None or anchor.get("snapshot") != policy.anchor_snapshot
+    ):
+        raise ValueError("policy anchor is missing or changed; review the frozen reference")
+    if policy.anchor is None and anchor is not None:
+        raise ValueError("an anchor must be declared and pinned in the gate policy")
+
+
+def _floor_checks(baseline, candidate, policy):
+    checks, missing = [], []
+    for metric, floor in policy.minimum_scores.items():
+        if metric == "retrieval":
+            pairs = [
+                ("(batch)", baseline["batch"]["retrieval_mrr"], candidate["batch"]["retrieval_mrr"])
+            ]
+        else:
+            pairs = [
+                (cid, base.get(metric) or {}, candidate["cases"].get(cid, {}).get(metric) or {})
+                for cid, base in baseline["cases"].items()
+            ]
+        applicable = 0
+        for cid, base, score in pairs:
+            value = score.get("mean")
+            if base.get("mean") is None and value is None:
+                continue  # A score not applicable on either side is not a zero.
+            applicable += 1
+            status = _status(floor, value, 0)
+            checks.append(Check(cid, "floor_" + metric, floor, value, 0, status))
+        if not applicable:
+            missing.append(f"quality floor for {metric} has no measured samples")
+    return checks, missing
+
+
+def gate(
+    baseline: dict,
+    candidate: dict,
+    tolerance: float = DEFAULT_TOLERANCE,
+    max_token_increase: float | None = None,
+    *,
+    policy: GatePolicy | None = None,
+    anchor: dict | None = None,
+) -> GateResult:
+    """Compare saved evidence, optionally enforcing floors, bounded loss and a fixed anchor."""
+    if policy is None:
+        if anchor is not None:
+            raise ValueError("an anchor requires a gate policy")
+        return _gate(baseline, candidate, tolerance, max_token_increase)
+    policy.validate()
+    _validate_anchor(policy, anchor)
+    result = _gate(baseline, candidate, tolerance, max_token_increase, policy.max_allowed_drop)
+    result.policy = policy.to_dict()
+    improved = any(c.status == "improved" for c in result.checks)
+    if anchor is not None:
+        anchored = _gate(anchor, candidate, tolerance, max_token_increase, policy.max_allowed_drop)
+        result.anchor_id = anchored.baseline_id
+        result.checks.extend(
+            Check(
+                "anchor/" + c.case_id, c.metric, c.baseline, c.candidate, c.allowed_drop, c.status
+            )
+            for c in anchored.checks
+        )
+        result.reasons.extend("anchor: " + r for r in anchored.reasons)
+        result.warnings.extend("anchor: " + w for w in anchored.warnings)
+        if anchored.verdict == "fail" or result.verdict == "fail":
+            result.verdict = "fail"
+        elif anchored.verdict == "inconclusive":
+            result.verdict = "inconclusive"
+    if candidate["summary"] is None:
+        return result
+    floors, unknown = _floor_checks(baseline["summary"], candidate["summary"], policy)
+    result.checks.extend(floors)
+    failed = [c for c in floors if c.status in {"regressed", "missing"}]
+    if failed:
+        result.verdict = "fail"
+        result.reasons.append(
+            "quality floor not met: " + ", ".join(f"{c.case_id} {c.metric}" for c in failed)
+        )
+    if unknown:
+        result.reasons.extend(unknown)
+        if result.verdict != "fail":
+            result.verdict = "inconclusive"
+    if policy.require_improvement and result.verdict == "pass" and not improved:
+        result.verdict = "fail"
+        result.reasons.append("policy requires an improvement beyond the allowed score margin")
+    return result
+
+
 def render_gate(result: GateResult) -> str:
     def f(x):
         return "  n/a" if x is None else f"{x:5.2f}"
@@ -547,6 +653,10 @@ def render_gate(result: GateResult) -> str:
         "",
         f"  {'Case':<34} {'metric':<10} {'base':>5} {'cand':>5} {'allowed':>7}  status",
     ]
+    if result.policy is not None:
+        lines.insert(3, "  Policy " + json.dumps(result.policy, sort_keys=True))
+    if result.anchor_id is not None:
+        lines.insert(3, f"  anchor    {result.anchor_id}")
     for c in result.checks:
         lines.append(
             f"  {c.case_id:<34} {c.metric:<10} {f(c.baseline)} {f(c.candidate)} "

@@ -21,10 +21,12 @@ from clayzer.gate import (
     compare,
     gate,
     load_baseline,
+    policy_anchor,
     render_compare,
     render_gate,
     setting_changes,
 )
+from clayzer.gate_policy import GatePolicy
 
 
 def _save_record(store, record):
@@ -72,6 +74,7 @@ def record_experiment(
     accept: bool = False,
     tolerance: float = DEFAULT_TOLERANCE,
     max_token_increase: float | None = None,
+    policy: GatePolicy | None = None,
 ) -> tuple[GateResult, str]:
     """Save an attempt; `accept` promotes only a passing, comparable development Batch.
 
@@ -82,6 +85,9 @@ def record_experiment(
     if not cfg.label.strip() or not hypothesis.strip():
         raise ValueError("experiments need a labelled Batch and a non-empty hypothesis")
     baseline = load_baseline(baselines_dir, baseline_name)
+    anchor = policy_anchor(policy, baselines_dir)
+    if accept and policy is not None and policy.anchor == baseline_name:
+        raise ValueError("an experiment cannot promote over its frozen anchor")
     if cfg.region != "dev" or baseline["config"].region != "dev":
         raise ValueError("prompt experiments use development Cases only; keep test Cases held out")
     if any(case.get("region", "dev") != "dev" for case in candidate.get("cases", [])):
@@ -95,7 +101,7 @@ def record_experiment(
             "change only one of prompt, caption model, tools, turn budget, or verifier"
         )
 
-    result = gate(baseline, candidate, tolerance, max_token_increase)
+    result = gate(baseline, candidate, tolerance, max_token_increase, policy=policy, anchor=anchor)
     decision = {"pass": "eligible", "fail": "rejected", "inconclusive": "inconclusive"}[
         result.verdict
     ]
@@ -114,6 +120,10 @@ def record_experiment(
         "candidate": asdict(cfg),
         "tolerance": tolerance,
         "max_token_increase": max_token_increase,
+        "policy": policy.to_dict() if policy is not None else None,
+        "anchor": {"config": asdict(anchor["config"]), "snapshot": anchor["snapshot"]}
+        if anchor is not None
+        else None,
         "decision": decision,
         "accept_requested": accept,
         "gate": {**asdict(result), "exit_code": result.exit_code},

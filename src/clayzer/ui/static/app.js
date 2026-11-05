@@ -114,9 +114,9 @@ const FLOW = [
   },
   {
     key: "gate", phase: "improve", title: "Regression gate", sub: "keep or reject the change", area: "Evaluation",
-    what: `The candidate Batch against the accepted ${term("Baseline")}. A Case regresses when its correctness, coverage, or fidelity drops more than max(0.05, the Baseline's Spread). Exit 0 pass, 1 fail, 2 inconclusive. Next, saved for later: a Proposer that reads a failure digest, proposes one change to the prompt, model, or tools, and lets the gate decide.`,
+    what: `The implemented gate compares a candidate Batch with the accepted ${term("Baseline")} on correctness, coverage, fidelity, Workflow Score, and retrieval. It records each manual experiment and only promotes passing, comparable evidence. The explicit policy caps allowed drops and also checks a pinned reference; quality floors and an improvement requirement are configurable. Exit 0 pass, 1 fail, 2 inconclusive. Reviewing the reference for the latest scoring setup, measuring a real prompt improvement, and building the automatic Proposer remain open follow-ups.`,
     why: "This is the improvement loop the pitch rests on: every change to the captioner is measured and kept only if nothing got worse.",
-    code: ["uv run clayzer baseline accept <id>", "uv run clayzer gate <id>", 'uv run clayzer experiment <id> --hypothesis "Expected improvement" [--accept]', "src/clayzer/gate.py", "src/clayzer/experiments.py"],
+    code: ["uv run clayzer gate <id> --policy policies/regression-gate.json", 'uv run clayzer experiment <id> --policy policies/regression-gate.json --hypothesis "Expected improvement" [--accept]', "src/clayzer/gate.py", "src/clayzer/gate_policy.py", "src/clayzer/experiments.py"],
     docs: [{ href: "/docs/docs/regression-gate.md", label: "Run and record a prompt experiment" }, { href: "/docs/docs/caption-plan.md#6-approach", label: "Plan §6: the improvement loop" }, { href: "/docs/docs/caption-plan.md#8-risks", label: "Plan §8: the gate's rules and their risks" }, { href: "/docs/docs/caption-plan.md#10-decisions-behind-this-plan", label: "Plan §10: decisions" }],
   },
   {
@@ -129,7 +129,7 @@ const FLOW = [
 ];
 
 function stepState(step, tasks) {
-  const mine = tasks.filter((t) => t.step === step.key);
+  const mine = tasks.filter((t) => t.step === step.key && t.completion_scope !== "follow-up");
   if (mine.length && mine.every((t) => t.status === "done")) return ["built", "#2f6b3a"];
   if (mine.some((t) => ["done", "doing"].includes(t.status))) return ["partly built", "#8a5b0e"];
   return ["not built", "#b9b0ab"];
@@ -415,6 +415,11 @@ async function howPage(stepKey) {
     const tier = { Must: 0, Should: 1, Could: 2 };
     const mine = tasks.filter((t) => t.step === s.key)
       .sort((x, y) => (order[x.status] - order[y.status]) || (tier[x.tier] - tier[y.tier]));
+    const implementation = mine.filter((t) => t.completion_scope !== "follow-up");
+    const followups = mine.filter((t) => t.completion_scope === "follow-up");
+    const taskCards = (items) => items.map((t) => `<div class="how-task">
+      <div>${statusBadge(t.status)} <span class="badge b-na">${esc(t.tier)}</span></div>
+      <p><a href="#/tasks/${esc(t.id)}">${esc(t.title)}</a></p></div>`).join("");
     const prev = FLOW[i - 1], next = FLOW[i + 1];
     document.querySelectorAll("#flow button").forEach((b) => b.setAttribute("aria-pressed", String(+b.dataset.i === i)));
     document.getElementById("step").innerHTML = `
@@ -422,7 +427,7 @@ async function howPage(stepKey) {
         <p class="how-kicker">Step ${i + 1} of ${FLOW.length} · ${esc(PHASES.find((p) => p.key === s.phase).label)}</p>
         <h2>${esc(s.title)}</h2>
         <p class="how-tags"><span class="how-area ${AREA_CLASS[s.area]}">${esc(s.area)}</span>
-          <span class="how-state ${st.cls}">${esc(st.label)}</span></p>
+          <span class="how-state ${st.cls}">${esc(st.label)}${followups.length ? " · implementation" : ""}</span></p>
       </div>
       <div class="how-panel-body">
         <div class="how-prose">
@@ -434,10 +439,11 @@ async function howPage(stepKey) {
           <ul class="how-docs">${s.docs.map((d) => `<li><a href="${esc(d.href)}" target="_blank" rel="noopener">${esc(d.label)}</a></li>`).join("")}</ul>` : ""}
         </div>
         <aside class="how-tasks" aria-label="Tasks for this step">
-          <h3>Tasks for this step <small>(${mine.filter((t) => t.status === "done").length} of ${mine.length} done)</small></h3>
-          ${mine.map((t) => `<div class="how-task">
-              <div>${statusBadge(t.status)} <span class="badge b-na">${esc(t.tier)}</span></div>
-              <p><a href="#/tasks/${esc(t.id)}">${esc(t.title)}</a></p></div>`).join("") || '<p class="sub">None listed.</p>'}
+          <h3>${followups.length ? "Implementation tasks" : "Tasks for this step"} <small>(${implementation.filter((t) => t.status === "done").length} of ${implementation.length} done)</small></h3>
+          ${taskCards(implementation) || '<p class="sub">None listed.</p>'}
+          ${followups.length ? `<h3>Validation and future work <small>(${followups.filter((t) => t.status === "done").length} of ${followups.length} done)</small></h3>
+            <p class="sub">These follow-ups remain separate from the step's implementation status.</p>
+            ${taskCards(followups)}` : ""}
           <a class="how-all" href="#/tasks">All tasks →</a>
         </aside>
       </div>
