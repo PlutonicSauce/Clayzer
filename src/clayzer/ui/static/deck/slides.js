@@ -1,14 +1,15 @@
-// The 8-minute pitch. One entry per slide: a title, a time budget in seconds (they add up to
-// 8:00; the notes panel warns when a slide runs long), presenter notes, a plain-language `spoken`
+// The 4-minute pitch. One entry per slide: a title, a time budget in seconds (they add up to
+// 4:00; the notes panel warns when a slide runs long), presenter notes, a plain-language `spoken`
 // script read aloud by the A key (accessibility), and the component.
 //
-// Numbers come from the committed Baseline (baselines/default/summary.json): base-v2, Nova Pro
-// captions judged by Opus 5.5, 4 dev Cases × 3 Repeats, all 12 Runs ok. Scale figures (15.2B
-// embeddings, ~99 MCP servers) are from the hackathon brief. Re-quote from a committed Baseline
-// if the scores change, never from a one-off Run.
+// Scores aren't quoted on a slide: the demo opens the live Overview, which reads the committed
+// Baseline. The problem slide's caption is a real Run (see caption-chip.js). Scale figures (15.2B
+// embeddings) are from the hackathon brief.
 
 import { html } from "./html.js";
-import { StoryArchitecture } from "./diagram.js";
+import { ArchitectureDiagram } from "./diagram.js";
+import { CaptionChip } from "./caption-chip.js";
+import { SolutionFlow } from "./value-flow.js";
 
 const Kicker = ({ children }) => html`<p class="kicker">${children}</p>`;
 
@@ -16,82 +17,136 @@ function Title() {
   return html`<div class="title-slide">
     <${Kicker}>Clay Earth Dataset Foundry · Caption track<//>
     <h1>Clayzer</h1>
-    <p class="lede">Give us your caption set, and we tell you how much of it you can trust, where
-      it fails, and what it costs to make better.</p>
+    <p class="pron"><span>/ˈkleɪ.zər/</span> KLAY-zer, rhymes with laser · <i>noun</i></p>
+    <p class="lede">A solution for producing captions you can trust, at scale.</p>
     <p class="team">Team Clayzer · Clay Earth Dataset Foundry hackathon · November 4th, 2026</p>
   </div>`;
 }
 
-function Problem() {
-  return html`<div class="two-col">
-    <div>
-      <${Kicker}>The problem<//>
-      <h2>Clay v2 learns from captions nobody has checked</h2>
-      <p class="big">Clay v2 is text-native. It is trained on written descriptions of satellite
-        and aerial images — and no one has the time to check whether those descriptions are true.</p>
-      <p class="big">A caption that miscounts turbines or invents a road teaches the model the
-        wrong thing, at continental scale.</p>
-    </div>
-    <div class="hook">
-      <p class="hook-label">Seen in a real Run</p>
-      <blockquote>"An aerial image of a wind farm … turbines in the north-west, north, and
-        north-east …"</blockquote>
-      <p class="hook-truth">The USGS turbine database says <b>16 turbines, to the south</b>.
-        Wrong count, wrong place. A plausible caption, and wrong — the kind that quietly poisons
-        training.</p>
+// The problem only, in three presses on one photo: the Caption is wrong (the 17 turbines both
+// records agree on appear), the records disagree too (the 18th, either side of the top edge), and
+// so we cross-check sources and only bring in a person when they conflict or are too uncertain.
+function Problem({ step = 0 }) {
+  const shown = step >= 1;
+  return html`<div class="problem">
+    <${Kicker}>New caption, who dis?<//>
+    <h2>Today, every caption is a black box</h2>
+    <div class="problem-grid">
+      <div class="hook">
+        <${CaptionChip} records=${shown} dispute=${step >= 2} />
+        <div class="hook-side">
+          <span class="hook-stamp">✗ Unchecked</span>
+          <p class="hook-label">A real caption</p>
+          <blockquote>“18 wind turbines, primarily in the center and eastern parts of the
+            image.”</blockquote>
+          <p class="hook-note">${shown
+            ? "Count right, place wrong: the records put every turbine around the centre."
+            : "Nova Pro saw only the photo. We ask it to name each object's place as one of our 9 grid cells, so \u201cwhere\u201d can be checked."}</p>
+        </div>
+      </div>
+      <div class="stakes">
+        <div class=${`wrong-card build ${step >= 2 ? "in" : ""}`}>
+          <p class="wrong-head">The records disagree too</p>
+          <p><b>USGS</b> counts 17 turbines in this photo. <b>OpenStreetMap</b> counts 18: it puts
+            the gold one 2 m further in, inside the top edge. One of them is wrong.</p>
+        </div>
+        <div class=${`triage build ${step >= 3 ? "in" : ""}`}>
+          <p class="triage-head">So we cross-check the sources</p>
+          <p class="triage-row ok"><b>Sources agree</b><span>labelled automatically</span></p>
+          <p class="triage-row ask"><b>Conflict, or too uncertain</b><span>only then, a person looks</span></p>
+          <p class="triage-foot">This conflict was flagged automatically. A person checked the photo: 18.</p>
+        </div>
+      </div>
     </div>
   </div>`;
 }
 
-// The architecture, told as a journey: one image goes in on the left, a trustworthy verdict comes
-// out on the right. Each stop is numbered so a non-technical listener can follow the story.
+// Our solution: how Clayzer earns trust, one technique per press (`steps` in SLIDES), with the
+// same Chip as the problem slide. The last press turns its Caption into one that matches the
+// records. Each point says what the code does today; the verify-then-write figures are from the
+// 4-Case test (verify-2 against base-v2, rescored with the same scorer).
+const TRUST = [
+  { icon: "check", title: "Verify, then write",
+    text: "Each fact is checked against imagery at its grid cell before the caption is written. In testing, every object it named was really there." },
+  { icon: "layers", title: "Hidden answer keys",
+    text: "Public records (USGS, OpenStreetMap), cross-checked by code, grade every fact. The captioner never sees them, so a good score is earned." },
+  { icon: "tag", title: "One shared vocabulary",
+    text: "About 20 object classes with their look-alikes and minimum sizes, so “building” for a greenhouse earns partial credit, not zero." },
+  { icon: "split", title: "Tune on one region, test on another",
+    text: "74 Mojave images to tune, 61 Texas images it never saw, plus look-alikes: greenhouses fooled it 9 of 12 times." },
+  { icon: "loop", title: "A self-improvement loop",
+    text: "Every change runs 3× per image and is kept only if it beats the baseline. It kept verify-then-write out: more accurate, but less complete." },
+];
+
+function TrustIcon({ name }) {
+  const s = { fill: "none", stroke: "currentColor", "stroke-width": 3, "stroke-linecap": "round", "stroke-linejoin": "round" };
+  return html`<svg class="trust-icon" viewBox="0 0 48 48" aria-hidden="true">
+    ${name === "check" && html`<g ...${s}><circle cx="24" cy="24" r="17" /><path d="M16 24l6 6 11-12" /></g>`}
+    ${name === "layers" && html`<g ...${s}><path d="M24 8 42 17 24 26 6 17Z" /><path d="M6 24l18 9 18-9" /><path d="M6 31l18 9 18-9" /></g>`}
+    ${name === "tag" && html`<g ...${s}><path d="M8 8h16l17 17-16 16L8 24Z" /><circle cx="16" cy="16" r="3" /></g>`}
+    ${name === "split" && html`<g ...${s}><rect x="5" y="12" width="15" height="24" rx="3" /><rect x="28" y="12" width="15" height="24" rx="3" /><path d="M20 24h8" stroke-dasharray="2 4" /></g>`}
+    ${name === "loop" && html`<g ...${s}><path d="M38 20a15 15 0 0 0-27-4" /><path d="M10 9v7h7" /><path d="M10 28a15 15 0 0 0 27 4" /><path d="M38 39v-7h-7" /></g>`}
+  </svg>`;
+}
+
+function Trust({ step = 0 }) {
+  const trusted = step > TRUST.length;
+  return html`<div class="problem trust-slide">
+    <${Kicker}>Our solution<//>
+    <h2>From black box to captions you can trust</h2>
+    <div class="trust-grid">
+      <div class=${`hook ${trusted ? "trusted" : ""}`}>
+        <${CaptionChip} fixed=${trusted} />
+        <span class="hook-stamp">${trusted ? "✓ Trusted" : "✗ Unchecked"}</span>
+        <p class="hook-label">${trusted ? "The goal" : "The same caption"}</p>
+        <blockquote>${trusted
+          ? "“18 wind turbines spread across the image, none in the centre.”"
+          : "“18 wind turbines, primarily in the center …”"}</blockquote>
+      </div>
+      <div class="trust">
+        ${TRUST.map((t, k) => html`<div class=${`trust-item build ${step >= k + 1 ? "in" : ""}`}>
+          <${TrustIcon} name=${t.icon} />
+          <div><b>${t.title}</b><p>${t.text}</p></div>
+        </div>`)}
+      </div>
+    </div>
+  </div>`;
+}
+
+// How it works, as one journey: public data in on the left, Clayzer's four numbered steps, and
+// trusted pairs out to Clay's text search, with what each part is worth along the bottom. (Merged
+// from the old story-architecture and downstream-value slides.)
 function Architecture() {
   return html`<div class="arch-slide">
-    <${Kicker}>How it works · follow one image through<//>
-    <h2>From a raw aerial tile to a verdict you can trust</h2>
-    <${StoryArchitecture} />
-    <p class="source">Same path for one image or a million: each stop is a managed AWS service, so
-      the story scales without changing. A role per service, every bucket private.</p>
+    <${Kicker}>How it works · start to finish<//>
+    <h2>From aerial image to searchable caption</h2>
+    <${SolutionFlow} />
   </div>`;
 }
 
-// One "approach" slide that carries the three novel ideas (originality) as it explains how a
-// caption is written and scored. Merged from the old Generation, Evaluation, and What's-new
-// slides to keep the deck to 8.
-function Approach() {
-  return html`<div>
-    <${Kicker}>Our approach · what's new<//>
-    <h2>Three things you won't find in a plain VLM prompt</h2>
-    <div class="criteria">
-      <div class="criterion"><b>Verify-then-write</b><p>Each Claim is checked against imagery at
-        its own 3 × 3 grid cell <i>as the caption is written</i> — wrong Claims are dropped or
-        moved, not graded after.</p></div>
-      <div class="criterion"><b>Hidden answer keys</b><p>The captioner never sees the ground truth
-        (USGS, OpenStreetMap), so a high score is earned. Grounding is two numbers, so a terse
-        caption can't win by saying less.</p></div>
-      <div class="criterion"><b>An ontology that feeds the model</b><p>The object vocabulary — its
-        look-alikes and house phrasings — is <i>learned from captions</i> and fed back into the
-        prompt, so the model confuses a greenhouse for a solar array less often.</p></div>
+// The AWS deployment, from diagram.js (infra/app.py, plus what caption-design.md §3.4 plans next).
+function Aws() {
+  return html`<div class="arch-slide">
+    <${Kicker}>On AWS · the services we use<//>
+    <h2>One deploy command, all managed services</h2>
+    <${ArchitectureDiagram} />
+    <div class="legend">
+      <span><i class="live"></i> Deployed: this deck is served by it</span>
+      <span><i class="planned"></i> Planned next</span>
+      <span>A role per service; the web app can only read its own part of the store</span>
     </div>
-    <p class="big">The brief asked for an evaluation sandbox. We built one that also makes the
-      captions better — and closes the loop: the ontology scores captions <i>and</i> teaches the
-      next ones, proven by the regression gate, not asserted.</p>
-    <p class="source">Captions on Bedrock (Nova Pro); fidelity judged by Opus 5.5; retrieval by
-      Titan embeddings. The ontology is data-driven (ADR-0010), induced from a caption corpus
-      (ADR-0011).</p>
   </div>`;
 }
 
 function Demo() {
   return html`<div>
     <${Kicker}>Live demo · the proof<//>
-    <h2>One Batch, from image to verdict</h2>
+    <h2>The site, in four stops</h2>
     <ol class="demo-script">
-      <li><b>A Case.</b> The image and what open data says is really there.</li>
-      <li><b>Its Caption.</b> Each Claim marked supported or not, on the 3 × 3 grid — see it, don't
+      <li><b>Overview.</b> The current Baseline: every Case, every Repeat, scored.</li>
+      <li><b>A Caption.</b> Each Claim marked supported or not, on the 3 × 3 grid — see it, don't
         read it.</li>
-      <li><b>The report.</b> Five criteria side by side, averaged over repeats.</li>
-      <li><b>The dataset card.</b> Where captions go wrong — a greenhouse called a solar array.</li>
+      <li><b>The report.</b> Five criteria side by side, and a Listen button that reads it aloud.</li>
       <li><b>Compare to Baseline.</b> The gate says better, worse, or inconclusive.</li>
     </ol>
     <p class="source">Live here: <a href="./">Overview</a> · <a href="./#/batches">Batches</a> ·
@@ -99,83 +154,103 @@ function Demo() {
   </div>`;
 }
 
-function Results() {
-  return html`<div>
-    <${Kicker}>Results · committed Baseline base-v2<//>
-    <h2>What we measured</h2>
-    <div class="criteria">
-      <div class="criterion"><b>0.58</b><p>Grounding correctness</p></div>
-      <div class="criterion"><b>0.67</b><p>Grounding coverage</p></div>
-      <div class="criterion"><b>0.54</b><p>Fidelity (Opus judge)</p></div>
-      <div class="criterion"><b>0.89</b><p>Retrieval MRR, ±0.02</p></div>
-      <div class="criterion"><b>3.9 s</b><p>per Caption on Bedrock</p></div>
-    </div>
-    <p class="big">The gate caught a vague one-Claim prompt that looked good on correctness but
-      collapsed on coverage (0.67 → 0.27) — the "say less to score higher" trap, stopped before it
-      became the Baseline. That is the eval doing its job.</p>
-    <p class="source">4 dev Cases × 3 Repeats, 12 of 12 Runs clean. Each rate is on its own;
-      weights are Clay's to set. From a committed Baseline, not a one-off Run.</p>
+// The example search, animated (HyperFrames project in ../Clayzer-videos/flood-search-motion).
+// It loops muted; the deck mounts one slide at a time, so it starts from the top on arrival.
+function ExampleSearch() {
+  return html`<div class="video-slide">
+    <${Kicker}>What trusted captions unlock<//>
+    <h2>Search the Earth in plain words</h2>
+    <video class="slide-video" src="static/deck/media/flood-search.mp4" poster="static/deck/media/flood-search-poster.jpg" autoplay muted loop playsInline
+      aria-label="A text search for the economic impact of flooding in Bangkok and access to aid returns four images whose checked captions match: a flooded district, a market and road under water, a relief site on dry ground, and an open route from the relief site to the flooded district. Then: results are only as good as the captions; Clayzer checks them."></video>
+    <p class="source">Search results are only as good as the captions behind them. Illustrative:
+      not real search results.</p>
   </div>`;
 }
 
+// Per 1,000 Captions and for Clay's ~70M training chips; docs/scale-napkin-math.md has the sums.
+const LEVERS = [
+  ["Nova Pro, on-demand", 2.59, "$181K", "measured"],
+  ["+ Bedrock batch inference", 1.30, "$91K", "published"],
+  ["+ Nova Lite first, 20% escalated to Pro", 0.36, "$25K", "assumed"],
+  ["+ 256 px where the class is still visible", 0.28, "$20K", "assumed"],
+  ["+ Caption 1 in 5, reuse via Clay embeddings", 0.056, "$3.9K", "assumed"],
+];
+
 function Scale() {
   return html`<div>
-    <${Kicker}>Scale &amp; impact<//>
-    <h2>Built to grow from 12 Runs to 15 billion</h2>
-    <div class="criteria">
-      <div class="criterion"><b>15.2B</b><p>embeddings Clay has already published — the scale its
-        captions must reach</p></div>
-      <div class="criterion"><b>Serverless</b><p>Bedrock, S3, and Step Functions fan out over
-        Chips; no server to outgrow</p></div>
-      <div class="criterion"><b>Cheap checks first</b><p>grounding and duplication run on the whole
-        set; the costly LLM judge only on a sample</p></div>
-      <div class="criterion"><b>Any caption set</b><p>point it at anyone's captions — ours, or
-        Clay's own pipeline — for a verdict, failure modes, and cost, no retraining</p></div>
+    <${Kicker}>At Clay's scale<//>
+    <h2>46× cheaper to caption Clay's 70M chips</h2>
+    <div class="scale">
+      <div class="magnitude">
+        <p><b>70M</b> chips in Clay v1.5, a stratified sample: ~5% of MGRS tiles, at most 6 dates
+          per place</p>
+        <p><b>86M</b> Chips in one NAIP pass over CONUS</p>
+        <p><b>~13B</b> in the Sentinel-2 archive over land</p>
+      </div>
+      <div class="ladder">
+        ${LEVERS.map(([name, per1k, total, basis]) => html`<div class="lever">
+          <span class="name">${name}</span>
+          <span class="bar"><i style=${`width: ${Math.max(1.5, (per1k / 2.59) * 100)}%`}></i></span>
+          <span class="total">${total}</span>
+          <span class=${`basis ${basis}`}>${basis}</span>
+        </div>`)}
+        <p class="judge">Scoring: an Opus judge on every Caption would cost <b>$1.1M</b>, 6× the
+          captions. Grounding needs no model call, so ours is <b>$5.5K</b> with Opus on a 1%
+          sample.</p>
+      </div>
     </div>
-    <p class="big">The impact: Clay can trust a caption set before training on it, instead of
-      finding out after a continental-scale run. And the ontology learned on the way makes the
-      next batch of captions better — a loop that compounds, not a one-off score.</p>
+    <p class="source">Measured: 2,559 tokens and 2.9 s per Caption (dev63, 189 Captions). Prices:
+      AWS Price List, us-east-1. "Assumed" rows are the next Batches to run.</p>
   </div>`;
 }
 
 function Next() {
   return html`<div class="title-slide closing">
     <${Kicker}>What it means for Clay<//>
-    <h2>Trust your captions before you train on them</h2>
-    <p class="lede">On Monday: hand Clayzer a caption set, get a verdict — how much to trust,
-      where it fails, what it costs to fix. Point it at Clay's own pipeline next.</p>
+    <h2>Trust your captions before anyone searches them</h2>
+    <p class="lede">Hand Clayzer a caption set, get a verdict: how much to trust, where it fails,
+      what it costs to fix.</p>
     <p class="team">The ask: Clay's real caption set and its rubric weights, so the verdict is
       Clay's, not our stand-in's.</p>
     <p class="access-note">Any slide reads itself aloud — press <b>A</b> or the Listen button.</p>
   </div>`;
 }
 
-// Eight slides, exactly 8:00. The story architecture, the three novel ideas, scale, and the
-// demo each get their own slide; writing + scoring + originality are merged into Approach, and
-// the accessibility note rides on the closing slide (the Listen feature is on every slide).
+// Nine slides, exactly 4:00, in four sections: the problem; the value it unlocks (search in words,
+// animated); our solution (how it works start to finish, how we earn trust, the AWS services, the
+// live demo); the cost at Clay's scale; then the close.
+// The deck's sections, in order, for the breadcrumb at the top of each slide (deck.js). A slide's
+// `section` names one; the title and closing slides have none.
+export const SECTIONS = ["Problem Statement", "Value Unlock", "Our Solution", "Scale"];
+
 export const SLIDES = [
-  { title: "Clayzer", seconds: 25, theme: "dark", component: Title,
-    spoken: "Clayzer. Give us your caption set, and we tell you how much of it you can trust, where it fails, and what it costs to make better.",
-    notes: ["Say the one-line pitch, then move on.", "8:00 total. T starts the timer, A reads a slide aloud."] },
-  { title: "The problem", seconds: 55, component: Problem,
-    spoken: "Clay's new model learns from written descriptions of satellite images that nobody has checked. In a real run, a caption described a wind farm with turbines to the north. The official database says sixteen turbines, to the south. Wrong count, wrong place. That kind of plausible, wrong caption quietly poisons training.",
-    notes: ["Read the wrong caption, then the answer key: 16 turbines, south.", "Make it concrete — this is the hook."] },
-  { title: "How it works", seconds: 75, component: Architecture,
-    spoken: "Here is the whole journey. One aerial image comes in on the left. Step one, a model on AWS writes a caption. Step two, before each statement is kept, we check it against the imagery. Step three, we score it against open map data the model never saw. Step four, a gate decides whether it is good enough. What comes out on the right is a verdict you can trust. The same path works for one image or a million.",
-    notes: ["Walk it as a story: one image in on the left, a verdict out on the right.", "Point at each numbered stop. End on: same path scales to millions."] },
-  { title: "Our approach · what's new", seconds: 70, component: Approach,
-    spoken: "Three things set this apart from a plain prompt. First, verify-then-write: each claim is checked against imagery as the caption is written, so wrong claims are dropped, not graded after. Second, the captioner never sees the answer keys, so a good score is earned. Third, and this is the differentiator: our object vocabulary is learned from a caption corpus and fed back into the model, so it confuses a greenhouse for a solar array less often. The ontology both scores captions and teaches the next ones — a loop, proven by the gate.",
-    notes: ["Originality: verify-then-write, hidden keys, and the ontology that feeds the model.", "The loop is the story: the ontology scores AND teaches. Proven by the gate, not asserted.", "Honest: the A/B/C comparison number is pending real Clay embeddings."] },
-  { title: "Live demo", seconds: 100, component: Demo,
-    spoken: "Now the proof. A case: the image and what is really there. Its caption, with each claim marked supported or not, right on the image. The report, five criteria side by side. The dataset card, showing where captions go wrong. And compare to baseline: the gate says better, worse, or inconclusive.",
-    notes: ["The core of the pitch. Case → Caption → report → dataset card → gate.", "Keep the recorded Batch open as the offline fallback."] },
-  { title: "Results", seconds: 50, component: Results,
-    spoken: "On our committed baseline: correctness zero point five eight, coverage zero point six seven, fidelity zero point five four, retrieval zero point eight nine. The headline: the gate caught a vague prompt whose coverage collapsed from zero point six seven to zero point two seven, and stopped it. That is the evaluation doing its job.",
-    notes: ["Numbers from the committed Baseline base-v2.", "Lead with the gate catching the vague prompt: coverage 0.67 → 0.27."] },
-  { title: "Scale & impact", seconds: 60, component: Scale,
-    spoken: "Will it scale? Clay has already published fifteen point two billion embeddings — that is the scale its captions must reach. Everything here is serverless: Bedrock, S3, and Step Functions fan out over images with no server to outgrow. Cheap checks run on the whole set; the costly judge only on a sample. Point it at any caption set, including Clay's own pipeline. The impact: Clay can trust a set before training on it, and the ontology it learns makes the next batch better — a loop that compounds.",
-    notes: ["Answer scale head on: 15.2B embeddings is the target; serverless fan-out.", "Impact + loop: a bad caption caught here is a lesson never learned; the ontology compounds."] },
-  { title: "What it means for Clay", seconds: 45, theme: "dark", component: Next,
-    spoken: "What it means for Clay: hand Clayzer a caption set, get a verdict — how much to trust, where it fails, what it costs to fix. Then point it at Clay's own pipeline. Our ask is Clay's real caption set and its rubric weights. And any slide here reads itself aloud — press A.",
-    notes: ["Close on the ask: Clay's real caption set and its rubric weights.", "Mention the Listen feature (A) as the accessibility point."] },
+  { title: "Clayzer", seconds: 10, theme: "dark", component: Title,
+    spoken: "Clayzer, said KLAY-zer, rhymes with laser. A solution for producing captions you can trust, at scale.",
+    notes: ["Say the name, KLAY-zer, then the one-line definition, and move on.", "4:00 total. T starts the timer, A reads a slide aloud."] },
+  { title: "The problem", section: "Problem Statement", seconds: 35, component: Problem, steps: 3,
+    spoken: "New caption, who dis? That is how captions on Clay's imagery work today. Here is a real one: the model saw only this photo and said eighteen wind turbines, mostly in the centre. The public records put the turbines all around the centre, not in it. But the records disagree too: the government database counts seventeen, OpenStreetMap counts eighteen, because they put this turbine two metres apart, either side of the edge. So we never trust one source. We cross-check them: when they agree, the label is automatic, and only when they conflict, like here, does a person look.",
+    notes: ["Open with the label as a joke: \"New caption, who dis? That's how Clay's imagery works today: a caption shows up and nobody knows if it's legit.\"", "Press 1: the 17 turbines both records agree on. The caption is wrong: they're all around the centre.", "Press 2: the gold turbine. USGS puts it just outside the top edge, OpenStreetMap just inside, 2 m apart: 17 or 18.", "Press 3: we stay out of hand-labelling unless sources conflict or confidence is too low. This conflict was flagged automatically (wind agreed on 25 of 26 Cases); a person checked the photo and confirmed 18.", "If asked: the cross-check is built for solar and wind; a confidence threshold for labels is the plan, not built yet.", "The 3 × 3 grid is ours: the model sees the plain photo, and the prompt makes it name each object's place as one of 9 cells."] },
+  { title: "Example search", section: "Value Unlock", seconds: 28, component: ExampleSearch,
+    spoken: "Why does this matter? Trusted captions make satellite imagery searchable in plain words. Ask about the economic impact of flooding in Bangkok and access to aid, and you get the images whose checked captions match: flooded streets, a market under water, a relief site, and the route to reach it. Search results are only as good as the captions behind them.",
+    notes: ["Let the video play; it loops every 16 s.", "The line to land: search results are only as good as the captions behind them.", "Illustrative, not real results: our Cases today are US solar, wind and land cover. Don't imply we have run this search."] },
+  { title: "How it works", section: "Our Solution", seconds: 30, component: Architecture,
+    spoken: "Here is how it works, start to finish. An aerial image and public records go in. One: a model writes the caption from the image alone. Two: each fact is checked against the imagery before it is kept. Three: we score it against the public records, which the model never sees. Four: a gate keeps a change only if it beats the baseline. Only pairs that pass go on to Clay, ready to search.",
+    notes: ["Follow the numbers: 1 write, 2 verify, 3 score against hidden records, 4 gate.", "Point at the bottom row: answer keys for free, wrong captions caught before anyone searches, search in words.", "The dashed loop back from Clay is planned, not built: say 'next'."] },
+  { title: "Our solution", section: "Our Solution", seconds: 40, component: Trust, steps: 6,
+    spoken: "Here is how we make captions you can trust. We verify, then write: each fact is checked against the imagery before the caption is written. The answer keys are public records, cross-checked by code, that the captioner never sees. One shared vocabulary of objects and their look-alikes. We tune on one region and test on another it never saw. And a self-improvement loop keeps only the changes that beat the baseline. The result: a caption that matches what is really there.",
+    notes: ["Press → for each point as you say it (5 presses); the 6th turns the caption green.", "Verify-then-write: in the 4-image test, every object it named was really there, and correctness rose 0.53 → 0.65. Don't claim it's in the baseline: the gate kept it out because coverage dropped.", "Say 'tune', not 'train': we tune the captioner's prompt and checks.", "Labels are automatic; a person only looks where the two records disagree."] },
+  { title: "On AWS", section: "Our Solution", seconds: 25, component: Aws,
+    spoken: "All of it runs on AWS, from one deploy command. Bedrock writes, judges and searches the captions, with Nova Pro, Claude Opus and Titan embeddings. Results live in S3, and the site runs on Fargate behind CloudFront. The dashed boxes are next: Step Functions to fan out, SageMaker for GPU cost, and AgentCore for the agentic captioner.",
+    notes: ["Solid boxes are running now: this deck comes from that Fargate task.", "One cdk deploy per account; nothing crosses accounts.", "Dashed boxes are next; lead into the scale slide: what it costs."] },
+  { title: "Live demo", section: "Our Solution", seconds: 32, component: Demo,
+    spoken: "Now the site. The overview shows the current baseline. A caption, with each claim marked supported or not, right on the image. The report, five criteria side by side, which can read itself aloud. And compare to baseline: the gate says better, worse, or inconclusive.",
+    notes: ["Overview → a Caption on its grid → report and Listen → Compare.", "Keep the recorded Batch open as the offline fallback."] },
+  { title: "At Clay's scale", section: "Scale", seconds: 20, component: Scale,
+    spoken: "What does this cost at Clay's scale? Clay's own training set is seventy million chips, and that is only a five percent sample of the world. Captioning all of it with our current model would cost about one hundred and eighty thousand dollars. Batch pricing halves that. A cheap model first, with only the hard images sent to the strong one, smaller images where objects are still visible, and reusing captions for look-alike chips bring it to about four thousand dollars, forty-six times cheaper. Checking matters too: a large model judging every caption would cost over a million dollars, but our checks against open data need no model at all.",
+    notes: ["Clay itself is a ~5% sample; the archives are 100× bigger, so cost per Caption decides what gets captioned.",
+      "Batch is a published 50%; the green 'assumed' rows are hypotheses our gate can test, which is the point.",
+      "Land the judge line: scoring with a big model costs more than captioning, and our grounding is free."] },
+  { title: "What it means for Clay", seconds: 20, theme: "dark", component: Next,
+    spoken: "Hand Clayzer a caption set and get a verdict: how much to trust, where it fails, what it costs to fix. Our ask is Clay's real caption set and its rubric weights. And any slide here reads itself aloud.",
+    notes: ["Close on the ask: Clay's real caption set and its rubric weights.", "Mention Listen (A) as the accessibility point."] },
 ];

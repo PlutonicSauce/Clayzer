@@ -59,6 +59,8 @@ p { margin: 0 0 18px; }
 .slide.dark .kicker { color: var(--captions-line); }
 .slide.dark ~ .pageno { color: rgba(255, 253, 251, .6); }
 .title-slide { justify-content: center; max-width: 1000px; }
+.title-slide .pron { margin-top: 22px; font-size: 30px; color: rgba(255, 253, 251, .7); }
+.title-slide .pron span { margin-right: 14px; color: var(--captions-line); }
 .title-slide .lede { margin-top: 34px; font-size: 38px; line-height: 1.4; color: rgba(255, 253, 251, .88); }
 .title-slide .team { margin-top: 40px; font-size: 22px; color: rgba(255, 253, 251, .6); }
 .title-slide .access-note { margin-top: 18px; font-size: 20px; color: rgba(255, 253, 251, .7); }
@@ -124,6 +126,22 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
   border-radius: 4px; border: 2px solid #6b6461; }
 .legend i.planned { border-style: dashed; border-color: #a59d99; }
 
+/* Scale slide: magnitude on the left, the cost ladder on the right. */
+.scale { display: grid; grid-template-columns: 0.75fr 1.6fr; gap: 56px; align-items: start; }
+.magnitude p { font-size: 22px; line-height: 1.4; color: var(--muted); margin-bottom: 26px; }
+.magnitude b { display: block; font-size: 52px; line-height: 1.05; color: var(--ink); }
+.lever { display: grid; grid-template-columns: 430px 1fr 96px 104px; align-items: center; gap: 16px;
+  padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 22px; }
+.lever .bar { height: 22px; background: var(--data); border-radius: 4px; }
+.lever .bar i { display: block; height: 100%; border-radius: 4px; background: var(--decision); }
+.lever .total { font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+.lever .basis { font-size: 15px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--muted); }
+.lever .basis.assumed { color: var(--ok); }
+.lever:last-of-type .total { color: var(--decision); }
+.judge { margin-top: 24px; padding: 16px 20px; border-radius: 12px; font-size: 22px; line-height: 1.4;
+  background: var(--evaluation); border: 2px solid var(--evaluation-line); }
+
 /* Presenter notes, over the bottom of the window (N). */
 .notes { position: fixed; left: 0; right: 0; bottom: 0; max-height: 40vh; overflow: auto;
   padding: 14px 24px 18px; background: rgba(20, 18, 17, .94); color: var(--paper);
@@ -132,3 +150,125 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
   font-variant-numeric: tabular-nums; }
 .notes-head .late { color: #f0a58f; font-weight: 700; }
 .notes ul { margin: 10px 0 0; padding-left: 20px; }
+
+/* The problem slide's Chip: the Caption's cell, and the public records drawn on the turbines. */
+.ex-chip { margin: 0; }
+.ex-frame { position: relative; width: 380px; height: 380px; border-radius: 10px; overflow: hidden; }
+.ex-frame img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ex-frame svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.ex-frame .grid line { stroke: #fffdfb; stroke-opacity: .75; stroke-width: 1.5; stroke-dasharray: 6 5; }
+.ex-frame .claim { fill: rgba(138, 91, 14, .16); stroke: #f2a93b; stroke-width: 5; }
+.ex-frame .pill rect { fill-opacity: .94; }
+.ex-frame .pill text { fill: #fffdfb; font: 700 20px system-ui, sans-serif; }
+.ex-frame .pill.near rect { fill: #8a5b0e; }
+.ex-frame .turbine { fill: #fffdfb; stroke: #252323; stroke-width: 3; }
+.ex-frame .turbine.disputed { fill: #f2c14e; }
+.ex-frame .disputed-ring { fill: none; stroke: #f2c14e; stroke-width: 4; stroke-dasharray: 5 4; }
+.ex-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 12px; font-size: 16px;
+  color: var(--muted); }
+.ex-legend span { white-space: nowrap; }
+.ex-legend i { display: inline-block; width: 12px; height: 12px; margin-right: 6px; vertical-align: -1px; }
+.ex-legend .dot { border-radius: 50%; }
+.ex-legend .dot.rec { background: #fffdfb; border: 2px solid var(--ink); }
+.ex-legend .dot.disputed { background: #f2c14e; border: 2px solid var(--ink); }
+.ex-legend .sq.claim { border: 3px solid #f2a93b; border-radius: 3px; background: rgba(138, 91, 14, .16); }
+
+/* A slide that is one looping, muted video under its kicker. */
+.video-slide { align-items: center; }
+.video-slide .kicker { align-self: flex-start; }
+.slide-video { width: 100%; max-height: 640px; aspect-ratio: 16 / 9; border-radius: 14px;
+  border: 1px solid var(--line); background: var(--paper); object-fit: contain; }
+.video-slide .source { align-self: flex-start; margin-top: 14px; }
+
+/* The problem slide: an untrusted caption on the left, the three ways we earn trust building in
+   on the right (one per press), and the caption turning trusted on the last press. */
+.problem h2 { margin-bottom: 30px; }
+.problem-grid { display: grid; grid-template-columns: 560px 1fr; gap: 56px; align-items: start; }
+.problem .hook { position: relative; align-self: stretch; transition: background-color .5s ease; }
+.problem .hook.trusted { background: var(--evaluation); }
+.problem .hook.trusted blockquote { border-left-color: var(--ok); }
+.hook-stamp { position: absolute; right: 26px; bottom: 22px; padding: 6px 16px; border-radius: 999px;
+  font-size: 18px; font-weight: 800; letter-spacing: .04em; color: #fffdfb; background: var(--decision); }
+.hook.trusted .hook-stamp { background: var(--ok); }
+.trust-head { margin: 0 0 18px; font-size: 22px; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--decision); }
+.trust-item { display: grid; grid-template-columns: 64px 1fr; gap: 20px; align-items: start;
+  padding: 18px 22px; margin-bottom: 16px; border-radius: 14px; background: var(--data);
+  border: 1px solid var(--data-line); }
+.trust-item b { display: block; font-size: 27px; margin: 2px 0 6px; }
+.trust-item p { margin: 0; font-size: 21px; line-height: 1.4; color: #4a4240; }
+.trust-icon { width: 56px; height: 56px; color: var(--decision); }
+.build { opacity: 0; transform: translateY(18px); transition: opacity .45s ease, transform .45s ease; }
+.build.in { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  .build, .problem .hook { transition: none; }
+}
+.ex-frame .records { opacity: 0; transition: opacity .5s ease; }
+.ex-frame .records.in { opacity: 1; }
+.ex-frame .claim.ok { fill: rgba(47, 107, 58, .14); stroke: #6fbf7e; }
+.ex-legend .sq.claim.ok { border-color: #2f6b3a; background: rgba(47, 107, 58, .16); }
+.problem .problem-grid { grid-template-columns: 790px 1fr; gap: 44px; }
+.problem .hook { display: grid; grid-template-columns: 400px 1fr; gap: 26px; align-items: start;
+  padding: 24px; }
+.problem .ex-frame { width: 400px; height: 400px; }
+.problem .ex-legend { flex-direction: column; gap: 2px; font-size: 15px; }
+.hook-side { display: flex; flex-direction: column; align-items: flex-start; }
+.problem .hook-stamp { position: static; margin-bottom: 18px; }
+.problem .hook .hook-label { margin: 0 0 8px; }
+.problem .hook blockquote { margin: 0 0 14px; font-size: 22px; }
+.hook-note { margin: 0; font-size: 19px; line-height: 1.4; color: #4a4240; }
+.problem .trust-item { padding: 14px 18px; grid-template-columns: 52px 1fr; gap: 14px; }
+.problem .trust-item b { font-size: 24px; }
+.problem .trust-item p { font-size: 18px; }
+.problem .trust-icon { width: 46px; height: 46px; }
+@media (prefers-reduced-motion: reduce) { .ex-frame .records { transition: none; } }
+
+/* Problem slide (problem only): the Chip card, and two short lines on what's at stake. */
+.stakes { display: flex; flex-direction: column; gap: 34px; padding-top: 30px; }
+.stakes p { margin: 0; font-size: 30px; line-height: 1.35; color: #3e3a39; }
+.stakes b { color: var(--decision); }
+
+/* Solution slide: the same Chip on the left, the five ways we earn trust building in. */
+.trust-grid { display: grid; grid-template-columns: 430px 1fr; gap: 40px; align-items: start; }
+.trust-slide .hook { position: relative; display: flex; flex-direction: column; align-items: flex-start; padding: 22px; }
+.trust-slide .ex-frame { width: 384px; height: 384px; }
+.trust-slide .ex-legend { display: none; }
+.trust-slide .hook-stamp { position: absolute; top: 34px; right: 34px; bottom: auto; height: auto; }
+.trust-slide .hook .hook-label { margin-top: 16px; }
+.trust-slide .hook .hook-label { margin: 0 0 6px; }
+.trust-slide .hook blockquote { margin: 0; font-size: 19px; }
+.trust-slide .trust-item { margin-bottom: 10px; padding: 11px 16px; }
+.trust-slide .trust-item b { font-size: 22px; margin: 0 0 3px; }
+.trust-slide .trust-item p { font-size: 17px; line-height: 1.35; }
+.trust-slide .trust-icon { width: 42px; height: 42px; }
+
+/* Problem slide, right column: the records disagreeing about this photo, then the triage rule. */
+.problem .stakes { gap: 22px; padding-top: 0; }
+.wrong-card { padding: 20px 22px; border-radius: 14px; background: var(--data); border: 1px solid var(--data-line); }
+.stakes .wrong-card p { margin: 0; font-size: 19px; line-height: 1.4; color: #4a4240; }
+.stakes .wrong-card .wrong-head { margin-bottom: 8px; font-size: 22px; font-weight: 800; color: var(--decision); }
+.triage { padding: 16px 18px; border-radius: 14px; border: 1px solid var(--line); }
+.triage p { margin: 0; }
+.stakes .triage-head { margin-bottom: 12px; font-size: 22px; font-weight: 800; color: var(--ink); }
+.stakes .triage-row { display: flex; justify-content: space-between; gap: 14px; padding: 10px 14px;
+  border-radius: 10px; font-size: 19px; margin-bottom: 8px !important; }
+.triage-row.ok { background: var(--evaluation); }
+.triage-row.ask { background: var(--delivery); }
+.triage-row span { color: #4a4240; }
+.stakes .wrong-card p { font-size: 21px; }
+.stakes .triage-foot { margin-top: 6px; font-size: 17px; color: var(--muted); }
+.ex-frame .disputed-ring { fill: none; stroke: #f2c14e; stroke-width: 5; stroke-dasharray: 7 5; }
+
+/* Section breadcrumb across the top of each slide: where we are in the story. */
+.sections { position: absolute; top: 22px; right: 32px; display: flex; gap: 6px; z-index: 3; }
+.sections button { display: flex; align-items: center; gap: 8px; padding: 6px 14px 6px 7px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--paper); color: var(--muted);
+  font: 600 15px system-ui, sans-serif; cursor: pointer; }
+.sections .n { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--line); color: var(--ink); font-size: 13px; font-weight: 800; }
+.sections button.done { color: var(--ink); }
+.sections button.done .n { background: var(--evaluation-line); }
+.sections button.current { background: var(--decision); border-color: var(--decision); color: #fffdfb; }
+.sections button.current .n { background: #fffdfb; color: var(--decision); }
+.video-slide h2 { align-self: flex-start; margin-bottom: 20px; }
+.video-slide .slide-video { max-height: 560px; }

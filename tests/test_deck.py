@@ -1,4 +1,4 @@
-"""The pitch deck at /deck: served, self-contained, and eight minutes long."""
+"""The pitch deck at /deck: served, self-contained, and four minutes long."""
 
 import re
 
@@ -30,6 +30,6 @@ def test_no_network_dependencies():
         ), f.name
 
 
-def test_slide_budgets_add_up_to_eight_minutes():
+def test_slide_budgets_add_up_to_four_minutes():
     seconds = [int(s) for s in re.findall(r"seconds: (\d+)", (DECK / "slides.js").read_text())]
-    assert sum(seconds) == 8 * 60
+    assert sum(seconds) == 4 * 60
