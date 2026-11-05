@@ -7,9 +7,9 @@
 // embeddings) are from the hackathon brief.
 
 import { html } from "./html.js";
-import { ArchitectureDiagram, StoryArchitecture } from "./diagram.js";
+import { ArchitectureDiagram } from "./diagram.js";
 import { CaptionChip } from "./caption-chip.js";
-import { ValueFlow } from "./value-flow.js";
+import { SolutionFlow } from "./value-flow.js";
 
 const Kicker = ({ children }) => html`<p class="kicker">${children}</p>`;
 
@@ -113,15 +113,14 @@ function Trust({ step = 0 }) {
   </div>`;
 }
 
-// The architecture, told as a journey: one image goes in on the left, a trustworthy verdict comes
-// out on the right. Each stop is numbered so a non-technical listener can follow the story.
+// How it works, as one journey: public data in on the left, Clayzer's four numbered steps, and
+// trusted pairs out to Clay's text search, with what each part is worth along the bottom. (Merged
+// from the old story-architecture and downstream-value slides.)
 function Architecture() {
   return html`<div class="arch-slide">
-    <${Kicker}>How it works · follow one image through<//>
-    <h2>From a raw aerial tile to a verdict you can trust</h2>
-    <${StoryArchitecture} />
-    <p class="source">Same path for one image or a million: each stop is a managed AWS service, so
-      the story scales without changing. A role per service, every bucket private.</p>
+    <${Kicker}>How it works · start to finish<//>
+    <h2>From aerial image to searchable caption</h2>
+    <${SolutionFlow} />
   </div>`;
 }
 
@@ -155,23 +154,16 @@ function Demo() {
   </div>`;
 }
 
-// Downstream value: how checked captions reach Clay v2 and what it can do with them.
-function Downstream() {
-  return html`<div class="arch-slide">
-    <${Kicker}>Downstream value<//>
-    <h2>Checked captions, searchable imagery</h2>
-    <${ValueFlow} />
-  </div>`;
-}
-
 // The example search, animated (HyperFrames project in ../Clayzer-videos/flood-search-motion).
 // It loops muted; the deck mounts one slide at a time, so it starts from the top on arrival.
 function ExampleSearch() {
   return html`<div class="video-slide">
-    <${Kicker}>Example · searching in words<//>
+    <${Kicker}>What trusted captions unlock<//>
+    <h2>Search the Earth in plain words</h2>
     <video class="slide-video" src="static/deck/media/flood-search.mp4" poster="static/deck/media/flood-search-poster.jpg" autoplay muted loop playsInline
       aria-label="A text search for the economic impact of flooding in Bangkok and access to aid returns four images whose checked captions match: a flooded district, a market and road under water, a relief site on dry ground, and an open route from the relief site to the flooded district. Then: results are only as good as the captions; Clayzer checks them."></video>
-    <p class="source">Illustrative: not real search results.</p>
+    <p class="source">Search results are only as good as the captions behind them. Illustrative:
+      not real search results.</p>
   </div>`;
 }
 
@@ -224,9 +216,9 @@ function Next() {
   </div>`;
 }
 
-// Ten slides, exactly 4:00, in four sections: the problem; the value it unlocks (downstream search
-// and an example); our solution (the story, how we earn trust, the AWS services, the live demo);
-// the cost at Clay's scale; then the close.
+// Nine slides, exactly 4:00, in four sections: the problem; the value it unlocks (search in words,
+// animated); our solution (how it works start to finish, how we earn trust, the AWS services, the
+// live demo); the cost at Clay's scale; then the close.
 // The deck's sections, in order, for the breadcrumb at the top of each slide (deck.js). A slide's
 // `section` names one; the title and closing slides have none.
 export const SECTIONS = ["Problem Statement", "Value Unlock", "Our Solution", "Scale"];
@@ -238,15 +230,12 @@ export const SLIDES = [
   { title: "The problem", section: "Problem Statement", seconds: 35, component: Problem, steps: 3,
     spoken: "New caption, who dis? That is how captions on Clay's imagery work today. Here is a real one: the model saw only this photo and said eighteen wind turbines, mostly in the centre. The public records put the turbines all around the centre, not in it. But the records disagree too: the government database counts seventeen, OpenStreetMap counts eighteen, because they put this turbine two metres apart, either side of the edge. So we never trust one source. We cross-check them: when they agree, the label is automatic, and only when they conflict, like here, does a person look.",
     notes: ["Open with the label as a joke: \"New caption, who dis? That's how Clay's imagery works today: a caption shows up and nobody knows if it's legit.\"", "Press 1: the 17 turbines both records agree on. The caption is wrong: they're all around the centre.", "Press 2: the gold turbine. USGS puts it just outside the top edge, OpenStreetMap just inside, 2 m apart: 17 or 18.", "Press 3: we stay out of hand-labelling unless sources conflict or confidence is too low. This conflict was flagged automatically (wind agreed on 25 of 26 Cases); a person checked the photo and confirmed 18.", "If asked: the cross-check is built for solar and wind; a confidence threshold for labels is the plan, not built yet.", "The 3 × 3 grid is ours: the model sees the plain photo, and the prompt makes it name each object's place as one of 9 cells."] },
-  { title: "Downstream value", section: "Value Unlock", seconds: 20, component: Downstream,
-    spoken: "Now imagine those captions were checked. Imagery and public records go into Clayzer. We write each caption from the image alone and check every fact against the records. Only pairs that pass go on to Clay, which makes the imagery searchable in words.",
-    notes: ["Left to right: public data, Clayzer (our part, the dashed box), Clay.", "The line to land: search results are only as good as the captions behind them.", "The Thailand flood search is an illustration: our Cases today are US solar, wind and land cover. Don't imply we have run it.", "The dashed loop back is planned, not built: say 'next'."] },
-  { title: "Example search", section: "Value Unlock", seconds: 18, component: ExampleSearch,
-    spoken: "Here is what that looks like. Ask in plain words, like the economic impact of flooding in Bangkok and access to aid, and you get the images whose checked captions match: flooded streets, a market under water, a relief site, and the route to reach it.",
-    notes: ["Let the video play; it loops every 16 s.", "Illustrative, not real results: don't imply we have run this search."] },
-  { title: "How it works", section: "Our Solution", seconds: 20, component: Architecture,
-    spoken: "Here is the whole journey. One aerial image comes in on the left. A model on AWS writes a caption. Before each statement is kept, we check it against the imagery. We score it against open map data the model never saw. A gate decides whether it is good enough. What comes out is a verdict you can trust, and the same path works for one image or a million.",
-    notes: ["One image in on the left, a verdict out on the right.", "Point at each numbered stop. End on: same path scales to millions."] },
+  { title: "Example search", section: "Value Unlock", seconds: 28, component: ExampleSearch,
+    spoken: "Why does this matter? Trusted captions make satellite imagery searchable in plain words. Ask about the economic impact of flooding in Bangkok and access to aid, and you get the images whose checked captions match: flooded streets, a market under water, a relief site, and the route to reach it. Search results are only as good as the captions behind them.",
+    notes: ["Let the video play; it loops every 16 s.", "The line to land: search results are only as good as the captions behind them.", "Illustrative, not real results: our Cases today are US solar, wind and land cover. Don't imply we have run this search."] },
+  { title: "How it works", section: "Our Solution", seconds: 30, component: Architecture,
+    spoken: "Here is how it works, start to finish. An aerial image and public records go in. One: a model writes the caption from the image alone. Two: each fact is checked against the imagery before it is kept. Three: we score it against the public records, which the model never sees. Four: a gate keeps a change only if it beats the baseline. Only pairs that pass go on to Clay, ready to search.",
+    notes: ["Follow the numbers: 1 write, 2 verify, 3 score against hidden records, 4 gate.", "Point at the bottom row: answer keys for free, wrong captions caught before anyone searches, search in words.", "The dashed loop back from Clay is planned, not built: say 'next'."] },
   { title: "Our solution", section: "Our Solution", seconds: 40, component: Trust, steps: 6,
     spoken: "Here is how we make captions you can trust. We verify, then write: each fact is checked against the imagery before the caption is written. The answer keys are public records, cross-checked by code, that the captioner never sees. One shared vocabulary of objects and their look-alikes. We tune on one region and test on another it never saw. And a self-improvement loop keeps only the changes that beat the baseline. The result: a caption that matches what is really there.",
     notes: ["Press → for each point as you say it (5 presses); the 6th turns the caption green.", "Verify-then-write: in the 4-image test, every object it named was really there, and correctness rose 0.53 → 0.65. Don't claim it's in the baseline: the gate kept it out because coverage dropped.", "Say 'tune', not 'train': we tune the captioner's prompt and checks.", "Labels are automatic; a person only looks where the two records disagree."] },

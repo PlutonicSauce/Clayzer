@@ -270,3 +270,5 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .sections button.done .n { background: var(--evaluation-line); }
 .sections button.current { background: var(--decision); border-color: var(--decision); color: #fffdfb; }
 .sections button.current .n { background: #fffdfb; color: var(--decision); }
+.video-slide h2 { align-self: flex-start; margin-bottom: 20px; }
+.video-slide .slide-video { max-height: 560px; }
