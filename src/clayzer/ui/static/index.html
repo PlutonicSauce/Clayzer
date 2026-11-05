@@ -81,6 +81,10 @@
         ><button class="btn secondary" id="listen-pause" disabled>Pause</button
         ><button class="btn secondary" id="listen-stop" disabled>Stop</button
         ><label
+          >Voice<select id="listen-voice" aria-describedby="listen-voice-help">
+            <option value="">Browser default</option>
+          </select></label
+        ><label
           >Reading speed<select id="listen-speed">
             <option value="0.75">0.75×</option>
             <option value="1" selected>1×</option>
@@ -96,9 +100,10 @@
         value="0"
         aria-label="Page summary reading progress"
       ></progress>
-      <p>
-        Your browser provides speech. Voice availability and processing depend
-        on its settings. Audio is optional; all information remains readable.
+      <p id="listen-voice-help">
+        British voices are preferred when available on your device. Voices
+        marked “browser service” may be processed by your browser provider.
+        Audio is optional; all information remains readable.
       </p>
     </details>
     <p id="route-status" class="sr-only" role="status"></p>
