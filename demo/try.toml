@@ -1,0 +1,39 @@
+# The "Try the captioner" page: a small, curated set of images a visitor can feed to the
+# Harness and watch it caption. Each pick names one recorded Run (batch, case, repeat); the
+# page replays that Run's Trace as a live-looking sequence of background steps, then shows the
+# Caption. When the app is started with --allow-launch, the page can also run the Harness live
+# against the same Case and show the real steps.
+#
+# The recorded Batch lives in the store (local batches/ or S3). batches/ is gitignored, so to
+# ship this on the hosted read-only site the Run must be packed into the demo pack, as Stories
+# are (see demo/stories.toml and `clayzer stories pack`). Locally, `uv run clayzer ui` reads it
+# straight from the store. Re-record with:
+#   uv run clayzer batch --repeats 1 --label e2e-demo-record --tools roda \
+#     --only fixed-dev-uspvdb-400117 fixed-dev-uswtdb-3025453 fixed-dev-neg-1
+# then update `batch` below to the new Batch id.
+
+batch = "20261105T141756263616Z-ccf4759a73fe4066b082a3ea8393be4c-e2e-demo-record"
+
+[[image]]
+id = "solar"
+case = "fixed-dev-uspvdb-400117"
+repeat = 1
+chip = "ca-uspvdb-400117-20220702"
+title = "A solar array in the desert"
+blurb = "A USGS-listed photovoltaic site near the centre of the tile, ringed by sparse shrubland and bare ground."
+
+[[image]]
+id = "wind"
+case = "fixed-dev-uswtdb-3025453"
+repeat = 1
+chip = "ca-uswtdb-3025453-20220702"
+title = "Wind turbines on open ground"
+blurb = "USGS-listed turbines spaced across a dry landscape, each casting a long thin shadow."
+
+[[image]]
+id = "negative"
+case = "fixed-dev-neg-1"
+repeat = 1
+chip = "ca-neg-1-20220607"
+title = "A place with no power site"
+blurb = "A negative control: USGS maps no solar or wind here, so a confident energy claim would be a false positive."

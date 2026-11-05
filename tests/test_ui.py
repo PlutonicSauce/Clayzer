@@ -100,6 +100,31 @@ def test_the_page_and_static_files_load(client):
     c, _ = client
     assert "Clayzer" in c.get("/").text
     assert c.get("/static/app.js").status_code == 200
+    assert c.get("/static/try.js").status_code == 200
+    assert c.get("/static/try.css").status_code == 200
+
+
+def test_try_picks_list_the_demo_images(client):
+    c, _ = client
+    d = c.get("/api/try").json()
+    assert d["batch"] and len(d["images"]) == 3
+    ids = {i["id"] for i in d["images"]}
+    assert ids == {"solar", "wind", "negative"}
+    for i in d["images"]:
+        # each pick names a Run and whether it is recorded in this store; the fixture store
+        # has no demo Batch, so the page falls back gracefully.
+        assert i["run"] == f"{i['case']}--r{i['repeat']}"
+        assert i["recorded"] is False and i["chip"] and i["title"]
+    assert d["available"] is False and d["allow_launch"] is False
+
+
+def test_the_real_try_config_parses():
+    from clayzer.ui.app import load_try
+
+    cfg = load_try()
+    assert cfg["batch"], "demo/try.toml must name a recorded Batch"
+    for img in cfg["images"]:
+        assert img["case"] and img["chip"] and img["title"] and img["blurb"]
 
 
 def test_the_real_task_board_and_glossary_parse():
