@@ -12,7 +12,7 @@
 // 2026-11-05.
 //
 // Builds, one per press (`steps: 2` in slides.js):
-//   0  the prompt, Nova Pro and its caption; on the photo, the cell the caption names
+//   0  the prompt, the captioner (a clay-pot robot; Nova Pro in the notes) and its caption; on the photo, the cell the caption names
 //   1  the claim crossed out: white roofs, no panels, and the same answer 3 times in 3
 //   2  the records disagree too: a loupe on the turbine at the top edge, then the two records side
 //      by side, 17 against 18
@@ -83,7 +83,49 @@ function Loupe() {
       <text class="pz-pin-label osm" x=${ox + 16} y=${oy + 20}>OSM</text>
     </g>
     <circle class="pz-loupe-ring" cx=${cx} cy=${cy} r=${R} />
+    <g class="pz-photo-tag"><rect x=${cx - 46} y=${cy + R - 30} width="92" height="26" rx="13" />
+      <text x=${cx} y=${cy + R - 12}>Wind farm</text></g>
     <text class="pz-loupe-cap" x=${cx} y="228">2 m apart</text>
+  </svg>`;
+}
+
+// The captioner, drawn as a clay pot: the photo in one hand, the caption it writes in the other.
+// It stands in for Nova Pro (named in the speaker notes). It blinks and its antenna bobs; reduced
+// motion keeps it still.
+function PotBot() {
+  return html`<svg class="pz-bot" viewBox="0 0 170 150" role="img" aria-label="A clay-pot robot holding
+    the photo in one hand and the caption it writes in the other">
+    <g class="pz-bot-antenna">
+      <line x1="85" y1="26" x2="85" y2="11" stroke="#8a4a33" stroke-width="3" stroke-linecap="round" />
+      <circle cx="85" cy="9" r="6" fill="#f2c14e" stroke="#8a5b0e" stroke-width="1.5" />
+    </g>
+    <path d="M45 82C34 80 26 72 22 64" fill="none" stroke="#8a4a33" stroke-width="7" stroke-linecap="round" />
+    <path d="M125 82C136 82 144 88 148 96" fill="none" stroke="#8a4a33" stroke-width="7" stroke-linecap="round" />
+    <path d="M57 32C46 48 36 68 39 94C42 120 62 136 85 136C108 136 128 120 131 94C134 68 124 48 113 32Z"
+      fill="#b06a4f" stroke="#8a4a33" stroke-width="2.5" />
+    <path d="M42 106C60 114 110 114 128 106L126 114C108 122 62 122 44 114Z" fill="#c98b6f" />
+    <ellipse cx="85" cy="32" rx="30" ry="7" fill="#c98b6f" stroke="#8a4a33" stroke-width="2.5" />
+    <ellipse cx="85" cy="32" rx="20" ry="3.5" fill="#8a4a33" />
+    <g class="pz-bot-eyes">
+      <ellipse cx="71" cy="70" rx="9" ry="10" fill="#fffdfb" />
+      <ellipse cx="99" cy="70" rx="9" ry="10" fill="#fffdfb" />
+      <circle cx="73" cy="72" r="4.5" fill="#252323" />
+      <circle cx="101" cy="72" r="4.5" fill="#252323" />
+      <circle cx="74.5" cy="70" r="1.5" fill="#fffdfb" />
+      <circle cx="102.5" cy="70" r="1.5" fill="#fffdfb" />
+    </g>
+    <circle cx="60" cy="86" r="5" fill="#e8a08a" opacity=".8" />
+    <circle cx="110" cy="86" r="5" fill="#e8a08a" opacity=".8" />
+    <path d="M77 88Q85 95 93 88" fill="none" stroke="#252323" stroke-width="2.5" stroke-linecap="round" />
+    <ellipse cx="85" cy="138" rx="26" ry="5" fill="#8a4a33" />
+    <g transform="rotate(-10 18 56)">
+      <rect x="4" y="44" width="28" height="24" rx="3" fill="#a9b29a" stroke="#fffdfb" stroke-width="2.5" />
+      <path d="M8 62L16 54L22 60L26 56L30 62" fill="none" stroke="#fffdfb" stroke-width="1.5" />
+    </g>
+    <g transform="rotate(8 152 104)">
+      <rect x="138" y="92" width="28" height="28" rx="3" fill="#f4dcd4" stroke="#9a4a35" stroke-width="2" />
+      <path d="M143 101H161M143 107H161M143 113H155" stroke="#9a4a35" stroke-width="2" stroke-linecap="round" />
+    </g>
   </svg>`;
 }
 
@@ -121,12 +163,12 @@ export function ProblemViz({ step = 0 }) {
       <div class="pz-flow">
         <div class="pz-step prompt"><p class="pz-k">The prompt</p><p>“${PROMPT}”</p></div>
         <span class="pz-arrow">→</span>
-        <div class="pz-step model"><p class="pz-k">Nova Pro</p><p>a vision-language model, shown only the photo</p></div>
+        <div class="pz-step model"><${PotBot} /><p>a vision-language model, shown only the photo</p></div>
         <span class="pz-arrow">→</span>
         <div class="pz-step caption"><p class="pz-k">Its caption</p><p>“${CAPTION}”</p><span class="pz-stamp">✗ Unchecked</span></div>
       </div>
       <div class=${`pz-compare pz-build ${on(step >= 2)}`}>
-        <p class="pz-head">Check it against public records? They disagree too</p>
+        <p class="pz-head">Check it against public records? <span class="pz-switch">On another photo, a wind farm,</span> they disagree</p>
         <div class="pz-vs">
           <${Loupe} />
           <${RecordMap} name="USGS" count="17" inside=${false} />
