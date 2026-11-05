@@ -28,8 +28,15 @@ T starts the deck's timer; the notes panel warns when a slide runs long.
 
 **On screen:** the title, with the date in its first line (2026 NOV 5). No presses.
 
-> Clayzer, said KLAY-zer. It comes from glaze, the finish a potter fires onto clay. A solution
-> for producing captions you can trust, at scale.
+*(Let the title sit for a beat.)*
+
+> Glaze is what makes a pot safe to use. *(pause)* We do that for Clay's captions.
+>
+> We're Clayzer, said KLAY-zer. Captions you can trust, at scale.
+
+Open cold on the glaze line: a pottery fact is unexpected, so the room leans in, and the second
+sentence says what we do before they know the name. If you add names, keep it to one breath:
+"I'm ___, with ___ and ___." That's about 3 seconds more.
 
 ## 2. The problem (0:10–0:50)
 
@@ -38,21 +45,26 @@ its caption was made: the real prompt, Nova Pro shown only the photo, and its ca
 unchecked. A line on the photo ties "Caption: a solar array" to the north-east cell it names.
 Two presses.
 
-> New caption, who dis? That is how captions on Clay's imagery work today. Here is a real one: we
-> gave a vision-language model one photo and a simple prompt, and it said a large solar array,
-> three times out of three.
+Tell it as a story: a confident answer, the reveal, then a twist.
 
-*Press 1: the claim crossed out, "Actually: white roofs", and "Same answer 3 times in 3".*
+> New caption, who dis? Here's a real one. We showed a vision model this photo with a simple
+> prompt. Its answer: a large solar array. Three times out of three. Sounds confident.
 
-> These are white roofs.
+*(pause) Press 1: the claim crossed out, "Actually: white roofs", and "Same answer 3 times in 3".*
+
+> These are white roofs. No panels.
 
 *Press 2: the records disagree too: a loupe on a wind-farm turbine at the photo's edge (USGS pin
 just outside, OSM pin just inside, 2 m apart), and the two records side by side, USGS 17 ≠
 OpenStreetMap 18.*
 
-> So check it against the public records? They disagree too: on this wind farm, the government
-> database counts seventeen turbines and OpenStreetMap counts eighteen, because they put one
-> turbine two metres apart, either side of the edge.
+> So check it against the public records? Here's the twist: they disagree too. On this wind
+> farm, the government counts seventeen turbines and OpenStreetMap eighteen. One turbine, two
+> metres apart, either side of the edge. *(gesture to each side of the top edge)*
+>
+> So what do you trust?
+
+End on the question and move on: How it works answers it.
 
 ## 3. Example search (0:50–1:12)
 
@@ -60,11 +72,17 @@ OpenStreetMap 18.*
 searches for rice fields near Bangkok that became buildings since 2011, shows three
 before-and-after pairs, and drops the third when the check finds fish ponds, not roofs.
 
-> Why does this matter? Trusted captions make satellite imagery searchable in plain words. Ask
-> which rice fields near Bangkok became buildings since the 2011 flood, and you get matching
-> before-and-after images. No map layer, no GIS skills. Fish ponds can pass for buildings, so we
-> check every caption. Then anyone can ask questions like this, about homes, harvests and jobs,
-> and trust the answers.
+Start the moment the slide appears: the video doesn't wait. Each line lands on a beat of it.
+
+> *(0 s, as the search types)* Why does this matter? Picture asking the planet a question, in
+> plain words: which rice fields near Bangkok became buildings since 2011?
+>
+> *(6 s, the results appear)* Three matches.
+>
+> *(8 s, it zooms on the third)* But this one says new buildings. We check it against the image.
+> *(beat, as the strike-through lands)* Fish ponds. Struck out.
+>
+> *(18 s, the end card)* Anyone can ask the Earth a question, and trust the answer.
 
 ## 4. How it works (1:12–1:54)
 
@@ -164,12 +182,12 @@ for questions.
 
 ## Rehearsal notes
 
-- At a calm 145 words a minute the whole script is about 590 words, 4:05, so it runs about 5
-  seconds over. Slide 8 runs about 8 seconds over (104 words against 35 seconds): give only the
-  first and last price and the time line if you're behind. Slide 4 runs about 6 over (116 words
-  against 42 seconds), and slide 3 about 4 (64 words against 22 seconds; drop "No map layer, no
-  GIS skills" if you need it). Slide 2 has about 6 seconds spare, slide 9 about 5, and slide 7
-  about 2, which the clicks will use.
+- At a calm 145 words a minute the whole script is about 575 words, 3:58: it fits, with a couple
+  of seconds to spare. Two slides run long and three have room. Slide 8 runs about 8 seconds over
+  (104 words against 35 seconds): give only the first and last price and the time line if you're
+  behind. Slide 4 runs about 6 over (116 words against 42 seconds). Slide 2 has about 8 seconds
+  spare, which the pauses will use, slide 9 about 5, and slide 7 about 2, for the clicks. Slides
+  1 and 3 fit their 10 and 22 seconds; on slide 3, cut "Three matches" if the video gets ahead.
 - Verify-then-write is part of the approach, but the Baseline ran without it. If asked whether
   77% includes it, say no: the Baseline is the plain captioner. In the 4-image test, every object
   it named was really there, and correctness rose from 0.53 to 0.65.
