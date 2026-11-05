@@ -220,7 +220,7 @@ function ExampleSearch() {
 function Scale({ step = 0 }) {
   return html`<div class="scale-slide">
     <${Kicker}>At Clay's scale<//>
-    <h2>How it scales: 46× cheaper per chip</h2>
+    <h2>How it scales</h2>
     <div class="scale-grid">
       <${PotteryScale} step=${step} />
       <div class="scale-side">

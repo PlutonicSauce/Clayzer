@@ -102,5 +102,7 @@ export function ChipStats() {
         style=${`background-image: url("/api/chips/${chip}.png")`}>
       <b>${n}</b><figcaption>${what}<span>${note}</span></figcaption>
     </figure>`)}
+    <p class="chip-def">A <b>chip</b> is one small square tile cut from a big aerial or satellite
+      image, like these.</p>
   </div>`;
 }
