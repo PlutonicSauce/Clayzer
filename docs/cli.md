@@ -215,6 +215,13 @@ uv sync --extra tools
 uv run clayzer batch --tools roda --label roda
 ```
 
+A server that reads an Answer Key (OpenStreetMap, Nominatim, Overture, USGS and the like) is
+refused, by name, before the Batch writes anything: `refused to start the Batch: MCP server ...
+would let the Harness read ... data, which holds the Answer Keys (ADR-0006)`. The check is one
+function ([`allowlist.py`](../src/clayzer/allowlist.py)) used by the Toolbox, by Batches, and by
+the AgentCore Runtime. Each Batch records every server's pin (`tool_servers`) and what each
+reported on connecting (`tool_versions`) in `batch.json`, and Compare shows a change in either.
+
 LGND Geo (`lgnd`) is remote and signs each person in through OAuth. Sign in once; the sign-in is
 saved in `~/.clayzer/auth/` (or `CLAYZER_AUTH_DIR`), outside the repo. A Batch never opens a
 browser: without a saved sign-in it stops and says to run `login`.
@@ -328,6 +335,128 @@ wrote with the same text; `--labels` with Claims people made, labelled on the we
 `/label` page (`uv run clayzer ui --calibrate`; see
 [labels/extraction/README.md](../labels/extraction/README.md)). Each extraction is a `judge` Step
 (`role: scoring`); the Traces and `agreement.json` go to the store.
+## Running the Harness on AgentCore
+
+This is the scored Batch/Run-contract path. The separate Gateway-backed, Chip-id-only
+deployment is documented in [Deploy](deploy.md#agentcore-captioner-23); its Runtime ARN
+does not accept the Batch contract below.
+
+`--harness agentcore` runs each Run's Harness (draft, tools, verify, rewrite) in an
+[Amazon Bedrock AgentCore](https://aws.amazon.com/bedrock/agentcore/) Runtime instead of in your
+terminal. The Batch still reads the Chip, checks its SHA-256, writes the Trace, and scores; the
+Runtime only produces the Caption. Two reasons to use it: the LGND sign-in is held by AgentCore
+Identity instead of one person's machine, and the Harness runs where the model and tools are.
+
+```sh
+# 1. Deploy the Runtime into your account (needs Node, Docker with ARM64 support, and a
+#    bootstrapped account). The Runtime ARN is printed as the RuntimeArn output.
+uv sync --group infra
+cd infra
+npm ci
+npx --no-install cdk bootstrap                          # only if not already bootstrapped
+npx --no-install cdk --app "uv run --group infra python agentcore_app.py" synth --strict
+npx --no-install cdk --app "uv run --group infra python agentcore_app.py" diff
+npx --no-install cdk --app "uv run --group infra python agentcore_app.py" deploy
+cd ..
+
+# 2. Keep the LGND sign-in in AgentCore Identity. Once per workload identity; needs a browser.
+uv run clayzer agentcore login lgnd
+
+# 3. Run a Batch on it.
+export CLAYZER_AGENTCORE_RUNTIME=<the RuntimeArn output>
+export CLAYZER_AGENTCORE_INBOUND_TOKEN_URL=<the InboundTokenUrl output>
+export CLAYZER_AGENTCORE_INBOUND_CLIENT_ID=<the InboundClientId output>
+export CLAYZER_AGENTCORE_INBOUND_SCOPE=<the InboundScope output>
+# Capture the credential into the environment; do not echo it or put it in a report.
+export CLAYZER_AGENTCORE_INBOUND_CLIENT_SECRET="$(aws cognito-idp describe-user-pool-client \
+  --region us-west-2 \
+  --user-pool-id <the InboundUserPoolId output> \
+  --client-id "$CLAYZER_AGENTCORE_INBOUND_CLIENT_ID" \
+  --query UserPoolClient.ClientSecret --output text)"
+uv run clayzer batch --harness agentcore --verify --repeats 3 --label agentcore
+```
+
+CDK and the AWS CLI use the shell's AWS credentials/profile. The Clayzer CLI additionally
+loads `.env`; keep that file consistent with the deployment account. The inbound credential
+authenticates the Batch to the Runtime; the separate LGND consent authorizes tool access.
+
+`login` prints a link. Open it, sign in to LGND, and approve. The browser then goes to a
+`localhost:8765` address that won't load; that is expected. Paste the whole address from the
+address bar back into the terminal. It sets up two things CDK can't (a person must be present):
+an OAuth client for LGND, registered at LGND's sign-in server, and the stored approval. It is safe
+to run again, and prints "already signed in" when there is nothing to do.
+
+What to know:
+
+- **One shared identity.** The approval is stored under a team user id (`clayzer-team`), so one
+  approval serves everyone who deploys or runs against that account, and all of them draw on one
+  LGND account's quota (the free tier is 150 calls a day, per [mcp.md](mcp.md)).
+- **Answer Keys stay out.** A request carries the Chip, the prompt, the model, the tool list, and
+  the Chip's footprint (for the verifier only), and has no field for a Case or its Reference
+  Labels; an unknown field is refused ([`contract.py`](../src/clayzer/agentcore/contract.py)). The
+  Runtime's role can't read the store either.
+- **Same Trace.** The Runtime returns every Step and the Batch writes the Trace, so scoring,
+  replay and the run reports work as before. Steps from the Runtime are marked `harness:
+  agentcore`.
+- **Recorded.** `batch.json` records `harness`, `runtime`, `runtime_build` (the git commit the
+  image was built from), and the tool pins and versions. Compare and the gate show a change in
+  any of them, and warn when a Baseline came from a different Harness.
+- **Same code.** The Runtime runs `harness.caption`, the function a local Batch runs. Scores from
+  the two paths agree within the noise of the model: 10 Repeats of 3 Cases showed no overall
+  difference, and the local Harness differs from itself by about as much as it does from AgentCore
+  at 3 Repeats. Use enough Repeats before reading a small difference as a regression.
+- **Cost of a failed Run.** A Bedrock error inside the Runtime comes back as the same error
+  code, so the Batch treats it as a Sandbox Failure (excluded, and run again by `--resume`). A
+  model that never submits a Caption is a Harness Fault, scored 0.
+- **Runtime logs.** `RuntimeLogGroup` names the KMS-encrypted group, retained for seven days.
+  AgentCore creates the group during Runtime creation; CDK uses idempotent SDK calls to apply
+  encryption and retention to it. Declaring a second log-group resource fails with
+  `AlreadyExists`. The configuration provider's diagnostic logs also expire after seven days.
+  The ARM64 image uses a hashed telemetry dependency lock and contains Harness modules and
+  ontology configuration; Cases, Chips, scorers and the web app are excluded.
+  Span export defaults off; the Batch's JSONL Trace is always complete. After an account owner
+  enables CloudWatch Transaction Search, deploy with `-c traces=true` to send OTLP spans to the
+  encrypted Runtime log group. This adds the scoped `logs:PutResourcePolicy` permission that
+  AgentCore requires. The stack does not change account-wide trace routing or indexing.
+  Sending OTLP spans while the account's destination is still `XRay` returns HTTP 400, even
+  with valid execution-role permissions.
+- **Tear down.** From `infra`, run
+  `npx --no-install cdk --app "uv run --group infra python agentcore_app.py" destroy ClayzerAgentCore`.
+  It removes the Runtime, role, workload identity, Cognito resources and Runtime log group,
+  and schedules the log-encryption key for deletion. The shared CDK bootstrap/ECR assets and
+  separate Gateway deployment remain. The OAuth provider and approval created by `login` are
+  outside the stack. The client registration survives, but destroying and recreating the workload
+  identity requires fresh browser consent: the lifecycle test confirmed that the old consent
+  is not reusable by the recreated identity. Normal stack updates preserve the identity.
+  Delete the provider only after confirming no remaining workload uses it.
+  The KMS deletion waiting period is 30 days. CDK provider Lambda diagnostic log groups remain
+  with seven-day retention. Account Transaction Search settings remain; inspect any
+  AgentCore-created span-delivery resource policy before removing it, because it is outside
+  CloudFormation ownership.
+
+For a teammate's account, use a clean checkout of the same commit and that account's credentials.
+Deploy before running `login`, then run a small Batch including a Fixed and a Change Case.
+Record the commit, runtime build, Case/Chip hashes, scores, failed Runs, latency and cost alongside
+a matching local Batch. Verify the stack's teardown before calling account portability complete.
+One Repeat is a functional smoke check; it does not establish score equivalence.
+These commands and the model permissions are validated in `us-west-2` with US (`us.`)
+inference profiles. Adapt the model ARNs and CLI region for other regions; EU/APAC profiles
+and other AWS partitions are not covered by this validation.
+
+Options for the stack are passed as `-c name=value`; see the docstring of
+[`infra/agentcore_app.py`](../infra/agentcore_app.py). The token source is chosen by
+`CLAYZER_TOKEN_SOURCE`: `file` (the default, what `clayzer login` saved) or `agentcore`. The stack
+sets it for the Runtime; set it yourself to run `clayzer tools lgnd` or a local `--verify` Batch
+on the Identity-held sign-in.
+
+### Another captioning model
+
+`--caption-model us.anthropic.claude-opus-5-5` runs the same Cases with Opus 5.5. It refuses a
+forced tool choice, so the Harness asks for `submit_caption` in the prompt instead of forcing it
+for models on that list ([`harness.py`](../src/clayzer/harness.py), `NO_FORCED_TOOL`). Opus is
+also the default Judge, so a Batch it captions is **self-graded**: the report, Compare, the web
+app and the gate all say so, and its Fidelity should not be compared with a Batch judged by a
+different model.
 
 ## The team web app
 
@@ -358,6 +487,13 @@ Put these in `.env` at the repo root (gitignored), or export them.
 | `CLAYZER_DATA_DIR`, `CLAYZER_BATCHES_DIR` | `data/`, `batches/` |
 | `CLAYZER_BASELINES_DIR` | `baselines/` (committed) |
 | `CLAYZER_AUTH_DIR` | `~/.clayzer/auth/` (MCP sign-ins) |
+| `CLAYZER_TOKEN_SOURCE` | `file` (the sign-in `clayzer login` saved). `agentcore` reads it from AgentCore Identity |
+| `CLAYZER_AGENTCORE_RUNTIME` | unset. The Runtime ARN for `--harness agentcore` |
+| `CLAYZER_AGENTCORE_REGION` | `AWS_REGION`, else `us-west-2` |
+| `CLAYZER_AGENTCORE_WORKLOAD` | `clayzer` (the Identity workload the sign-in is stored under) |
+| `CLAYZER_AGENTCORE_USER_ID` | `clayzer-team` (the shared identity) |
+| `CLAYZER_AGENTCORE_PROVIDER` | `clayzer-lgnd` (the OAuth client's name in Identity) |
+| `CLAYZER_AGENTCORE_RETURN_URL` | `http://localhost:8765/callback` |
 
 Credentials in `.env` take precedence over a shell's AWS profile, region, or Bedrock bearer token.
 

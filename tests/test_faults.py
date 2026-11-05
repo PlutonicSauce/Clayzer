@@ -17,7 +17,8 @@ NO_CALL = {"content": [{"text": "I can't"}]}
 
 
 @pytest.mark.parametrize("code", ["ThrottlingException", "ServiceUnavailableException",
-                                  "ReadTimeoutError", "ExpiredTokenException", "AccessDeniedException"])  # fmt: skip
+                                  "ReadTimeoutError", "ExpiredTokenException", "AccessDeniedException",
+                                  "AuthorizationRequired"])  # fmt: skip
 def test_environment_failures_dont_count_against_the_harness(code):
     fault = classify(step(error="boom", error_code=code))
     assert fault["attribution"] == "environment"

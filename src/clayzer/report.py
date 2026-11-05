@@ -1,5 +1,6 @@
 """The Markdown report for a Batch. Each criterion is reported on its own (CAP-15)."""
 
+from clayzer import provenance
 from clayzer.grounding import COMPARABILITY_NOTE, SCORE_SCOPE_NOTE, specificity_note
 
 
@@ -33,6 +34,11 @@ def render(b: dict) -> str:
             f"(prompt `{cfg.prompt_sha}`, {cfg.prompt_source}) · fidelity by "
             f"`{cfg.judge_model or 'not judged'}` · retrieval by `{cfg.embed_model}` · "
             f"Cases `{cfg.cases_sha}` · scorer `{cfg.scorer_version}`"
+        ),
+        *(
+            ["", f"**{provenance.SELF_GRADED_NOTE}**"]
+            if provenance.self_graded(cfg.caption_model, cfg.judge_model)
+            else []
         ),
         "",
         (

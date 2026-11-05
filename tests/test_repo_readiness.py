@@ -37,9 +37,31 @@ def _hits(pattern: re.Pattern) -> list[str]:
     out = []
     for path, text in _text_files():
         for n, line in enumerate(text.splitlines(), 1):
-            if m := pattern.search(line):
+            if m := pattern.search(_scan_line(path, line)):
                 out.append(f"{path.relative_to(REPO)}:{n}: {m.group(0)}")
     return out
+
+
+def _scan_line(path, line: str) -> str:
+    # A numeric substring of a verified-format package digest isn't an account id.
+    # Keep scanning the rest of the line/file, including index URLs and credentials.
+    line = re.sub(r"--hash=sha256:[a-f0-9]{64}\b", "", line)
+    relative = path.relative_to(REPO).parts
+    if relative[:1] == ("tests",) or relative[:2] == ("infra", "tests"):
+        # AWS's documented example account is used by isolated IAM/CDK unit fixtures.
+        line = re.sub(r"(?<!\d)123456789012(?!\d)", "<example-account>", line)
+    return line
+
+
+def test_scan_exempts_only_hashes_and_the_test_fixture_account():
+    digest = "--hash=sha256:" + "a" * 20 + "824191099700" + "b" * 32
+    assert (
+        _scan_line(REPO / "infra/requirements.txt", digest + " private-index") == " private-index"
+    )
+    assert _scan_line(REPO / "tests/example.py", "123456789012 987654321098") == (
+        "<example-account> 987654321098"
+    )
+    assert _scan_line(REPO / "src/example.py", "123456789012") == "123456789012"
 
 
 def test_the_repo_is_licensed_apache_2():
@@ -50,9 +72,9 @@ def test_the_repo_is_licensed_apache_2():
 @pytest.mark.parametrize(
     "what,pattern",
     [
-        # An AWS account id: twelve digits on their own (OSM and USGS ids are shorter). A Batch
-        # id's time, T<HHMMSS><microseconds>Z, is also twelve digits, so a T...Z run isn't one.
-        ("account id", r"(?<![\d.])(?<!T)\d{12}(?![\d.])|(?<![\d.])T?\d{12}(?![\d.Z])"),
+        # An AWS account id: twelve digits on their own (OSM and USGS ids are shorter). Not the
+        # time in a Batch id, "20261104T235507159978Z", which is twelve digits after its T.
+        ("account id", r"(?<![\d.T])\d{12}(?![\d.])"),
         ("ARN with an account", r"arn:aws[a-z-]*:[a-z0-9-]+:[a-z0-9-]*:\d{12}:"),
         ("deployment hostname", (r"\b[a-z0-9]{8,}\.cloudfront\.net|[a-z0-9-]+\.elb\.amazonaws\.com"
                                  r"|[a-z0-9]+\.execute-api\.[a-z0-9-]+\.amazonaws\.com"

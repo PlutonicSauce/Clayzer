@@ -58,6 +58,38 @@ jobs:
       - name: Duplication (Python and JS)
         run: npx --yes jscpd@5.4.2 src --min-tokens 50 --threshold 3 --ignore "**/vendor/**" --reporters consoleFull
 
+  agentcore-package:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          python-version: "3.12"
+      - name: Tests against the runtime dependency lock
+        run: |
+          uv sync --extra ui --extra tools
+          uv pip install --require-hashes -r infra/agentcore-requirements.lock
+          uv run --no-sync pytest tests/test_agentcore.py tests/test_agentcore_callback.py tests/test_agentic.py -q
+      - name: Build and import the deployed ARM64 package
+        run: |
+          uv run python infra/package_agentcore.py /tmp/agentcore.zip
+          uv run python -m zipfile -e /tmp/agentcore.zip /tmp/agentcore-package
+          cd /tmp/agentcore-package
+          uv run --no-project --python 3.12 python -I -S -c "import sys; sys.path.insert(0, '/tmp/agentcore-package'); import entrypoint, clayzer.mcp_auth, clayzer.store, clayzer.config, mcp.client.streamable_http, botocore.config; from clayzer.agentcore.gateway_runtime import create_app; assert create_app()"
+      - name: Build and smoke-test the Batch Runtime container
+        run: |
+          docker build --platform linux/arm64 -f infra/agentcore/Dockerfile \
+            --build-arg BUILD="$GITHUB_SHA" -t clayzer-agentcore-batch:ci .
+          docker run --rm --network none \
+            --mount type=bind,source="$PWD/tests/agentcore_container_smoke.py",target=/tmp/smoke.py,readonly \
+            --entrypoint python clayzer-agentcore-batch:ci /tmp/smoke.py
+      - uses: actions/upload-artifact@v7
+        with:
+          name: agentcore-runtime
+          path: |
+            /tmp/agentcore.zip
+            /tmp/agentcore.manifest.json
+
   infra:
     runs-on: ubuntu-latest
     steps:
@@ -69,7 +101,7 @@ jobs:
         with:
           node-version-file: .nvmrc
       - name: OIDC trust policy regression tests
-        run: uv run --group infra pytest infra/tests -q
+        run: uv run --group infra pytest infra/tests tests/test_agentcore_cdk.py -q
       - name: CDK synth (no account needed)
         working-directory: infra
         run: |
@@ -80,7 +112,7 @@ jobs:
   # Set up once: deploy infra/github_oidc.py, then give the environment the AWS_DEPLOY_ROLE_ARN
   # secret and the AWS_REGION and CLAYZER_STORE variables (docs/deploy.md, "What's left").
   deploy:
-    needs: [lint, test, frontend, infra]
+    needs: [lint, test, frontend, infra, agentcore-package]
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     # The task image is ARM64, so build it on an ARM runner instead of under emulation.
     runs-on: ubuntu-24.04-arm

@@ -9,6 +9,7 @@ data
 runs
 batches
 infra/cdk.out
+infra/node_modules
 *.jpeg
 *.zip
 .claude

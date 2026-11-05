@@ -170,8 +170,32 @@ def test_the_toolbox_talks_to_a_real_stdio_server():
         assert box.call("nope", {}).error_code == "UnknownTool"
 
 
+@needs_mcp
+def test_toolbox_filters_disallowed_names_before_bedrock_validation(tmp_path):
+    server = tmp_path / "server.py"
+    server.write_text(
+        "from mcp.server.mcpserver import MCPServer\n"
+        'server = MCPServer("filtered")\n'
+        '@server.tool(name="' + "excluded_" * 10 + '")\n'
+        'def excluded() -> str:\n    return "excluded"\n'
+        "@server.tool()\n"
+        'def lookup() -> str:\n    return "allowed"\n'
+        "server.run()\n"
+    )
+    with Toolbox(
+        [McpServer("fake", sys.executable, [str(server)])],
+        allowed_tools=frozenset({"lookup"}),
+    ) as box:
+        assert [spec.name for spec in box.specs] == ["lookup"]
+        assert box.call("lookup", {}).text == "allowed"
+
+
 def test_unknown_servers_are_refused():
     with pytest.raises(ValueError, match="unknown MCP server"):
+        Toolbox.named(["nonsense"])
+    # A forbidden server is refused by name with the reason (ADR-0006), not as merely unknown;
+    # tests/test_allowlist.py covers the list itself.
+    with pytest.raises(ValueError, match="Answer Keys"):
         Toolbox.named(["openstreetmap"])
 
 
@@ -192,6 +216,8 @@ def test_a_batch_with_tools_records_them(tmp_path, monkeypatch):
                         progress=lambda _: None)  # fmt: skip
     cfg = batches.load_config(store, bid)
     assert (cfg.tools, cfg.max_turns) == (["fake"], harness.MAX_TURNS)
+    # The servers used are on record (ADR-0006): the pin at creation, and what each reported.
+    assert set(cfg.tool_servers) == {"fake"} and set(cfg.tool_versions) == {"fake"}
     run, _ = loads(store.get(trace_key(bid, SOLAR["id"], 1)))
     assert {"submit_caption", "lookup", "broken"} <= set(run.tools)
     assert run.metadata["turn_budget"]["turns"] == 1
